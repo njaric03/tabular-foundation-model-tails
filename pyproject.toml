@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tfm-tails"
+version = "1.0.0"
+description = "Upper-tail behaviour of the predictive distribution in tabular foundation models"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "scipy", "scikit-learn"]
+
+# Model packages are NOT dependencies. TabDPT, TabFM and EXAONE need mutually
+# incompatible torch versions, so each lives in its own virtualenv and this
+# package is installed into all of them with `pip install -e .`.
+
+[project.optional-dependencies]
+analysis = ["matplotlib", "jupyter", "nbconvert"]
+
+[tool.setuptools]
+packages = ["common", "common.adapters"]

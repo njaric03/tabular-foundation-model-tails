@@ -1,0 +1,19 @@
+# Sve tekstualno ide u repo sa LF. Bez ovoga git na Windowsu na svaki `git diff`
+# ispisuje "LF will be replaced by CRLF" za svaku skriptu.
+* text=auto eol=lf
+
+# .sh se pusta iz sh/bash; CRLF u shebang liniji ga lomi
+*.sh text eol=lf
+
+# Binarno -- nikakva konverzija
+*.doc   binary
+*.docx  binary
+*.ckpt  binary
+*.pt    binary
+*.safetensors binary
+
+# CSV rezultati: diff po redovima je koristan, merge nije
+*.csv text eol=lf -merge
+
+# Notebook: ne pokusavaj merge, izlaz je nemerdzljiv
+*.ipynb text eol=lf -merge linguist-documentation
