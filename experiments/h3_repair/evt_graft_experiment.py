@@ -21,20 +21,22 @@ Rezultati u `evt_graft.csv`.
 """
 import os
 import time
-import warnings
 import numpy as np
 import pandas as pd
 from scipy.stats import genpareto
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 
-warnings.filterwarnings("ignore")
-from posthoc_evt_mod import (NIVOI, I50, I90, ALPHA0, fit_evt_rep,
-                             fit_evt_rep_reg, spoji, sve_metrike)
+from common import datasets, generator, models, paths, quiet
 
-from common import datasets, models, paths
+quiet.silence()
 
-W = np.array([1.0, -0.7, 0.5, 0.0, 0.0])
+# `posthoc_evt_mod` je staro ime modula `evt_graft.py`, iz istog direktorijuma.
+# Uvoz je posle preimenovanja 7.9.2026 ostao neispravljen.
+from evt_graft import (NIVOI, I50, I90, ALPHA0, fit_evt_rep,
+                       fit_evt_rep_reg, spoji, sve_metrike)
+
+# W je u `common/generator.py`; ovde je stajala kopija formule.
 XI_SINT = [0.0, 0.3, 0.5, 0.7, 0.9]
 SEEDS = [0, 1, 2]
 N_TR_SINT, N_TE_SINT = 2000, 800
@@ -50,11 +52,9 @@ def kvantili(model, Xtr, ytr, Xte, seed):
 
 # ------------------------------------------------------------------ podaci
 def sint(xi, n, rng):
-    X = rng.normal(size=(n, 5))
-    s = np.exp(0.6 * (X @ W) / np.linalg.norm(W))
-    U = rng.random(n)
-    y = s * (-np.log(1 - U)) if xi == 0 else s * ((1 - U) ** (-xi) - 1) / xi
-    return X, y
+    """Isti generator koji dobijaju modeli; xi = 0 je Gumbelova granica u njemu."""
+    p = generator.gpd(n, rng, xi=xi)
+    return p.X, p.y
 
 
 def ucitaj(ime):

@@ -41,21 +41,20 @@ Rezultati se dopisuju u `mean_correction.csv`.
 """
 import os
 import time
-import warnings
 import numpy as np
 import pandas as pd
 from sklearn.datasets import fetch_openml
 from sklearn.isotonic import IsotonicRegression
 from sklearn.model_selection import train_test_split
 
-from common import datasets, paths
+from common import datasets, generator, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 N_TRAIN, N_TEST = 2000, 900
 
 MODEL = os.environ.get("MODEL", "TabICLv2")
-W = np.array([1.0, -0.7, 0.5, 0.0, 0.0])
+# W je u `common/generator.py`; ovde je stajala kopija formule.
 XI_SINT = [0.0, 0.3, 0.5, 0.7, 0.9]
 SEEDS = [0, 1, 2]
 N_FIT, N_VAL, N_TEST = 2000, 800, 1500
@@ -114,11 +113,9 @@ def rmse(mu, y):
 
 # ------------------------------------------------------------------ podaci
 def sint(xi, n, rng):
-    X = rng.normal(size=(n, 5))
-    s = np.exp(0.6 * (X @ W) / np.linalg.norm(W))
-    U = rng.random(n)
-    y = s * (-np.log(1 - U)) if xi == 0 else s * ((1 - U) ** (-xi) - 1) / xi
-    return X, y, s / (1 - xi) if xi < 1 else np.full(n, np.nan)
+    """Isti generator koji dobijaju modeli, plus prava uslovna sredina s/(1-xi)."""
+    p = generator.gpd(n, rng, xi=xi)
+    return p.X, p.y, generator.true_mean(p)
 
 
 def ucitaj(ime):

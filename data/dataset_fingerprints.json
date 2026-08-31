@@ -1,0 +1,72 @@
+{
+ "218_house_8L": {
+  "n_cols": 8,
+  "n_rows": 22784,
+  "y_max": 500001.0,
+  "y_min": 0.0,
+  "y_sha1": "910b3c22d3c9ca53"
+ },
+ "Allstate_Claims_Severity": {
+  "n_cols": 130,
+  "n_rows": 188318,
+  "y_max": 121012.25,
+  "y_min": 0.67,
+  "y_sha1": "37b15b7cdc23aaf4"
+ },
+ "Buzzinsocialmedia_Twitter": {
+  "n_cols": 77,
+  "n_rows": 583250,
+  "y_max": 75724.5,
+  "y_min": 0.0,
+  "y_sha1": "1c001f55308bcb5d"
+ },
+ "CPS1988": {
+  "n_cols": 6,
+  "n_rows": 28155,
+  "y_max": 18777.2,
+  "y_min": 50.05,
+  "y_sha1": "dbd96351468ff320"
+ },
+ "OnlineNewsPopularity": {
+  "n_cols": 60,
+  "n_rows": 39644,
+  "y_max": 843300.0,
+  "y_min": 1.0,
+  "y_sha1": "b1ef84148bd35b5c"
+ },
+ "diamonds": {
+  "n_cols": 9,
+  "n_rows": 53940,
+  "y_max": 18823.0,
+  "y_min": 326.0,
+  "y_sha1": "d0b56d04f7fb87d2"
+ },
+ "house_16H": {
+  "n_cols": 16,
+  "n_rows": 22784,
+  "y_max": 500001.0,
+  "y_min": 0.0,
+  "y_sha1": "910b3c22d3c9ca53"
+ },
+ "houses": {
+  "n_cols": 8,
+  "n_rows": 20640,
+  "y_max": 500001.0,
+  "y_min": 14999.0,
+  "y_sha1": "df8e648d1634ab1e"
+ },
+ "particulate-matter-ukair-2017": {
+  "n_cols": 9,
+  "n_rows": 394299,
+  "y_max": 651.3,
+  "y_min": -4.166,
+  "y_sha1": "60ed780bdcb19df2"
+ },
+ "superconduct": {
+  "n_cols": 81,
+  "n_rows": 21263,
+  "y_max": 185.0,
+  "y_min": 0.00021,
+  "y_sha1": "a7e3880f5cf8057f"
+ }
+}

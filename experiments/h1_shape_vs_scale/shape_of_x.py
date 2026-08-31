@@ -36,14 +36,13 @@ Results in shape_of_x_20.csv (n_est=4) and shape_of_x_nest1.csv (n_est=1).
 """
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, generator, metrics, models, paths
+from common import append, generator, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 N_TRAIN, N_TEST = 2000, 900
 # Ensemble size is a knob: vincentization.md shows aggregation lowers the

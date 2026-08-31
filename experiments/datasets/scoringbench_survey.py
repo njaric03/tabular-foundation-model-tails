@@ -27,21 +27,17 @@ POKRETANJE
 ----------
     python -u scoringbench_survey.py
 """
-import json
 import os
-import re
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import brentq
 from scipy.stats import genpareto
-from sklearn.datasets import fetch_openml
 
-from common import append, datasets, metrics, paths
+from common import append, datasets, metrics, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 MAX_ROWS = 30000
 MIN_N = 3000        # prag za PROLAZAK kriterijuma (isti kao dataset_selection.py)
@@ -52,10 +48,13 @@ FRACS = [0.05, 0.10, 0.20]
 OUT = os.environ.get("OUTPUT", "scoringbench_survey.csv")
 IMENA = "sb_datasets.json"
 IDS = "sb_openml_ids.json"
-# Imena koja se na OpenML-u zovu drugacije nego u ScoringBench-u.
-ALIJASI = {"Ele2": 42362}
 KOLONE = ["dataset", "n", "d", "shifted", "gpd05", "gpd10", "gpd20", "hill", "quantile",
-          "estimate_range", "range_threshold", "tied_share", "reason", "passes"]
+          "estimate_range", "range_threshold", "tied_share",
+          # Odakle je meta dosla i koliko je kolona bilo kategorijsko. Prvo je do
+          # sada bila tiha odluka unutar loadera, a iz ovog pregleda izlazi bazna
+          # stopa poluge, dakle naslovna brojka drugog dela.
+          "source", "target_source", "n_categorical",
+          "reason", "passes"]
 KEY = ["dataset"]
 
 
@@ -63,77 +62,18 @@ KEY = ["dataset"]
 
 
 # --------------------------------------------------------- ucitavanje
-PMLB_URL = ("https://github.com/EpistasisLab/pmlb/raw/master/datasets/"
-            "{ime}/{ime}.tsv.gz")
-
-
-def ucitaj_pmlb(ime):
-    """PMLB skupovi (imena tipa `215_2dplanes`) nisu na OpenML-u pod tim imenom."""
-    df = pd.read_csv(PMLB_URL.format(ime=ime), sep="\t", compression="gzip")
-    y = pd.to_numeric(df.pop("target"), errors="coerce").to_numpy(dtype=float)
-    return df, y
-
-
-def ucitaj(ime, ids):
-    """Probaj po imenu na OpenML-u, pa po ID-ju iz mape ScoringBench-a, pa PMLB."""
-    if re.match(r"^\d+_", ime):
-        X, y = ucitaj_pmlb(ime)
-        return pripremi(X, y)
-    last = None
-    kandidati = [{"name": ime}]
-    if ime in ALIJASI:
-        kandidati.insert(0, {"data_id": ALIJASI[ime]})
-    if ime in ids:
-        kandidati.append({"data_id": ids[ime]})
-    kandidati.append({"name": ime, "as_frame": False})   # retki ARFF
-    for kw in kandidati:
-        try:
-            af = kw.pop("as_frame", True)
-            d = fetch_openml(as_frame=af, parser="auto", **kw)
-            if not af:
-                d.data = pd.DataFrame(np.asarray(d.data.todense() if hasattr(d.data, "todense")
-                                                 else d.data))
-            break
-        except Exception as e:
-            last = e
-            d = None
-    if d is None:
-        # poslednja sansa: mozda ipak stoji u PMLB-u
-        try:
-            return pripremi(*ucitaj_pmlb(ime))
-        except Exception:
-            raise RuntimeError(f"ne mogu da ucitam ({type(last).__name__}: {last})")
-
-    X = d.data.copy()
-    y = pd.to_numeric(pd.Series(np.asarray(d.target).ravel()),
-                      errors="coerce").to_numpy(dtype=float)
-    if not np.isfinite(y).any():
-        # Podrazumevani target nije numericki (npr. datum ili kategorija).
-        # Uzmi poslednju numericku kolonu kao target -- ScoringBench radi regresiju,
-        # pa numericki target mora da postoji negde u okviru.
-        num = X.select_dtypes(include=[np.number]).columns
-        if len(num) == 0:
-            raise RuntimeError("nema nijedne numericke kolone")
-        kol = num[-1]
-        y = X.pop(kol).to_numpy(dtype=float)
-    return pripremi(X, y)
-
-
-def pripremi(X, y):
-    """Kategorije u kodove, popuna nedostajucih, izbacivanje neispravnog targeta."""
-    y = np.asarray(y, dtype=float)
-    if not np.isfinite(y).any():
-        raise RuntimeError("target nije numericki")
-    X = X.copy()
-    for c in X.select_dtypes(exclude="number").columns:
-        X[c] = X[c].astype("category").cat.codes
-    X = X.fillna(X.median(numeric_only=True)).fillna(0.0)
-    ok = np.isfinite(y)
-    return X.to_numpy(dtype=float)[ok], y[ok]
+# Ucitavanje je `common/datasets.py`. Ovde je do sada stajala peta kopija istog
+# koda -- iste kandidature na OpenML-u, isti PMLB fallback, ista `pripremi` --
+# iako `common/datasets.py` u svom zaglavlju pise da je bas ovaj loader
+# kanonski. Kopija je bila i mesto gde se cutke bira meta: kada podrazumevani
+# target nije numericki, uzima se poslednja numericka kolona. Sada to bira ista
+# funkcija za sve skripte i upisuje se u `datasets.LAST["target_source"]`, pa
+# ulazi u CSV.
 
 
 def obradi(ime, ids):
-    X, y = ucitaj(ime, ids)
+    X, y = datasets.load(ime, ids)
+    info = dict(datasets.LAST)
     if len(y) > MAX_ROWS:
         idx = np.random.default_rng(0).choice(len(y), MAX_ROWS, replace=False)
         X, y = X[idx], y[idx]
@@ -170,12 +110,15 @@ def obradi(ime, ids):
                 gpd05=po_pragu[0], gpd10=g10, gpd20=po_pragu[2],
                 hill=h10, quantile=kv,
                 estimate_range=raspon_tri, range_threshold=range_threshold,
-                tied_share=tied_share, reason="", passes=passes)
+                tied_share=tied_share, reason="", passes=passes,
+                source=info.get("source", ""),
+                target_source=info.get("target_source", ""),
+                n_categorical=info.get("n_categorical", 0))
 
 
 def main():
-    imena = json.load(open(IMENA, encoding="utf-8"))
-    ids = json.load(open(IDS, encoding="utf-8"))
+    imena = paths.load_json(IMENA)
+    ids = paths.load_json(IDS)
     gotovi = set()
     if paths.result(OUT).exists():
         gotovi = set(pd.read_csv(paths.result(OUT)).dataset)

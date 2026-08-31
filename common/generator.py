@@ -45,6 +45,14 @@ class Data(NamedTuple):
     xi: np.ndarray         # GPD shape per point (a constant is broadcast)
 
 
+class Covariates(NamedTuple):
+    """The design without the draw: X, the linear predictor, the scale, the shape."""
+    X: np.ndarray
+    lin: np.ndarray        # x.w / norm(w), the standardised linear predictor
+    s: np.ndarray
+    xi: np.ndarray
+
+
 def xi_of_x(X: np.ndarray) -> np.ndarray:
     """Tail shape rises with x4, which has zero weight in the scale.
 
@@ -52,6 +60,32 @@ def xi_of_x(X: np.ndarray) -> np.ndarray:
     tail through x4 is genuine shape adaptation, not a by-product of a larger scale.
     """
     return XI_LO + (XI_HI - XI_LO) * norm.cdf(X[:, 4])
+
+
+def covariates(n: int, rng, *, xi, d: int = 5,
+               w: np.ndarray | None = None) -> Covariates:
+    """X, the linear predictor, s(x) and xi(x), without drawing the target.
+
+    Split out of `gpd` for the scripts that need this design but a different
+    tail family or a different link: `tail_families.py` draws Frechet, Burr and
+    Student-t on top of it, and `coherence.py` needs an additive control where
+    the log is not the canonical scale. Both used to carry their own copy of
+    W, of s(x) and of xi(x).
+
+    The draw order is the same as in `gpd` -- X first, the target's uniform
+    afterwards -- so a script that calls this and then draws its own U gets the
+    same stream it had when the formula was inline.
+    """
+    w = W if w is None else np.asarray(w, dtype=float)
+    X = rng.normal(size=(n, d))
+    lin = (X @ w) / np.linalg.norm(w)
+    # Written exactly as the inline copies had it. Associating the multiplication
+    # the other way (0.6 * lin) moves the last bit and changes published numbers;
+    # tests/test_generator.py holds that line down.
+    s = np.exp(0.6 * (X @ w) / np.linalg.norm(w))
+    xi_v = (xi_of_x(X) if isinstance(xi, str) and xi == XI_OF_X
+            else np.full(n, float(xi)))
+    return Covariates(X=X, lin=lin, s=s, xi=xi_v)
 
 
 def gpd(n: int, rng, *, xi, d: int = 5, w: np.ndarray | None = None,
@@ -66,11 +100,8 @@ def gpd(n: int, rng, *, xi, d: int = 5, w: np.ndarray | None = None,
     ones always did, so the flag exists to reproduce both exactly rather than
     quietly changing published numbers. Pass clip=True for a constant xi.
     """
-    w = W if w is None else np.asarray(w, dtype=float)
-    X = rng.normal(size=(n, d))
-    s = np.exp(0.6 * (X @ w) / np.linalg.norm(w))
-    xi_v = (xi_of_x(X) if isinstance(xi, str) and xi == XI_OF_X
-            else np.full(n, float(xi)))
+    c = covariates(n, rng, xi=xi, d=d, w=w)
+    X, s, xi_v = c.X, c.s, c.xi
     # rng.random draws from [0, 1), so 1 - U is never zero.
     U = rng.random(n)
     if clip:

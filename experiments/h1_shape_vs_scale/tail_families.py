@@ -38,15 +38,14 @@ POKRETANJE
 import importlib.util
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.stats import norm, t as student_t
 
-from common import append, generator, metrics, models, paths
+from common import append, generator, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 QS = [0.5, 0.9, 0.99]
 HI, LO = 0.99, 0.9
@@ -97,11 +96,16 @@ def uzorkuj(familija, U, xi, s):
 
 
 def podaci(familija, n, rng):
-    X = rng.normal(size=(n, 5))
-    s = np.exp(0.6 * (X @ generator.W) / np.linalg.norm(generator.W))
-    xi = generator.XI_LO + (generator.XI_HI - generator.XI_LO) * norm.cdf(X[:, 4])
+    """Isti dizajn kao glavni generator, druga familija repa nad njim.
+
+    X, s(x) i xi(x) dolaze iz `generator.covariates`, pa vise ne postoje kao
+    kopija; ovde se crta samo U i primenjuje kvantilna funkcija familije. Redosled
+    izvlacenja je isti kao ranije (prvo X, pa U), pa se stari rezultati
+    reprodukuju.
+    """
+    c = generator.covariates(n, rng, xi=generator.XI_OF_X)
     U = np.clip(rng.random(n), 1e-9, 1 - 1e-9)
-    return X, uzorkuj(familija, U, xi, s), s, xi
+    return c.X, uzorkuj(familija, U, c.xi, c.s), c.s, c.xi
 
 
 def jedan(familija, ime, seed):

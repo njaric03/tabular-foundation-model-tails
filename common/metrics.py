@@ -140,6 +140,34 @@ def sd_shift(sample):
     return float(np.std(s) / max(np.std(s[:-1]), 1e-12))
 
 
+def y0_for_sd_shift(y, target, hi_factor=1e9):
+    """The injected value that makes sd_shift(y + [y0]) equal `target`.
+
+    Doses were defined as a multiple of max(y_train), and max(y_train) is itself
+    a heavy-tailed random variable: at xi = 0.9 the same nominal dose of 100
+    produced an sd shift between 50 and 97 across five seeds, so part of the
+    scatter that the seed-count corrections chased was scatter in the treatment
+    rather than in the model. Dosing on the sd shift removes that, and puts the
+    synthetic experiment on the same axis as the prevalence survey, where the
+    worst of 99 public datasets sits at 19.9.
+
+    Returns NaN when the target is below what a duplicate of the current maximum
+    already produces, which is the smallest shift an added point can cause.
+    """
+    y = np.asarray(y, dtype=float)
+    lo = float(y.max())
+    if sd_shift(np.append(y, lo)) > target:
+        return np.nan
+    hi = lo if lo > 0 else 1.0
+    for _ in range(64):
+        hi *= 10.0
+        if sd_shift(np.append(y, hi)) >= target:
+            break
+        if hi > abs(lo) * hi_factor:
+            return np.nan
+    return float(brentq(lambda v: sd_shift(np.append(y, v)) - target, lo, hi))
+
+
 # ------------------------------------------------------------- scoring rules
 
 def pinball_all(q, y, levels=LEVELS):

@@ -45,14 +45,13 @@ POKRETANJE
 import importlib.util
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, generator, metrics, models, paths
+from common import append, generator, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.5,0.7,0.9").split(",")]

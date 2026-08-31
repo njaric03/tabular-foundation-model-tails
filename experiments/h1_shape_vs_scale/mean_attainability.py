@@ -24,9 +24,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import genpareto
 
-from common import paths
+from common import generator, paths
 
-W = np.array([1.0, -0.7, 0.5, 0.0, 0.0])
 XI_RUN = [0.0, 0.3, 0.5, 0.7, 0.9]
 N_TRAIN = 2000
 N_REP_SAMPLE = 400        # replikacija za uzoracki prosek (jeftino)
@@ -34,11 +33,9 @@ N_REP_ORACLE = 120        # replikacija za EVT orakl (skuplje)
 
 
 def make_data(xi, n, rng):
-    X = rng.normal(size=(n, 5))
-    s = np.exp(0.6 * (X @ W) / np.linalg.norm(W))
-    U = rng.random(n)
-    y = s * (-np.log(1 - U)) if xi == 0 else s * ((1 - U) ** (-xi) - 1) / xi
-    return X, y, s
+    """Isti generator koji dobijaju modeli; xi = 0 je Gumbelova granica u njemu."""
+    p = generator.gpd(n, rng, xi=xi)
+    return p.X, p.y, p.s
 
 
 def oracle_mean(X, y, frac=0.10):

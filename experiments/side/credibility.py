@@ -44,14 +44,13 @@ POKRETANJE
 """
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, models, paths
+from common import append, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 N_PO_GRUPI = [int(v) for v in os.environ.get("N_PO_GRUPI", "2,5,10,20,50").split(",")]
 K_LISTA = [float(v) for v in os.environ.get("K", "1,4,25").split(",")]

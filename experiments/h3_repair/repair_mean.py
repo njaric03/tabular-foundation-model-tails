@@ -23,18 +23,17 @@ POKRETANJE
 """
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, generator, metrics, models, paths
+from common import append, generator, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 N_EST = int(os.environ.get("N_EST", "4"))
 
-W = np.array([1.0, -0.7, 0.5, 0.0, 0.0])
+# W je u `common/generator.py`; ovde je stajala mrtva kopija.
 MODEL = os.environ.get("MODEL", "TabDPT")
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.7,0.9").split(",")]
 SEEDOVA = int(os.environ.get("SEEDS", "5"))

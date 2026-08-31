@@ -38,7 +38,6 @@ POKRETANJE
 """
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -46,12 +45,11 @@ import torch
 from scipy.optimize import brentq
 from scipy.stats import norm
 
-from common import append, generator, metrics, paths
+from common import append, generator, metrics, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
-W = np.array([1.0, -0.7, 0.5, 0.0, 0.0])
-XI_LO, XI_HI = 0.15, 0.90
+# W, XI_LO i XI_HI su u `common/generator.py`; ovde su stajale kao mrtva kopija.
 N_TRAIN, N_TEST = 2000, 900
 N_TERCILA = 3
 HI, LO = 0.99, 0.90

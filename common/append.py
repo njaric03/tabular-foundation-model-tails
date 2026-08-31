@@ -39,7 +39,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from common import paths
+from common import paths, provenance
 
 # How long to wait for someone else's lock before giving up.
 WAIT_S = 120
@@ -120,9 +120,17 @@ def _reconcile(p: Path, columns: list[str]) -> None:
 
 
 def write(output, row: dict, columns: list[str]) -> None:
-    """Append one row, under a lock, after reconciling the header."""
+    """Append one row, under a lock, after reconciling the header.
+
+    The first write to an output also records the package versions, the commit
+    and the environment knobs of this process in `results/provenance.csv`. It
+    happens here rather than in each script because a step that has to be
+    remembered is a step that gets forgotten: `models.describe` was written for
+    exactly this purpose and never called from anywhere.
+    """
     p = _path(output)
     p.parent.mkdir(parents=True, exist_ok=True)
+    provenance.record(p.name)
     with _Lock(p):
         _reconcile(p, columns)
         empty = not p.exists() or p.stat().st_size == 0

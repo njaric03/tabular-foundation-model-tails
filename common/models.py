@@ -12,7 +12,16 @@ RULES BUILT IN
   - EVERY model gets random_state=seed. No exceptions and no silent zero.
   - describe() returns the run parameters as a dict, so they enter the CSV as
     columns. Rule 2 of the README: a knob that is not a column cannot be
-    reconstructed afterwards.
+    reconstructed afterwards. What the environment sets rather than the script --
+    package versions, the commit, the virtualenv -- goes to
+    `results/provenance.csv`, written by `common/append.py` itself.
+  - HYPERPARAMETERS OF THE CONTROLS ARE FIXED, NOT TUNED. The tree models run at
+    the settings below on every dataset, while the foundation models run at their
+    library defaults. For the robustness claim that is irrelevant: the controls
+    are there to show that a model which does not standardise the target does not
+    react, and no tuning changes that. For the H1 table, where GBM captures more
+    of the shape gradient than the foundation models do, it is a limitation worth
+    stating rather than defending.
   - An unknown model name fails immediately instead of silently falling through
     to the GBM branch, which is what most of the copies did.
 
@@ -61,7 +70,15 @@ def normalise(name: str) -> str:
 
 
 def describe(name: str, seed: int, n_est: int, **extra) -> dict:
-    """Run parameters as CSV columns. See rule 2 in the README."""
+    """Run parameters as CSV columns. See rule 2 in the README.
+
+    Kept because it names the minimum every row must carry, but nothing calls it:
+    the scripts build their own row dicts, which is why it was written and then
+    forgotten. What cannot be forgotten now is the environment: `common/append.py`
+    records package versions, the commit and the environment knobs into
+    `results/provenance.csv` on the first write of every process, without any
+    script having to remember to ask.
+    """
     return dict(model=normalise(name), seed=seed, n_est=n_est, **extra)
 
 

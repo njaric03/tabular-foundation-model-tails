@@ -44,14 +44,13 @@ import importlib.util
 import json
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, datasets, metrics, models, paths
+from common import append, datasets, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 QS = [0.5, 0.9, 0.99]
 HI, LO = 0.99, 0.9

@@ -30,7 +30,6 @@ Rezultati u `graft_gate.csv`, jedan red po (skup, model, seed).
 """
 import os
 import time
-import warnings
 import numpy as np
 import pandas as pd
 from scipy.optimize import brentq
@@ -38,12 +37,18 @@ from scipy.stats import genpareto
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 
-warnings.filterwarnings("ignore")
+from common import quiet
+
+quiet.silence()
+
+# `posthoc_evt_mod` je ime koje je taj modul imao pre preimenovanja 7.9.2026; sada
+# je `evt_graft.py`, u istom direktorijumu. Uvoz je ostao na starom imenu, pa se
+# skripta nije mogla ni pokrenuti. `tests/test_scripts_import.py` to sada hvata.
+from evt_graft import NIVOI, I50, ALPHA0, fit_evt_rep_reg, spoji, sve_metrike
 
 N_TRAIN, N_TEST = 2000, 900
-from posthoc_evt_mod import NIVOI, I50, ALPHA0, fit_evt_rep_reg, spoji, sve_metrike
 
-W = np.array([1.0, -0.7, 0.5, 0.0, 0.0])
+# W je u `common/generator.py`; ovde je stajala kopija formule.
 XI_SINT = [0.0, 0.3, 0.5, 0.7, 0.9]
 SEEDS = [0, 1, 2]
 # DEKONTAMINACIJA (vidi `findings/h1/vincentization.md` i `findings/side/coherence.md`):
@@ -52,7 +57,7 @@ SEEDS = [0, 1, 2]
 # Podrazumevano ostaje staro ponasanje, da se ranije brojke reprodukuju.
 import os as _os
 
-from common import datasets, metrics, paths
+from common import datasets, generator, metrics, paths, quiet
 N_EST = int(_os.environ.get("N_EST", "4"))
 LOG_SKALA = _os.environ.get("LOG_SKALA", "0") == "1"
 N_FIT, N_VAL, N_TEST = 2000, 800, 1000
@@ -165,10 +170,9 @@ def obelezja(Xfit, yfit, med_fit, q_fit):
 
 # ------------------------------------------------------------------ podaci
 def sint(xi, n, rng):
-    X = rng.normal(size=(n, 5))
-    s = np.exp(0.6 * (X @ W) / np.linalg.norm(W))
-    U = rng.random(n)
-    return X, (s * (-np.log(1 - U)) if xi == 0 else s * ((1 - U) ** (-xi) - 1) / xi)
+    """Isti generator koji dobijaju modeli; xi = 0 je Gumbelova granica u njemu."""
+    p = generator.gpd(n, rng, xi=xi)
+    return p.X, p.y
 
 
 def ucitaj(ime):

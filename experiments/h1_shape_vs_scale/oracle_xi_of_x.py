@@ -40,20 +40,21 @@ POKRETANJE
 """
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import brentq
 from scipy.stats import genpareto, norm
 
-from common import metrics, paths
+from common import generator, metrics, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
-# --- isti generator i iste konstante kao shape_of_x.py ---
-W = np.array([1.0, -0.7, 0.5, 0.0, 0.0])
-XI_LO, XI_HI = 0.15, 0.90
+# Generator je `common/generator.py`, isti objekat koji dobijaju i modeli. Ovde je
+# do sada stajala kopija W, XI_LO/XI_HI i same formule. Ta kopija je bila
+# opasnija nego drugde: ovo je kontrola koja odlucuje da li je H1 tvrdnja o
+# modelima ili o podacima, a to poredjenje vazi samo dok orakl uzorkuje iz
+# ISTOG generatora. Parity cuva `tests/test_generator.py`.
 N_TERCILA = 3
 HI, LO = 0.99, 0.9
 
@@ -63,17 +64,9 @@ POT_FRAC = 0.10
 OUT = os.environ.get("OUTPUT", "oracle_xi_of_x.csv")
 
 
-def xi_of_x(X):
-    return XI_LO + (XI_HI - XI_LO) * norm.cdf(X[:, 4])
-
-
 def make_data(n, rng):
-    X = rng.normal(size=(n, 5))
-    s = np.exp(0.6 * (X @ W) / np.linalg.norm(W))
-    xi = xi_of_x(X)
-    U = rng.random(n)
-    y = s * ((1 - U) ** (-xi) - 1) / xi
-    return X, y, s, xi
+    p = generator.gpd(n, rng, xi=generator.XI_OF_X)
+    return p.X, p.y, p.s, p.xi
 
 
 def skala_regresijom(X, y):

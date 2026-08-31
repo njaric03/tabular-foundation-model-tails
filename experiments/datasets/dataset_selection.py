@@ -22,16 +22,15 @@ freMTPL2sev imaju veliki deo mase na par tacaka, sto kvari i procenu i kvantilne
 Rezultati u `dataset_selection.csv`; oni koji prodju idu u `selected_datasets.txt`.
 """
 import time
-import warnings
 import numpy as np
 import pandas as pd
 from scipy.optimize import brentq
 from scipy.stats import genpareto
 from sklearn.datasets import fetch_openml
 
-from common import datasets, metrics, paths
+from common import datasets, metrics, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 MAX_ROWS = 30000
 MIN_N = 3000

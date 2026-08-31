@@ -47,14 +47,13 @@ POKRETANJE
 import importlib.util
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, generator, metrics, models, paths
+from common import append, generator, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.3,0.7,0.9").split(",")]
@@ -84,8 +83,10 @@ GENERATOR = os.environ.get("GENERATOR", "multiplicative")
 
 
 def podaci(n, xi, rng):
-    X = rng.normal(size=(n, 5))
-    lin = (X @ generator.W) / np.linalg.norm(generator.W)
+    # X i linearni prediktor iz `generator.covariates`, da W i s(x) postoje na
+    # jednom mestu; redosled izvlacenja (prvo X, pa U) je nepromenjen.
+    c = generator.covariates(n, rng, xi=xi)
+    X, lin = c.X, c.lin
     U = np.clip(rng.random(n), 1e-9, 1 - 1e-9)
     sum_ = ((1 - U) ** (-xi) - 1) / xi
     if GENERATOR == "additive":

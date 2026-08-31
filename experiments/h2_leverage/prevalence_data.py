@@ -42,14 +42,13 @@ import importlib.util
 import json
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, datasets, metrics, models, paths
+from common import append, datasets, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 
 UZORAKA = int(os.environ.get("UZORAKA", "40"))
