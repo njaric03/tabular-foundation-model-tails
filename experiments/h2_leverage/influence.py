@@ -41,23 +41,37 @@ Rezultati u `influence.csv`.
 POKRETANJE
 ----------
     python -u influence.py
-    XI=0.7 SEEDOVA=3 MODELI=TabICLv2 python -u influence.py
+    XI=0.7 SEEDS=3 MODELS=TabICLv2 python -u influence.py
+
+    # doza kao ciljani pomeraj sd: realan opseg iz `prevalence_data.csv`
+    DOSE_MODE=sd DOSES=2,4,10,20 OUTPUT=influence_sd.csv python -u influence.py
 """
 import importlib.util
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, generator, metrics, models, paths
+from common import append, generator, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.3,0.7").split(",")]
 DOZE = [float(v) for v in os.environ.get("DOSES", "1,3,10,100").split(",")]
+# Sta doza znaci. "max": y0 = doza * max(y_train), kako je i mereno do sada.
+# "sd": doza JE ciljani pomeraj sd, a y0 se resava iz njega
+# (`metrics.y0_for_sd_shift`).
+#
+# Zasto postoji drugi rezim. max(y_train) je i sam tesko-repna slucajna
+# velicina, pa ista nominalna doza nije ista intervencija po seedovima: pri
+# xi = 0.9 i dozi 100 stvarni pomeraj sd ide od 50.3 do 97.1 preko pet seedova.
+# Deo rasipanja koji je devet puta obarao nalaze (`findings/NALAZI.md` §6) je
+# zato rasipanje TRETMANA, ne modela. Uz to, prevalencija poluge je merena bas
+# u pomeraju sd (najgori od 99 skupova: 19.9), pa se tek u ovom rezimu sintetika
+# i stvarni podaci crtaju na istoj osi.
+DOSE_MODE = os.environ.get("DOSE_MODE", "max")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
 MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
 N_EST = int(os.environ.get("N_EST", "1"))
@@ -69,12 +83,17 @@ UDEO_BLIZU = 0.10
 POZICIJA = os.environ.get("POSITION", "centre")   # centar | rub | slucajna
 N_TRAIN = int(os.environ.get("N_TRAIN", str(N_TRAIN)))
 OUT = os.environ.get("OUTPUT", "influence.csv")
-KOLONE = ["xi", "model", "dose", "seed", "position", "n_train", "n_est",
+KOLONE = ["xi", "model", "dose", "dose_mode", "seed", "position", "n_train", "n_est",
+          # sd_shift je IZMERENA jacina intervencije, a `dose` je samo nominalna.
+          # Bez nje se sintetika ne moze uporediti sa prevalencijom poluge, koja
+          # je merena u pomeraju sd (`prevalence_data.csv`).
+          "sd_shift", "y0_over_max",
           "local_q50", "local_q90", "local_q99", "global_q50", "global_q90", "global_q99",
           "xi_without", "xi_with", "seconds", "reason"]
 # Svaki podesivi parametar mora u kljuc, inace pokretanje sa drugom vrednoscu
-# nadje "vec uradjeno" i tiho ne uradi nista.
-KLJUC = ["xi", "model", "dose", "seed", "position", "n_train", "n_est"]
+# nadje "vec uradjeno" i tiho ne uradi nista. `dose_mode` je u kljucu jer doza 10
+# znaci dve razlicite intervencije u dva rezima.
+KLJUC = ["xi", "model", "dose", "dose_mode", "seed", "position", "n_train", "n_est"]
 
 
 def kvantili(ime, Xtr, ytr, Xte, seed):
@@ -105,7 +124,14 @@ def jedan(xi, ime, doza, seed, kes):
         x0 = Xtr[[int(np.random.default_rng(seed).integers(len(Xtr)))]].copy()
     else:
         x0 = np.zeros((1, Xtr.shape[1]))
-    y0 = np.array([doza * ytr.max()])
+    if DOSE_MODE == "sd":
+        v = metrics.y0_for_sd_shift(ytr, doza)
+        if not np.isfinite(v):
+            return dict(reason=f"sd shift {doza} unreachable: a duplicate of the "
+                               f"maximum already gives more")
+        y0 = np.array([v])
+    else:
+        y0 = np.array([doza * ytr.max()])
     q_sa = kvantili(ime, np.vstack([Xtr, x0]), np.concatenate([ytr, y0]), Xte, seed)
 
     d = np.linalg.norm(Xte - x0, axis=1)
@@ -124,6 +150,8 @@ def jedan(xi, ime, doza, seed, kes):
         r[f"local_{naziv}"] = promena(blizu, i)
         r[f"global_{naziv}"] = promena(np.ones(len(Xte), bool), i)
     r["xi_without"], r["xi_with"] = xi_iz(q_bez), xi_iz(q_sa)
+    r["sd_shift"] = metrics.sd_shift(np.append(ytr, y0))
+    r["y0_over_max"] = float(y0[0] / ytr.max())
     r["reason"] = ""
     return r
 
@@ -137,8 +165,9 @@ def main():
         for ime in MODELI:
             for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
                 for doza in DOZE:
-                    k = dict(xi=xi, model=ime, dose=doza, seed=seed,
-                             position=POZICIJA, n_train=N_TRAIN, n_est=N_EST)
+                    k = dict(xi=xi, model=ime, dose=doza, dose_mode=DOSE_MODE,
+                             seed=seed, position=POZICIJA, n_train=N_TRAIN,
+                             n_est=N_EST)
                     if append.key(k, KLJUC) in gotovi:
                         continue
                     t1 = time.time()

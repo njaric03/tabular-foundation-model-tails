@@ -38,14 +38,13 @@ POKRETANJE
 import importlib.util
 import os
 import time
-import warnings
 
 import numpy as np
 import pandas as pd
 
-from common import append, generator, metrics, models, paths
+from common import append, generator, metrics, models, paths, quiet
 
-warnings.filterwarnings("ignore")
+quiet.silence()
 
 from common.adapters import exaone as E
 
@@ -58,6 +57,9 @@ DOZA = float(os.environ.get("DOZA", "100"))
 OUT = os.environ.get("OUTPUT", "mean_exaone.csv")
 KLJUC = ["xi", "seed", "n_train", "n_est", "dose"]
 KOLONE = ["xi", "model", "seed", "n_train", "n_est", "dose",
+          # sd_shift je izmerena jacina intervencije; `dose` je samo nominalna, a
+          # max(y_train) je i sam slucajan, pa ista doza nije isti tretman po seedu.
+          "sd_shift",
           "ratio_true", "ratio_truncated", "mean_influence", "seconds", "reason"]
 
 
@@ -95,7 +97,9 @@ def main():
 
                 r = dict(ratio_true=float(np.mean(mod) / np.mean(prava)),
                          ratio_truncated=float(np.mean(mod) / np.mean(odsec)),
-                         mean_influence=uticaj, reason="")
+                         mean_influence=uticaj,
+                         sd_shift=metrics.sd_shift(np.append(ytr, DOZA * T)),
+                         reason="")
             except Exception as e:
                 r = dict(reason=f"{type(e).__name__}: {e}"[:110])
             r.update(k, model="EXAONE",

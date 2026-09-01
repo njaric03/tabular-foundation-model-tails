@@ -60,6 +60,32 @@ def scale_share_by_model(d: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out).set_index("model").sort_values("share", ascending=False)
 
 
+def share_by_run(shape: pd.DataFrame, scale: pd.DataFrame) -> pd.DataFrame:
+    """Both shares per (model, seed), for the paired test on the synthetic data.
+
+    `slope_by_model` and `scale_share_by_model` average over seeds first and are
+    what the headline table quotes. The paired test needs the two shares run by
+    run instead, and the free unit there is the seed: one seed is one draw of the
+    data, while the three models share it. See `common/stats.py`.
+    """
+    def per_run(d, f, name):
+        out = []
+        for (m, s), g in ok_rows(d).groupby(["model", "seed"]):
+            g = g.sort_values("tercile")
+            if len(g) < 3:
+                continue
+            out.append({"model": m, "seed": s, name: f(g)})
+        return pd.DataFrame(out)
+
+    a = per_run(shape, lambda g: ((g.xi_implied.iloc[-1] - g.xi_implied.iloc[0])
+                                  / (g.xi_true.iloc[-1] - g.xi_true.iloc[0])),
+                "shape_share")
+    b = per_run(scale, lambda g: (np.log(g.median_model.iloc[-1] / g.median_model.iloc[0])
+                                  / np.log(g.median_true.iloc[-1] / g.median_true.iloc[0])),
+                "scale_share")
+    return a.merge(b, on=["model", "seed"]).dropna()
+
+
 def median_response(d: pd.DataFrame, col: str, by=("model",)) -> pd.DataFrame:
     """Median response with the spread that a single median would hide.
 
@@ -72,15 +98,22 @@ def median_response(d: pd.DataFrame, col: str, by=("model",)) -> pd.DataFrame:
                          "n": g.count()}).sort_values("median")
 
 
-def paired_rank_test(d: pd.DataFrame, a="scale_share", b="shape_share"):
-    """How often a is closer to 1 than b, with a paired Wilcoxon on the distances.
+def paired_rank_test(d: pd.DataFrame, a="scale_share", b="shape_share",
+                     cluster="dataset"):
+    """How often a is closer to 1 than b, at the row level and per cluster.
 
     The real-data claim is made by rank rather than as a percentage because the
     reference shape gradient there is weak, so the ratio explodes.
+
+    Two p-values come back, and the conservative one is the one to quote. The
+    rows are nested -- 9 datasets x 3 models x 3 seeds -- so a Wilcoxon over all
+    of them counts 59 dependent comparisons as if they were 59 independent ones.
+    `cluster_p` reduces each dataset to one median difference first and runs an
+    exact sign test on those. See `common/stats.py`.
     """
-    from scipy.stats import wilcoxon
-    d = ok_rows(d).dropna(subset=[a, b])
-    da, db = (d[a] - 1).abs(), (d[b] - 1).abs()
-    wins = int((da < db).sum())
-    stat, p = wilcoxon(da, db)
-    return dict(n=len(d), a_closer=wins, share=wins / len(d) if len(d) else np.nan, p=p)
+    from common import stats
+    d = ok_rows(d)
+    r = stats.paired_by_cluster(d, a=a, b=b, cluster=cluster)
+    return dict(n=r["n"], a_closer=r["wins"], share=r["share"], p=r["naive_p"],
+                clusters=r["clusters"], cluster_wins=r["cluster_wins"],
+                cluster_p=r["cluster_p"])

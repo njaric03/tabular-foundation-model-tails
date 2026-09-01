@@ -21,7 +21,12 @@ about 94% of the change in scale and only about 40 to 50% of the change in shape
 a bootstrap spread of 0.15 to 0.20 across seeds. This is not a limit of the sample: an
 extreme-value oracle on the same 2000 rows recovers 98%. The dissociation survives four
 distribution families (60 of 60 runs), a location-invariant estimator, a reseeding
-control, and it holds by rank on nine real datasets (98% of 59 runs, p = 3.4e-11).
+control, and it holds by rank on nine real datasets (9 of 9 datasets, p = 0.002 by a
+sign test at the level of the dataset, which is the free unit; the row-level
+p = 3.4e-11 counts 3 seeds and 3 models per dataset as independent and should not be
+quoted). What does not travel to real data is the number 43%: the feature carrying the
+gradient there is chosen as a maximum over columns, and on 9 of 10 datasets that
+gradient does not clear its own selection noise.
 
 **2. The predictive distribution is not robust to a single leverage row in the context.**
 Read from the source of five packages: none of them protects the target variable, which
@@ -39,6 +44,9 @@ a robust one makes everything worse by an order of magnitude, because the output
 is calibrated on exactly that non-robust scale: the vulnerability and the safety mechanism
 are the same thing. The one free recommendation is `n_estimators=1`, which buys about 9%
 of tail accuracy at no cost to the median.
+
+Not yet measured, and the most direct question the framing raises: what fraction of
+held-out outcomes exceeds the predicted Q(0.99). Everything above is indirect.
 
 The first two weaknesses share a birthplace, the layer that processes the target, but not
 a trigger. They are not causally linked, and the thesis does not claim they are.
@@ -63,11 +71,13 @@ which models expose a predictive distribution at all.
 
 | folder | what is inside |
 |---|---|
-| `common/` | the only shared code: paths, CSV append, generator, model dispatcher, metrics, dataset loading, model adapters |
+| `common/` | the only shared code: paths, CSV append, generator, model dispatcher, metrics, clustered tests, dataset loading, provenance, model adapters |
 | `experiments/` | one folder per hypothesis, plus `datasets/` and `side/` |
+| `tests/` | property tests for the estimators, the generator and the append guards |
 | `run/` | drivers for the long measurement runs, with the choice of parameters argued in the header |
 | `data/` | inputs: the ScoringBench name and id lists, the selected datasets |
-| `results/` | one CSV per measurement, mirroring `experiments/` |
+| `results/` | one CSV per measurement, mirroring `experiments/`, plus `provenance.csv` |
+| `requirements/` | frozen package sets per virtualenv, written by `run/freeze_envs.sh` |
 | `findings/` | one document per phenomenon, in Serbian, plus `NALAZI.md` as the overview |
 | `analysis/` | three notebooks that reproduce every table in the findings from the CSVs |
 | `figures/` | figures for the thesis |
@@ -89,6 +99,13 @@ TabPFN and TabICL run in the system Python. Install the package into each of the
 Model weights are never stored in the repo; TabFM is fetched by `run/download_tabfm.sh`
 and needs about 10 GB free.
 
+Which versions were installed matters, because the central claim of the second part is a
+statement about what specific package versions do to the target variable. Two things
+record it. `results/provenance.csv` gets one row per process, written by `common/append.py`
+on its first write: package versions, commit, interpreter, virtualenv and every
+environment knob. `sh run/freeze_envs.sh` writes `requirements/<env>.txt` for each
+virtualenv it can find, which is the set to reinstall from.
+
 ## Running
 
 From the repo root, with `-u` so output is not buffered. Settings go through environment
@@ -107,7 +124,18 @@ sh run/run_tabpfn_reseed.sh
 Every number in `FINDINGS.md` and in `findings/` is produced by the notebooks in
 `analysis/`, which read the CSVs in `results/` and print any disagreement with the text.
 
-## Four rules
+The estimators have tests, because three numerical bugs in them are on record and all
+three were found by reading rather than by running. They need nothing but numpy, scipy
+and pandas, so they run in any of the environments:
+
+```bash
+python -m pytest tests -q
+```
+
+`TFM_STRICT=1` turns a numeric warning into an exception and makes a changed dataset
+fingerprint fail the run instead of printing. Worth one pass after touching an estimator.
+
+## Six rules
 
 Each one has been broken once already and cost measurements.
 
@@ -120,6 +148,12 @@ Each one has been broken once already and cost measurements.
    else stays in `archive/`.
 4. The same seed for every model in the same comparison, and `random_state=seed` for all
    of them. This lives in one place, `common/models.py`.
+5. Warnings are filtered by category, never blanket. `filterwarnings("ignore")` at the
+   top of every script hid a divide-by-zero in the tail-index inversion for months.
+   `common/quiet.py` silences package noise and leaves `RuntimeWarning` visible.
+6. A test may not be counted more often than its free unit varies. Three seeds on one
+   dataset are not three independent comparisons; `common/stats.py` reports the
+   cluster-level p-value next to the row-level one, and the text quotes the first.
 
 ## Related repositories
 
