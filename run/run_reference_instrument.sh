@@ -37,7 +37,7 @@
 #
 #     sh run/run_reference_instrument.sh
 set -x
-PY=python
+PY=${PY:-python}   # no model is called, any environment with numpy and scipy
 
 SEEDS=3 N_PERM=20 N_BOOT=200 OUTPUT=reference_instrument.csv \
   $PY -u experiments/h1_shape_vs_scale/reference_instrument.py

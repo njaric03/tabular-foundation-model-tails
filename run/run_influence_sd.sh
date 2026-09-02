@@ -14,7 +14,7 @@
 #        xi = 0.7   sd shift 50.3 to 97.1
 #
 #    a factor of two in the causal quantity, across seeds, at one nominal dose.
-#    Part of the scatter that nine self-corrections chased is scatter in the
+#    Part of the scatter that twelve self-corrections chased is scatter in the
 #    treatment, not in the model. Dosing on the sd shift removes it.
 #
 # 2. THE GRID MISSES THE REAL RANGE. The prevalence survey measured the sd shift
@@ -43,11 +43,17 @@
 # with the existing ones measured on the old definition.
 #
 #     sh run/run_influence_sd.sh
+#
+# TabPFN needs a Prior Labs account before its weights load; see README, Setup.
+# Until that is done, run the rest and add TabPFN-V3 later, since every cell is keyed:
+#
+#     MODELS=TabICLv2,GBM sh run/run_influence_sd.sh
+#
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
-PY=python
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
 
-MODELS=TabICLv2,TabPFN-V3,GBM XI=0.3,0.7 \
+MODELS=${MODELS:-TabICLv2,TabPFN-V3,GBM} XI=0.3,0.7 \
   DOSE_MODE=sd DOSES=2,4,10,20,50 SEEDS=5 N_EST=1 \
   OUTPUT=influence_sd.csv \
   $PY -u experiments/h2_leverage/influence.py

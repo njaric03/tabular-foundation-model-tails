@@ -34,13 +34,19 @@
 # known by construction and any deviation is the model rather than the data.
 #
 #     sh run/run_coverage.sh
+#
+# TabPFN needs a Prior Labs account before its weights load; see README, Setup.
+# Until that is done, run the rest and add TabPFN-V3 later, since every cell is keyed:
+#
+#     MODELS=TabICLv2,GBM sh run/run_coverage.sh
+#
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
-PY=python
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
 
 SETS="freMTPL2sev,OnlineNewsPopularity,diamonds,particulate-matter-ukair-2017,\
 Buzzinsocialmedia_Twitter,CPS1988,218_house_8L,superconduct,houses,house_16H"
 
-MODELS=GBM,XGB,TabICLv2,TabPFN-V3 DATASETS="$SETS" \
+MODELS=${MODELS:-GBM,XGB,TabICLv2,TabPFN-V3} DATASETS="$SETS" \
   DOSES=0,100 SEEDS=3 N_EST=1 OUTPUT=coverage.csv \
   $PY -u experiments/h1_shape_vs_scale/coverage.py

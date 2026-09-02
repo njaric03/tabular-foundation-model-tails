@@ -51,10 +51,16 @@
 # The bootstrap is over the data, not the model, so it costs seconds per cell.
 #
 #     sh run/run_dissociation_real_slope.sh
+#
+# TabPFN needs a Prior Labs account before its weights load; see README, Setup.
+# Until that is done, run the rest and add TabPFN-V3 later, since every cell is keyed:
+#
+#     MODELS=TabICLv2,GBM sh run/run_dissociation_real_slope.sh
+#
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
-PY=python
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
 
-MODELS=TabICLv2,TabPFN-V3,GBM SEEDS=3 N_EST=4 N_BOOT=100 \
+MODELS=${MODELS:-TabICLv2,TabPFN-V3,GBM} SEEDS=3 N_EST=4 N_BOOT=100 \
   OUTPUT=dissociation_real_slope.csv \
   $PY -u experiments/h1_shape_vs_scale/dissociation_real_slope.py

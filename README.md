@@ -6,9 +6,10 @@ Measurements, results and text.
 Tabular foundation models now sit at the top of the [TabArena](https://tabarena.ai)
 leaderboard, and their predictive distribution is increasingly read directly, for
 intervals and for risk. This repository asks how far that output can be trusted in the
-upper tail. Five foundation models are measured (TabPFN, TabICL, TabDPT, TabFM,
-EXAONE-Tabular) against gradient boosting and XGBoost as controls, all on CPU, without
-retraining any of them.
+upper tail: what the models track, what one row in the context can do to it, and what can
+be repaired after pre-training. Five foundation models are measured (TabPFN, TabICL,
+TabDPT, TabFM, EXAONE-Tabular) against gradient boosting and XGBoost as controls, all on
+CPU, without retraining any of them.
 
 Detailed findings are written in Serbian, the language of the thesis, under `findings/`.
 `FINDINGS.md` is the English summary with every headline number.
@@ -93,18 +94,37 @@ working directory:
 pip install -e .
 ```
 
-Three virtualenvs are needed because TabDPT, TabFM and EXAONE require mutually
-incompatible torch versions: `venv-tabfm` (TabFM, EXAONE), `venv-tabdpt`, `venv-graph`.
-TabPFN and TabICL run in the system Python. Install the package into each of them.
+Four virtualenvs, because TabDPT, TabFM and EXAONE require mutually incompatible torch
+versions: `venv-tfm` (TabPFN, TabICL, XGBoost), `venv-tabfm` (TabFM, EXAONE),
+`venv-tabdpt`, `venv-graph`. Install the package into each of them.
+
+`venv-tfm` pins the pair the second part is a statement about:
+
+```bash
+python -m venv venv-tfm
+venv-tfm/Scripts/python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+venv-tfm/Scripts/python.exe -m pip install "tabpfn==8.4.0" "tabicl==2.1.1" xgboost pandas scipy scikit-learn
+venv-tfm/Scripts/python.exe -m pip install -e .
+```
+
+The pins are the point: `findings/NALAZI.md` section 2.1 reads the preprocessing of those
+exact versions line by line, and pip serves newer ones (8.5.0, 2.2.0) by default.
+
+TabPFN 8.4.0 will not load its weights without a Prior Labs account: the first call opens
+a browser login, asks for a licence to be accepted and then for an API key. Only the
+account holder can do that, so every driver in `run/` takes a `MODELS=` override, and
+because every cell is keyed, TabPFN-V3 can be filled in afterwards without remeasuring
+anything else.
+
+Whatever is installed is recorded twice, because the central claim of the second part is a
+statement about what specific package versions do to the target variable.
+`results/provenance.csv` gets one row per process, written by `common/append.py` on its
+first write: package versions, commit, interpreter, virtualenv and every environment knob.
+`sh run/freeze_envs.sh` writes `requirements/<env>.txt` for each virtualenv it can find,
+which is the set to reinstall from.
+
 Model weights are never stored in the repo; TabFM is fetched by `run/download_tabfm.sh`
 and needs about 10 GB free.
-
-Which versions were installed matters, because the central claim of the second part is a
-statement about what specific package versions do to the target variable. Two things
-record it. `results/provenance.csv` gets one row per process, written by `common/append.py`
-on its first write: package versions, commit, interpreter, virtualenv and every
-environment knob. `sh run/freeze_envs.sh` writes `requirements/<env>.txt` for each
-virtualenv it can find, which is the set to reinstall from.
 
 ## Running
 
@@ -125,8 +145,9 @@ Every number in `FINDINGS.md` and in `findings/` is produced by the notebooks in
 `analysis/`, which read the CSVs in `results/` and print any disagreement with the text.
 
 The estimators have tests, because three numerical bugs in them are on record and all
-three were found by reading rather than by running. They need nothing but numpy, scipy
-and pandas, so they run in any of the environments:
+three were found by reading rather than by running. They need numpy, scipy, pandas and
+matplotlib, the last only because one test imports every script in `experiments/` and one
+of those draws figures:
 
 ```bash
 python -m pytest tests -q
@@ -154,9 +175,3 @@ Each one has been broken once already and cost measurements.
 6. A test may not be counted more often than its free unit varies. Three seeds on one
    dataset are not three independent comparisons; `common/stats.py` reports the
    cluster-level p-value next to the row-level one, and the text quotes the first.
-
-## Related repositories
-
-[tndp-novi-sad](https://github.com/njaric03/tndp-novi-sad) designs public transport line
-networks with a graph neural network trained by reinforcement learning. It was the other
-candidate for this thesis and continues as a separate seminar project.

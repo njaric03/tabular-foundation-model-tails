@@ -55,6 +55,12 @@ MIN_PO_TERCILU = 400
 HI, LO, MID = 0.99, 0.9, 0.5
 N_PERM = int(os.environ.get("N_PERM", "50"))     # nulta raspodela izbora
 N_BOOT = int(os.environ.get("N_BOOT", "200"))    # interval za referentni gradijent
+# Udeo gornjih opservacija u Hillovom estimatoru. Do sada je bio fiksiran na 0,10
+# u celom repozitorijumu, a Hill je poznat po osetljivosti na taj izbor: ceo
+# referentni gradijent na stvarnim podacima visi o njemu, i to nigde nije mereno.
+# Sweep je jedna komanda, bez ijednog poziva modelu:
+#     for k in 0.05 0.10 0.20; do K_SHARE=$k OUTPUT=reference_instrument_k$k.csv ... ; done
+K_SHARE = float(os.environ.get("K_SHARE", "0.10"))
 SEEDOVA = int(os.environ.get("SEEDS", "3"))
 PODRAZUMEVANI = ["OnlineNewsPopularity", "diamonds", "particulate-matter-ukair-2017",
                  "Buzzinsocialmedia_Twitter", "CPS1988", "218_house_8L",
@@ -62,13 +68,13 @@ PODRAZUMEVANI = ["OnlineNewsPopularity", "diamonds", "particulate-matter-ukair-2
 SKUPOVI = os.environ.get("DATASETS", ",".join(PODRAZUMEVANI)).split(",")
 OUT = os.environ.get("OUTPUT", "reference_instrument.csv")
 
-KOLONE = ["dataset", "seed", "feature", "n_features",
+KOLONE = ["dataset", "seed", "k_share", "feature", "n_features",
           # referentni gradijent, tri instrumenta nad ISTIM tercilima
           "ref_range_hill", "ref_range_ratio", "ref_range_ratio_residual",
           # interval za Hillov, i nulta raspodela koju sam izbor obelezja pravi
           "boot_lo", "boot_hi", "null_p50", "null_p95", "above_null",
           "seconds", "reason"]
-KEY = ["dataset", "seed"]
+KEY = ["dataset", "seed", "k_share"]
 
 
 def skala_regresijom(Xf, yf):
@@ -88,7 +94,8 @@ def xi_hill(y, s_hat, terc):
     for t in range(N_TERCILA):
         z = y[terc == t] / s_hat[terc == t]
         z = z[np.isfinite(z) & (z > 0)]
-        out.append(metrics.hill(z) if len(z) >= MIN_PO_TERCILU else np.nan)
+        out.append(metrics.hill(z, k_share=K_SHARE) if len(z) >= MIN_PO_TERCILU
+                   else np.nan)
     return out
 
 
@@ -202,7 +209,7 @@ def main():
     t0 = time.time()
     for skup in SKUPOVI:
         for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-            k = dict(dataset=skup, seed=seed)
+            k = dict(dataset=skup, seed=seed, k_share=K_SHARE)
             if append.key(k, KEY) in gotovi:
                 continue
             t1 = time.time()

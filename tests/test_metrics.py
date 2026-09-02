@@ -121,7 +121,9 @@ def test_truncated_mean_matches_numeric_integration(xi):
     t = 8.0
     grid = np.linspace(0, t, 400_001)
     pdf = genpareto.pdf(grid, c=xi)
-    want = np.trapz(grid * pdf, grid) / np.trapz(pdf, grid)
+    # numpy 2 renamed trapz to trapezoid; the venvs run different majors.
+    trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz")
+    want = trapz(grid * pdf, grid) / trapz(pdf, grid)
     assert float(metrics.truncated_mean_std(t, xi)) == pytest.approx(want, rel=1e-3)
 
 
