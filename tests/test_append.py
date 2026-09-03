@@ -5,6 +5,8 @@ Every one of these corresponds to a failure that cost measurements: shifted
 columns when a script gained a parameter, a resume key missing a knob so a
 re-run silently did nothing, and two processes writing one output.
 """
+import sys
+
 import pandas as pd
 import pytest
 
@@ -72,3 +74,12 @@ def test_provenance_is_recorded_for_the_output(out, tmp_path):
     d = pd.read_csv(tmp_path / "provenance.csv")
     assert d.output.iloc[0] == "t.csv"
     assert set(["git_sha", "v_numpy", "python", "venv"]) <= set(d.columns)
+
+
+def test_a_new_result_lands_in_the_subfolder_of_the_script_writing_it(monkeypatch):
+    """results/ mirrors experiments/, so a first write must not land in its root."""
+    from common import paths
+    monkeypatch.setattr(
+        sys, "argv", [str(paths.ROOT / "experiments" / "h1_shape_vs_scale" / "x.py")])
+    p = paths.result("a_name_that_does_not_exist_yet.csv")
+    assert p.parent == paths.ROOT / "results" / "h1_shape_vs_scale"

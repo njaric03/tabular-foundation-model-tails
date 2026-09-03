@@ -41,6 +41,13 @@
   "y_min": 326.0,
   "y_sha1": "d0b56d04f7fb87d2"
  },
+ "freMTPL2sev": {
+  "n_cols": 10,
+  "n_rows": 24944,
+  "y_max": 4075400.56,
+  "y_min": 1.0,
+  "y_sha1": "6556b2ef02fcf21c"
+ },
  "house_16H": {
   "n_cols": 16,
   "n_rows": 22784,

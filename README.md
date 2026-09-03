@@ -25,9 +25,12 @@ distribution families (60 of 60 runs), a location-invariant estimator, a reseedi
 control, and it holds by rank on nine real datasets (9 of 9 datasets, p = 0.002 by a
 sign test at the level of the dataset, which is the free unit; the row-level
 p = 3.4e-11 counts 3 seeds and 3 models per dataset as independent and should not be
-quoted). What does not travel to real data is the number 43%: the feature carrying the
-gradient there is chosen as a maximum over columns, and on 9 of 10 datasets that
-gradient does not clear its own selection noise.
+quoted). The number travels too, but only once the quotient is dropped: the feature
+carrying the gradient was chosen as a maximum over columns, and on 9 of 10 datasets that
+gradient does not clear its own selection noise. Read instead as the slope of the model's
+gradient on the reference across every usable feature, corrected for the noise in the
+reference, the shape share on real data is 0.40 for TabPFN-V3 and 0.53 for TabICLv2,
+against 0.42 to 0.43 on the generator.
 
 **2. The predictive distribution is not robust to a single leverage row in the context.**
 Read from the source of five packages: none of them protects the target variable, which
@@ -46,8 +49,10 @@ is calibrated on exactly that non-robust scale: the vulnerability and the safety
 are the same thing. The one free recommendation is `n_estimators=1`, which buys about 9%
 of tail accuracy at no cost to the median.
 
-Not yet measured, and the most direct question the framing raises: what fraction of
-held-out outcomes exceeds the predicted Q(0.99). Everything above is indirect.
+Everything above is indirect, so the fraction of held-out outcomes that falls below the
+predicted quantile is measured on its own. There the foundation models hold their nominal
+level better than the tree controls, and one leverage row costs a fraction of a point at
+0.99 while moving TabPFN five points at the median.
 
 The first two weaknesses share a birthplace, the layer that processes the target, but not
 a trigger. They are not causally linked, and the thesis does not claim they are.

@@ -79,7 +79,19 @@ def _find(name: str, kind: str) -> Path:
 
     # Does not exist yet: return where it should be written.
     first = ROOT / SEARCH[kind][0]
-    return (first if first.is_dir() else ROOT) / name
+    if not first.is_dir():
+        return ROOT / name
+    # results/ mirrors experiments/, so the first write of a new CSV belongs in the
+    # subfolder named after the script writing it, not in the root of results/.
+    # Without this every new measurement lands one level too high and has to be
+    # moved by hand; coverage.csv and influence_sd.csv both did.
+    if kind == "result":
+        argv0 = sys.argv[0] if sys.argv else ""
+        if argv0:
+            sub = Path(argv0).resolve().parent.name
+            if sub and (first / sub).is_dir():
+                return first / sub / name
+    return first / name
 
 
 def path(name: str, kind: str = "result") -> Path:
