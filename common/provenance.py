@@ -17,7 +17,7 @@ rows were written.
 
 Nothing calls this by hand: `common/append.py` records once per process the
 first time it writes to an output. A knob that is not recorded is a knob that
-cannot be reconstructed (rule 2 of the README), and a package version is a knob
+cannot be reconstructed (rule 2 of RULES.md), and a package version is a knob
 the environment sets rather than the script.
 """
 from __future__ import annotations

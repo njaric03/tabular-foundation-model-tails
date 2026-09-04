@@ -11,7 +11,7 @@ be seen. It hit 278 TabPFN rows across 9 CSV files.
 RULES BUILT IN
   - EVERY model gets random_state=seed. No exceptions and no silent zero.
   - describe() returns the run parameters as a dict, so they enter the CSV as
-    columns. Rule 2 of the README: a knob that is not a column cannot be
+    columns. Rule 2 of RULES.md: a knob that is not a column cannot be
     reconstructed afterwards. What the environment sets rather than the script --
     package versions, the commit, the virtualenv -- goes to
     `results/provenance.csv`, written by `common/append.py` itself.
@@ -70,7 +70,7 @@ def normalise(name: str) -> str:
 
 
 def describe(name: str, seed: int, n_est: int, **extra) -> dict:
-    """Run parameters as CSV columns. See rule 2 in the README.
+    """Run parameters as CSV columns. See rule 2 in RULES.md.
 
     Kept because it names the minimum every row must carry, but nothing calls it:
     the scripts build their own row dicts, which is why it was written and then

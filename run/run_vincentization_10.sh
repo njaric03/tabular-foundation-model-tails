@@ -20,7 +20,7 @@
 #     sh run/run_vincentization_10.sh
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
-PY=python
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
 
 MODELS=TabICLv2,TabPFN-V3 SEEDS=10 XI=0.3,0.7,0.9 \
   OUTPUT=vincentization_10seeds.csv \

@@ -28,7 +28,7 @@
 #     sh run/run_leverage_real_wide.sh
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
-PY=python
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
 
 SETS="freMTPL2sev,Brazilian_houses,OnlineNewsPopularity,nyc-taxi-green-dec-2016,\
 Job_Profitability,stock_fardamento02,Buzzinsocialmedia_Twitter,\

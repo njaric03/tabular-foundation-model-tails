@@ -19,7 +19,7 @@
 #     sh run/run_catboost.sh
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
-PY=python
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
 M=CB
 
 # H1: does it track the conditional shape any better than the others?

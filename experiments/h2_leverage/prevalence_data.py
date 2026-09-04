@@ -65,7 +65,7 @@ KOLONE = (["dataset", "n_rows", "n_subsamples", "leverage_median", "leverage_p90
           + [f"p_poluga_{p}" for p in (3, 5, 10, 100)]
           + ["hill_xi", "n_fit", "seconds", "reason"])
 # n_fit is a knob that changes the result, so it is a column and part of the key
-# (README rule 2); UZORAKA is already recorded as n_subsamples.
+# (rule 2 in RULES.md); UZORAKA is already recorded as n_subsamples.
 KEY = ["dataset", "n_fit"]
 
 

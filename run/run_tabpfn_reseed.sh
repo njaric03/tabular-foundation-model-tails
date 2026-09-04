@@ -34,7 +34,7 @@
 # Traje satima. Pusti tek kad EXAONE stream-ovi stanu, ili prihvati deljenje CPU-a.
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
-PY=python
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
 M=TabPFN-V3
 
 # ---- prioritet 1: naslovne brojke (n_est=4, 20 seedova) ---------------------
