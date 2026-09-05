@@ -53,7 +53,7 @@ N_EST = int(os.environ.get("N_EST", "4"))
 # slope distribution cannot be compared with the oracle one.
 SEEDS = [7000 + 1000 * i for i in range(int(os.environ.get("SEEDS", "20")))]
 OUTPUT = os.environ.get("OUTPUT", "shape_of_x_20.csv")
-MODELS = os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3").split(",")
+MODELS = models.parse_list(os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3"))
 QS = [0.5, 0.9, 0.99]
 HI, LO = 0.99, 0.9
 N_TERCILES = 3

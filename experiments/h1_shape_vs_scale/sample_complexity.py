@@ -52,7 +52,7 @@ N_TRAIN, N_TEST = 2000, 900
 # ansambla prosledjuje kroz N_EST koji cita `shape_of_x.py`.
 N_GRID = [int(v) for v in os.environ.get("N_GRID", "500,1000,2000,4000").split(",")]
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
-MODELI = os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3"))
 SEEDS = [7000 + 1000 * i for i in range(SEEDOVA)]
 N_TERCILA = 3
 OUT = os.environ.get("OUTPUT", "sample_complexity.csv")

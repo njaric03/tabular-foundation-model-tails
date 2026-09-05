@@ -48,7 +48,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from common import append, generator, metrics, paths, quiet
+from common import append, generator, metrics, models, paths, quiet
 
 quiet.silence()
 
@@ -56,7 +56,7 @@ quiet.silence()
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.7,0.9").split(",")]
 CLANOVA = int(os.environ.get("MEMBERS", "4"))
 SEEDOVA = int(os.environ.get("SEEDS", "3"))
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3"))
 N_TRAIN, N_TEST = 2000, 900
 # Gusta mreza za CDF, ali sa TACNO 0.90 i 0.99 unutra -- inace brojke nisu uporedive
 # sa ostalim skriptama koje mere bas na tim nivoima.

@@ -82,7 +82,7 @@ PODRAZUMEVANI = ["OnlineNewsPopularity", "diamonds", "particulate-matter-ukair-2
                  "Buzzinsocialmedia_Twitter", "CPS1988", "218_house_8L",
                  "superconduct", "houses", "Allstate_Claims_Severity", "house_16H"]
 SKUPOVI = os.environ.get("DATASETS", ",".join(PODRAZUMEVANI)).split(",")
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 OUT = os.environ.get("OUTPUT", "dissociation_real_slope.csv")
 
 KOLONE = ["dataset", "model", "seed", "n_est", "n_features",

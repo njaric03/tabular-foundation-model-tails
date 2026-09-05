@@ -39,7 +39,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from common import append, generator, paths, quiet
+from common import append, generator, models, paths, quiet
 
 quiet.silence()
 
@@ -47,7 +47,7 @@ quiet.silence()
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.7,0.9").split(",")]
 VARIJANTE = os.environ.get("VARIANTS", "sirovo,robusna").split(",")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3"))
 N_TRAIN, N_TEST = 2000, 900
 NIVOI = [0.5, 0.9, 0.99, 0.999]
 IME_NIVOA = {0.5: "pb50", 0.9: "pb90", 0.99: "pb99", 0.999: "pb999"}

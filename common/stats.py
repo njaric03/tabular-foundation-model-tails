@@ -70,3 +70,27 @@ def describe(res: dict, unit="datasets") -> str:
     return (f"{res['wins']}/{res['n']} rows (naive p = {res['naive_p']:.2g}, "
             f"pseudoreplicated); {res['cluster_wins']}/{res['clusters']} {unit} "
             f"(sign test p = {res['cluster_p']:.2g})")
+
+
+def add_target_group(d: pd.DataFrame, column="dataset") -> pd.DataFrame:
+    """Add a `target_group` column: the identity of the target, not its name.
+
+    Rule 6 was written about seeds, and the same error is available one level
+    up. `218_house_8L` and `house_16H` are two OpenML names for one target
+    vector under two feature sets, so a sign test over dataset names counts
+    nine free units where there are eight. The direction of every conclusion
+    survives it; the p-value moves from 0.002 to 0.0039.
+    """
+    from common import datasets as _datasets
+
+    groups = _datasets.target_groups()
+    out = d.copy()
+    out["target_group"] = out[column].map(lambda n: groups.get(n, n))
+    return out
+
+
+def paired_by_target(d: pd.DataFrame, a: str, b: str, column="dataset",
+                     target: float = 1.0) -> dict:
+    """`paired_by_cluster` with the target vector, not the name, as the unit."""
+    return paired_by_cluster(add_target_group(d, column), a, b,
+                             cluster="target_group", target=target)

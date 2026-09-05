@@ -55,7 +55,7 @@ N_TRAIN, N_TEST = 2000, 900
 
 FAMILIJE = os.environ.get("FAMILIJE", "gpd,frechet,burr,studentt").split(",")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
-MODELI = os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3"))
 SEEDS = [7000 + 1000 * i for i in range(SEEDOVA)]
 N_TERCILA = 3
 BURR_C = 2.0

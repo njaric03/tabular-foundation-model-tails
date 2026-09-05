@@ -73,7 +73,7 @@ DOZE = [float(v) for v in os.environ.get("DOSES", "1,3,10,100").split(",")]
 # i stvarni podaci crtaju na istoj osi.
 DOSE_MODE = os.environ.get("DOSE_MODE", "max")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 N_EST = int(os.environ.get("N_EST", "1"))
 N_TRAIN, N_TEST = 2000, 900
 NIVOI = [0.5, 0.9, 0.99]

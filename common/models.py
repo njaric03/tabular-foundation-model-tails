@@ -59,6 +59,18 @@ SUPPORTED = ["GBM", "XGB", "CB", "TabICLv2", "TabPFN-V3", "TabPFN-v2.5",
 MEAN_ONLY = ["TabFM"]
 
 
+def parse_list(value: str) -> list[str]:
+    """Split a `MODELS=` value and canonicalise every name in it.
+
+    Scripts used to write the caller's spelling straight into the `model`
+    column, so `MODELS=XGBoost` and `MODELS=XGB` produced two labels for one
+    model and `prevalence_models.csv` disagrees with `coverage.csv` to this
+    day. Parsing through here means the CSV carries the canonical name whatever
+    the caller typed.
+    """
+    return [normalise(x.strip()) for x in value.split(",") if x.strip()]
+
+
 def normalise(name: str) -> str:
     name = SYNONYMS.get(name, name)
     if name not in SUPPORTED:

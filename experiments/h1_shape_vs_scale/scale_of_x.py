@@ -58,7 +58,7 @@ N_TRAIN, N_TEST = 2000, 900
 
 BROJ_SEEDOVA = int(os.environ.get("SEEDS", "20"))
 SEEDS = [7000 + 1000 * i for i in range(BROJ_SEEDOVA)]
-MODELI = os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3"))
 N_TERCILA = 3
 OUT = os.environ.get("OUTPUT", "scale_of_x.csv")
 

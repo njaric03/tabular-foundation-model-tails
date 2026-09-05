@@ -64,7 +64,7 @@ N_FIT, N_TEST = 3000, 6000
 N_EST = int(os.environ.get("N_EST", "1"))
 SEEDOVA = int(os.environ.get("SEEDS", "3"))
 DOZE = [float(v) for v in os.environ.get("DOSES", "0,100").split(",")]
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM,XGB").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM,XGB"))
 # Isti devet skupova na kojima stoji disocijacija na stvarnim podacima, plus
 # freMTPL2sev, jedini skup u pregledu koji ima i polugu i najtezi rep.
 PODRAZUMEVANI = ["freMTPL2sev", "OnlineNewsPopularity", "diamonds",

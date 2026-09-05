@@ -12,7 +12,7 @@ TabDPT, TabFM, EXAONE-Tabular) against gradient boosting and XGBoost as controls
 CPU, without retraining any of them.
 
 Detailed findings are written in Serbian, the language of the thesis, under `findings/`.
-`FINDINGS.md` is the English summary with every headline number, and `RULES.md` the six
+`FINDINGS.md` is the English summary with every headline number, and `RULES.md` the seven
 operating rules the measurements run under.
 
 ## What the three parts claim
@@ -23,8 +23,10 @@ about 94% of the change in scale and only about 40 to 50% of the change in shape
 a bootstrap spread of 0.15 to 0.20 across seeds. This is not a limit of the sample: an
 extreme-value oracle on the same 2000 rows recovers 98%. The dissociation survives four
 distribution families (60 of 60 runs), a location-invariant estimator, a reseeding
-control, and it holds by rank on nine real datasets (9 of 9 datasets, p = 0.002 by a
-sign test at the level of the dataset, which is the free unit; the row-level
+control, and it holds by rank on real data (8 of 8 target vectors, p = 0.0039 by a
+sign test at the level of the target, which is the free unit; ten dataset names were
+loaded, two of which -- `218_house_8L` and `house_16H` -- serve one target under two
+feature sets, so counting nine of nine datasets counted one unit twice; the row-level
 p = 3.4e-11 counts 3 seeds and 3 models per dataset as independent and should not be
 quoted). The number travels too, but only once the quotient is dropped: the feature
 carrying the gradient was chosen as a maximum over columns, and on 9 of 10 datasets that
@@ -56,23 +58,39 @@ level better than the tree controls, and one leverage row costs a fraction of a 
 0.99 while moving TabPFN five points at the median.
 
 The first two weaknesses share a birthplace, the layer that processes the target, but not
-a trigger. They are not causally linked, and the thesis does not claim they are.
+a trigger. They are not causally linked, and the thesis does not claim they are. For
+TabPFN the birthplace is now a single expression, read out of `regressor.py`: the largest
+value the model can report is `borders[-1] * y_train_std_ + y_train_mean_`, a pre-training
+constant times a non-robust scale. The border grid behind it holds 341 borders per unit in
+the body and three between 50 and 128 standard deviations, so above about 17 the whole tail
+is five bars, and the reported 0.999 quantile jumps from 3.3 to 105.8 on a half-per-mille
+change in one bar. That is the mechanism behind the bimodal responses reported in part two.
+The head's tail is half-normal, lighter than TabICL's exponential, and the quantile function
+the package actually calls does not read even that. See `findings/h1/head_tail_family.md`;
+it costs no GPU and no training.
 
 ## Models
 
 | model | quantiles | why it is here |
 |---|---|---|
-| TabPFN-V3, v2.6, v2.5 | yes | top of TabArena; bar-distribution head |
+| TabPFN-V3 | yes | top of TabArena; bar-distribution head |
 | TabICLv2 | yes | 999-quantile head, different output construction |
 | EXAONE-Tabular | yes | second on TabArena; shares TabICL's head |
 | TabDPT | via its bin head | 2048 fixed bins, recovered in `common/adapters/tabdpt.py` |
 | TabFM | no, mean only | first on TabArena in regression, but publishes no distribution |
 | XGBoost, sklearn GBM | yes | controls that do not standardise the target |
 | CatBoost | yes | best tree model in regression on TabArena; wired up, not yet measured |
+| TabPFN-v2.5, v2.6 | yes | wired up through `TABPFN_PATHS`; **no rows in `results/`** |
 
 Left out on purpose: LimiX and Mitra return a point prediction only, so there is nothing
 distributional to measure; RealTabPFN-2.5 is not public. The boundary of this work is
 which models expose a predictive distribution at all.
+
+How much of each model is actually measured is uneven, and the table above does not show
+it. Counted over the `model` column of every file in `results/`: TabPFN-V3 in 36, TabICLv2
+in 28, GBM in 23, EXAONE in 7, TabDPT in 2, TabFM in 1, CatBoost in none. Five foundation
+models are wired up; two and a half carry the results. `findings/NALAZI.md` section 9
+lists the runners that close the gap and what each one buys.
 
 ## Structure
 

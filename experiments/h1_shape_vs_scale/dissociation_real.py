@@ -61,7 +61,7 @@ PODRAZUMEVANI = ["OnlineNewsPopularity", "diamonds", "particulate-matter-ukair-2
                  "Buzzinsocialmedia_Twitter", "CPS1988", "218_house_8L",
                  "superconduct", "houses", "Allstate_Claims_Severity", "house_16H"]
 SKUPOVI = os.environ.get("DATASETS", ",".join(PODRAZUMEVANI)).split(",")
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 SEEDOVA = int(os.environ.get("SEEDS", "3"))
 N_FIT, N_TEST = 3000, 6000
 N_TERCILA = 3

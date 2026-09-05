@@ -1,4 +1,4 @@
-# Six rules for running the measurements
+# Seven rules for running the measurements
 
 Each one has been broken once already and cost measurements.
 
@@ -17,3 +17,13 @@ Each one has been broken once already and cost measurements.
 6. A test may not be counted more often than its free unit varies. Three seeds on one
    dataset are not three independent comparisons; `common/stats.py` reports the
    cluster-level p-value next to the row-level one, and the text quotes the first.
+   The unit is the thing, not its label: `218_house_8L` and `house_16H` are one target
+   vector under two feature sets, so nine dataset names were eight free units and
+   p = 0.002 was p = 0.0039. Cluster with `stats.paired_by_target`, which groups by the
+   recorded `y_sha1` rather than by name.
+
+7. A model is written to the CSV under its canonical name, never under the spelling the
+   caller used. `MODELS=XGBoost` and `MODELS=XGB` produced two labels for one control and
+   split every `groupby("model")` that touched both files. `models.parse_list` normalises
+   at the point the environment is read, and `tests/test_identity.py` fails on any name in
+   `results/` that no script can reproduce.

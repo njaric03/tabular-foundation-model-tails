@@ -233,3 +233,40 @@ def _load(name, ids=None):
         LAST["target_source"] = f"last-numeric-column:{num[-1]}"
         y = X.pop(num[-1]).to_numpy(dtype=float)
     return prepare(X, y)
+
+
+def target_groups() -> dict:
+    """Dataset name to the identity of its target vector.
+
+    Two OpenML names can serve the same target under different feature sets.
+    `218_house_8L` and `house_16H` are the pair in this repository: 22.784 rows,
+    the same `y_sha1`, 8 columns against 16. A per-dataset sign test that counts
+    both is counting one free unit twice, which is rule 6 one level up from the
+    seed level where it was first caught.
+
+    The grouping key is the recorded target hash, so a name with no fingerprint
+    yet maps to itself and forms its own group. That keeps the function usable
+    on result frames written before the fingerprints existed.
+    """
+    try:
+        path = paths.data(FINGERPRINTS)
+    except Exception:
+        path = paths.path(FINGERPRINTS, "data")
+    if not path.exists():
+        return {}
+    known = json.loads(path.read_text(encoding="utf-8"))
+    return {name: fp["y_sha1"] for name, fp in known.items() if "y_sha1" in fp}
+
+
+def target_group(name: str) -> str:
+    """The target identity of one dataset, or its own name when unknown."""
+    return target_groups().get(name, name)
+
+
+def duplicate_targets() -> dict:
+    """Target hash to the dataset names that share it, for hashes shared by more
+    than one name. Empty when every recorded dataset has its own target."""
+    out: dict = {}
+    for name, key in target_groups().items():
+        out.setdefault(key, []).append(name)
+    return {k: sorted(v) for k, v in out.items() if len(v) > 1}

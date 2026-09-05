@@ -59,7 +59,7 @@ quiet.silence()
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.3,0.7,0.9").split(",")]
 TRANSF = os.environ.get("TRANSF", "log,koren3,koren").split(",")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 N_EST = int(os.environ.get("N_EST", "1"))     # 1, da se izbegne efekat iz findings/h1/vincentization.md
 N_TRAIN, N_TEST = 2000, 900
 NIVOI = [0.5, 0.9, 0.99]

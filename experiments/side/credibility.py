@@ -55,7 +55,7 @@ quiet.silence()
 N_PO_GRUPI = [int(v) for v in os.environ.get("N_PO_GRUPI", "2,5,10,20,50").split(",")]
 K_LISTA = [float(v) for v in os.environ.get("K", "1,4,25").split(",")]
 PONAVLJANJA = int(os.environ.get("PONAVLJANJA", "20"))
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 G = int(os.environ.get("N_GROUPS", "40"))
 MU, TAU2 = 100.0, 25.0
 OUT = os.environ.get("OUTPUT", "credibility.csv")

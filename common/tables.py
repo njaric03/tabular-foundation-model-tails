@@ -117,3 +117,21 @@ def paired_rank_test(d: pd.DataFrame, a="scale_share", b="shape_share",
     return dict(n=r["n"], a_closer=r["wins"], share=r["share"], p=r["naive_p"],
                 clusters=r["clusters"], cluster_wins=r["cluster_wins"],
                 cluster_p=r["cluster_p"])
+
+
+def canonical_models(d: pd.DataFrame, column="model") -> pd.DataFrame:
+    """Map the `model` column onto the canonical names in `common/models.py`.
+
+    Older scripts wrote whatever the caller passed in `MODELS=`, so `XGBoost`
+    and `XGB` both appear across the result files for one model and any
+    `groupby("model")` splits it in two. New runs go through
+    `models.parse_list`; this repairs the frames already written.
+    """
+    from common import models as _models
+
+    if column not in d.columns:
+        return d
+    out = d.copy()
+    out[column] = out[column].map(
+        lambda n: _models.SYNONYMS.get(n, n) if isinstance(n, str) else n)
+    return out

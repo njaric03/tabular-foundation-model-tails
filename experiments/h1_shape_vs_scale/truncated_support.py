@@ -56,7 +56,7 @@ quiet.silence()
 
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.5,0.7,0.9").split(",")]
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 N_TRAIN, N_TEST = 2000, 900
 # `findings/h1/vincentization.md`: velicina ansambla menja rep kod TabPFN-a, pa je podesiva.
 N_EST = int(os.environ.get("N_EST", "4"))

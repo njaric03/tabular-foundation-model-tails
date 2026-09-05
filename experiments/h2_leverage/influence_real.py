@@ -49,7 +49,7 @@ quiet.silence()
 PODRAZUMEVANI = ["freMTPL2sev", "OnlineNewsPopularity", "Buzzinsocialmedia_Twitter",
                  "Allstate_Claims_Severity"]
 SKUPOVI = os.environ.get("DATASETS", ",".join(PODRAZUMEVANI)).split(",")
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 SEEDOVA = int(os.environ.get("SEEDS", "10"))
 N_EST = int(os.environ.get("N_EST", "1"))
 N_FIT, N_TEST = 2000, 1500

@@ -38,7 +38,7 @@ quiet.silence()
 
 SKUPOVI = os.environ.get(
     "DATASETS", "freMTPL2sev,OnlineNewsPopularity,Allstate_Claims_Severity").split(",")
-MODELI = os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM").split(",")
+MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 DOZE = [float(v) for v in os.environ.get("DOSES", "0,10,100").split(",")]  # 0 = cist skup
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
 N_EST = int(os.environ.get("N_EST", "1"))
