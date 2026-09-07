@@ -6,6 +6,13 @@
   "y_min": 0.0,
   "y_sha1": "910b3c22d3c9ca53"
  },
+ "Airlines_DepDelay_10M": {
+  "n_cols": 9,
+  "n_rows": 10000000,
+  "y_max": 2119.0,
+  "y_min": -1197.0,
+  "y_sha1": "e902c7ceca35f869"
+ },
  "Allstate_Claims_Severity": {
   "n_cols": 130,
   "n_rows": 188318,
@@ -68,6 +75,13 @@
   "y_max": 651.3,
   "y_min": -4.166,
   "y_sha1": "60ed780bdcb19df2"
+ },
+ "stock_fardamento02": {
+  "n_cols": 6,
+  "n_rows": 6277,
+  "y_max": 833.0,
+  "y_min": 1.0,
+  "y_sha1": "cfaedc79fc7f5407"
  },
  "superconduct": {
   "n_cols": 81,

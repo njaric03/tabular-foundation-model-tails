@@ -40,7 +40,11 @@ Read from the source of five packages: none of them protects the target variable
 is standardised by its plain mean and standard deviation, while features are as a rule
 put through outlier-resistant transforms. One added row can move Q(0.99) by tens of
 percent, and the predicted mean of some models by an order of magnitude including a sign
-change. Tree ensembles, which do not standardise the target, do not react at any dose.
+change. Tree ensembles, which do not standardise the target, do not lose the tail: CatBoost's
+implied tail index rises with the dose, from 0.34 to 0.43, while TabPFN's falls from 0.43
+to -0.03. They are not inert, though, and an earlier version of this page said they were:
+CatBoost's local Q(0.99) moves by up to 74% where sklearn GBM moves by 3.9%. Trees absorb
+the row; the foundation models lose the family.
 The trigger is a data error rather than a heavy tail as such: a standard-deviation shift
 of 4x or more occurs in 2% of 99 public datasets.
 
@@ -49,8 +53,10 @@ measurable.** Winsorizing the target helps at alpha = 0.99 under contamination, 
 23.5%, but consistently hurts TabICL at alpha = 0.999. Replacing the scale estimator with
 a robust one makes everything worse by an order of magnitude, because the output support
 is calibrated on exactly that non-robust scale: the vulnerability and the safety mechanism
-are the same thing. The one free recommendation is `n_estimators=1`, which buys about 9%
-of tail accuracy at no cost to the median.
+are the same thing. The one free recommendation is `n_estimators=1`, worth about 27% of
+implied tail index at a true 0.7 and 0.9 on ten seeds, and only 4% at 0.3, so it applies
+when the tail is heavy. The whole loss happens at the first aggregation and only in
+TabPFN-V3; TabICLv2 does not respond to ensemble size at all.
 
 Everything above is indirect, so the fraction of held-out outcomes that falls below the
 predicted quantile is measured on its own. There the foundation models hold their nominal
@@ -79,7 +85,7 @@ it costs no GPU and no training.
 | TabDPT | via its bin head | 2048 fixed bins, recovered in `common/adapters/tabdpt.py` |
 | TabFM | no, mean only | first on TabArena in regression, but publishes no distribution |
 | XGBoost, sklearn GBM | yes | controls that do not standardise the target |
-| CatBoost | yes | best tree model in regression on TabArena; wired up, not yet measured |
+| CatBoost | yes | best tree model in regression on TabArena; tracks conditional shape at 0.60, better than any foundation model here |
 | TabPFN-v2.5, v2.6 | yes | wired up through `TABPFN_PATHS`; **no rows in `results/`** |
 
 Left out on purpose: LimiX and Mitra return a point prediction only, so there is nothing
