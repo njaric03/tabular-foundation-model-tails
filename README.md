@@ -11,9 +11,9 @@ be repaired after pre-training. Five foundation models are measured (TabPFN, Tab
 TabDPT, TabFM, EXAONE-Tabular) against gradient boosting and XGBoost as controls, all on
 CPU, without retraining any of them.
 
-Detailed findings are written in Serbian, the language of the thesis, under `findings/`.
-`FINDINGS.md` is the English summary with every headline number, and `RULES.md` the seven
-operating rules the measurements run under.
+The detailed write-up is in Serbian, the language of the thesis, and is kept outside this
+repository. What lives here is the code, the inputs and the measured CSVs, under the seven
+operating rules in `RULES.md`.
 
 ## What the three parts claim
 
@@ -72,8 +72,8 @@ the body and three between 50 and 128 standard deviations, so above about 17 the
 is five bars, and the reported 0.999 quantile jumps from 3.3 to 105.8 on a half-per-mille
 change in one bar. That is the mechanism behind the bimodal responses reported in part two.
 The head's tail is half-normal, lighter than TabICL's exponential, and the quantile function
-the package actually calls does not read even that. See `findings/h1/head_tail_family.md`;
-it costs no GPU and no training.
+the package actually calls does not read even that. Reading it costs no GPU and no
+training.
 
 ## Models
 
@@ -93,10 +93,12 @@ distributional to measure; RealTabPFN-2.5 is not public. The boundary of this wo
 which models expose a predictive distribution at all.
 
 How much of each model is actually measured is uneven, and the table above does not show
-it. Counted over the `model` column of every file in `results/`: TabPFN-V3 in 36, TabICLv2
-in 28, GBM in 23, EXAONE in 7, TabDPT in 2, TabFM in 1, CatBoost in none. Five foundation
-models are wired up; two and a half carry the results. `findings/NALAZI.md` section 9
-lists the runners that close the gap and what each one buys.
+it. Counted over the `model` column of every file in `results/`, after the runs of
+2026-09-08: TabPFN-V3 in 38, TabICLv2 in 29, GBM in 23, EXAONE in 7, XGBoost in 3, CatBoost
+in 3, TabDPT in 3, TabFM in 1. Five foundation models are wired up; two and a half carry
+the results, and EXAONE and TabFM are the two that a reader will ask about first. The
+runners that close the gap are in `run/`, each with its choice of parameters argued in the
+header.
 
 ## Structure
 
@@ -109,10 +111,8 @@ lists the runners that close the gap and what each one buys.
 | `data/` | inputs: the ScoringBench name and id lists, the selected datasets |
 | `results/` | one CSV per measurement, mirroring `experiments/`, plus `provenance.csv` |
 | `requirements/` | frozen package sets per virtualenv, written by `run/freeze_envs.sh` |
-| `findings/` | one document per phenomenon, in Serbian, plus `NALAZI.md` as the overview |
-| `analysis/` | three notebooks that reproduce every table in the findings from the CSVs |
+| `analysis/` | three notebooks that reproduce every table in the write-up from the CSVs |
 | `figures/` | figures for the thesis |
-| `thesis/` | the topic application, the literature search, working notes |
 | `archive/` | outside git: logs, notebooks, superseded results |
 
 ## Setup
@@ -137,8 +137,8 @@ venv-tfm/Scripts/python.exe -m pip install "tabpfn==8.4.0" "tabicl==2.1.1" xgboo
 venv-tfm/Scripts/python.exe -m pip install -e .
 ```
 
-The pins are the point: `findings/NALAZI.md` section 2.1 reads the preprocessing of those
-exact versions line by line, and pip serves newer ones (8.5.0, 2.2.0) by default.
+The pins are the point: the preprocessing of those exact versions was read line by line,
+and pip serves newer ones (8.5.0, 2.2.0) by default.
 
 TabPFN 8.4.0 will not load its weights without a Prior Labs account: the first call opens
 a browser login, asks for a licence to be accepted and then for an API key. Only the
@@ -171,8 +171,8 @@ Long runs are kept as scripts under `run/`:
 sh run/run_tabpfn_reseed.sh
 ```
 
-Every number in `FINDINGS.md` and in `findings/` is produced by the notebooks in
-`analysis/`, which read the CSVs in `results/` and print any disagreement with the text.
+Every number quoted in the write-up is produced by the notebooks in `analysis/`, which
+read the CSVs in `results/` and print any disagreement with the text.
 
 The estimators have tests, because three numerical bugs in them are on record and all
 three were found by reading rather than by running. They need numpy, scipy, pandas and
