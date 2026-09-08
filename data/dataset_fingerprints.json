@@ -20,6 +20,13 @@
   "y_min": 0.67,
   "y_sha1": "37b15b7cdc23aaf4"
  },
+ "Brazilian_houses": {
+  "n_cols": 12,
+  "n_rows": 10692,
+  "y_max": 1120000.0,
+  "y_min": 499.0,
+  "y_sha1": "4e0fb97d1ec7246f"
+ },
  "Buzzinsocialmedia_Twitter": {
   "n_cols": 77,
   "n_rows": 583250,
@@ -33,6 +40,13 @@
   "y_max": 18777.2,
   "y_min": 50.05,
   "y_sha1": "dbd96351468ff320"
+ },
+ "Job_Profitability": {
+  "n_cols": 29,
+  "n_rows": 14480,
+  "y_max": 166.9843,
+  "y_min": -638.6337,
+  "y_sha1": "298424b62a2376eb"
  },
  "OnlineNewsPopularity": {
   "n_cols": 60,
@@ -68,6 +82,13 @@
   "y_max": 500001.0,
   "y_min": 14999.0,
   "y_sha1": "df8e648d1634ab1e"
+ },
+ "nyc-taxi-green-dec-2016": {
+  "n_cols": 14,
+  "n_rows": 581835,
+  "y_max": 250.7,
+  "y_min": -10.56,
+  "y_sha1": "f906923009a02caa"
  },
  "particulate-matter-ukair-2017": {
   "n_cols": 9,

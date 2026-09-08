@@ -190,7 +190,12 @@ def _load(name, ids=None):
         LAST["source"] = "pmlb"
         return prepare(*_load_pmlb(name))
 
-    last, d = None, None
+    # Every candidate's failure is kept. Keeping only the last one reports the
+    # error of the as_frame=False fallback, which for a table with string columns
+    # is always "try as_frame=True" and hides why the as_frame=True attempt, made
+    # first, actually failed. That cost one dataset a silent drop from the wide
+    # leverage sweep.
+    failures, d = [], None
     candidates = [{"name": name}]
     if name in ALIASES:
         candidates.insert(0, {"data_id": ALIASES[name]})
@@ -198,6 +203,7 @@ def _load(name, ids=None):
         candidates.append({"data_id": ids[name]})
     candidates.append({"name": name, "as_frame": False})   # rare ARFF
     for kw in candidates:
+        tried = dict(kw)
         try:
             as_frame = kw.pop("as_frame", True)
             d = fetch_openml(as_frame=as_frame, parser="auto", **kw)
@@ -207,13 +213,17 @@ def _load(name, ids=None):
                 d.data = pd.DataFrame(np.asarray(raw))
             break
         except Exception as e:
-            last, d = e, None
+            failures.append(f"{tried}: {type(e).__name__}: {e}")
+            d = None
     if d is None:
         try:
             LAST["source"] = "pmlb"
             return prepare(*_load_pmlb(name))
-        except Exception:
-            raise RuntimeError(f"cannot load {name} ({type(last).__name__}: {last})")
+        except Exception as e:
+            failures.append(f"pmlb: {type(e).__name__}: {e}")
+            raise RuntimeError(
+                "cannot load %s; every source failed:\n  %s"
+                % (name, "\n  ".join(failures)))
 
     X = d.data.copy()
     y = pd.to_numeric(pd.Series(np.asarray(d.target).ravel()),
