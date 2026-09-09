@@ -54,6 +54,13 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              "N_PER_BIN", "K_SHARE", "LOG_SCALE", "MAX_ATTEMPTS", "MASS",
              "N_BOOT", "N_FIT", "N_GRID", "N_PERM", "N_PER_GROUP", "N_TEST",
              "OUTPUT1", "OUTPUT2", "N_REPEATS", "TRANSFORMS", "N_SUBSAMPLES",
+             # Read in `common/`, not in a script, which is why the first sweep
+             # over `experiments/` missed them. Both change what EXAONE returns:
+             # DTYPE decides whether the shipped float16 or the CPU default
+             # float32 is used, PER_LEVEL whether the quantile bank is read in
+             # one pass or one per level. (`N` in that adapter's __main__ demo is
+             # left out: it writes no CSV.)
+             "DTYPE", "PER_LEVEL",
              # Not read by any script here: TabPFN's own package setting, whose
              # `env_prefix="TABPFN_"` picks the generation. `mean_correction.py`
              # builds TabPFNRegressor itself, without `model_path`, so this is

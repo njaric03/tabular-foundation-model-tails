@@ -29,10 +29,28 @@ Dakle jedan broj, bez optimizacije i bez pretpostavke o obliku repa.
 Uz to se meri i bogatija varijanta: izotona regresija yhat -> y naucena na `val`, za
 slucaj da deficit nije isti po celom opsegu predikcije.
 
+MODELI, PODACI I UPIS IDU KROZ `common/`
+---------------------------------------
+Ovaj fajl je do sada gradio modele sam, ucitavao skupove sam i pisao CSV sam.
+Bio je jedini takav: `common/models.py` je nastao 31.8., tri dana posle njega, i
+tada nije prevucen.
+
+Prelazak nije bio mehanicki, jer `models.mean` za TabICL i TabPFN vraca MEDIJANU,
+uz obrazlozenje da je to najblizi tackovni sazetak bez dodatnih pretpostavki. Tu
+je predmet merenja SREDINA, pa je u `common/models.py` dodat `predictive_mean`,
+koji od modela trazi `output_type="mean"`. `mean` ostaje netaknut, jer ga citaju
+`truncated_support`, `repair_mean` i `credibility`.
+
+Uz to: `datasets.load(..., positive_only=True)` umesto lokalne kopije ucitavanja,
+pa svaki skup prolazi kroz proveru otiska; i `append.write` umesto rucnog
+prepisivanja celog CSV-a, pa se dobija zakljucavanje, provenance red i zastita od
+pomeranja kolona. `n_est` je sada knob, kolona i deo kljuca, kako trazi pravilo 2.
+
 POKRETANJE
 ----------
     MODEL=TabICLv2   python mean_correction.py
-    MODEL=TabPFN-V3  python mean_correction.py        # bira se i TABPFN_MODEL_VERSION
+    MODEL=TabPFN-V3  python mean_correction.py
+    MODEL=TabPFN-v2.5 python mean_correction.py       # generacija ide kroz TABPFN_PATHS
     MODEL=GBM        python mean_correction.py
     MODEL=TabDPT     venv-tabdpt/Scripts/python mean_correction.py
     MODEL=TabFM      venv-tabfm/Scripts/python mean_correction.py
@@ -43,22 +61,29 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from sklearn.datasets import fetch_openml
 from sklearn.isotonic import IsotonicRegression
 from sklearn.model_selection import train_test_split
 
-from common import datasets, generator, paths, quiet
+from common import append, datasets, generator, models, paths, quiet
 
 quiet.silence()
 
 N_TRAIN, N_TEST = 2000, 900
 
-MODEL = os.environ.get("MODEL", "TabICLv2")
+MODEL = models.parse_list(os.environ.get("MODEL", "TabICLv2"))[0]
+N_EST = int(os.environ.get("N_EST", "4"))
 # W je u `common/generator.py`; ovde je stajala kopija formule.
 XI_SINT = [0.0, 0.3, 0.5, 0.7, 0.9]
 SEEDS = [0, 1, 2]
 N_FIT, N_VAL, N_TEST = 2000, 800, 1500
 OUT = os.environ.get("OUTPUT", "mean_correction.csv")
+
+VARIANTS = ["raw", "constant", "mean_ratio", "isotonic"]
+KOLONE = (["dataset", "model", "seed", "n_est", "c_val", "c_test",
+           "c_ratio", "unknown_share"]
+          + [f"{p}_{v}" for p in ("gdev", "rmse", "ratio") for v in VARIANTS]
+          + ["seconds", "reason"])
+KLJUC = ["dataset", "model", "seed", "n_est"]
 
 # TabFM je ~1,6 mlrd parametara na CPU-u, oko dva i po minuta po fitu; smanjen profil.
 if MODEL == "TabFM":
@@ -67,37 +92,14 @@ if MODEL == "TabFM":
 
 # ------------------------------------------------------------------ modeli
 def napravi_prediktor(Xf, yf, seed):
-    """Vrati funkciju X -> predvidjena uslovna sredina."""
-    if MODEL == "TabICLv2":
-        from tabicl import TabICLRegressor
-        m = TabICLRegressor(n_estimators=4, device="cpu", random_state=seed)
-        m.fit(Xf, yf)
-        return lambda X: np.asarray(m.predict(X, output_type="mean"), dtype=float)
-    if MODEL.startswith("TabPFN"):
-        from tabpfn import TabPFNRegressor
-        m = TabPFNRegressor(n_estimators=4, device="cpu", random_state=seed,
-                            ignore_pretraining_limits=True)
-        m.fit(Xf, yf)
-        return lambda X: np.asarray(m.predict(X, output_type="mean"), dtype=float)
-    if MODEL == "TabDPT":
-        from tabdpt import TabDPTRegressor
-        m = TabDPTRegressor(device="cpu", use_flash=False)
-        m.fit(Xf, yf)
-        return lambda X: np.asarray(m.predict(X, n_ensembles=4, seed=seed), dtype=float)
-    if MODEL == "TabFM":
-        import tabfm
-        from tabfm import TabFMRegressor
-        ck = os.path.expanduser("~/tabfm-regression")
-        import torch
-        mod = tabfm.tabfm_v1_0_0_pytorch.load(model_type="regression", checkpoint_path=ck,
-                                              device="cpu", dtype=torch.bfloat16)
-        r = TabFMRegressor(mod, n_estimators=1, random_state=seed)
-        r.fit(Xf, yf)
-        return lambda X: np.asarray(r.predict(X), dtype=float)
-    from sklearn.ensemble import GradientBoostingRegressor
-    g = GradientBoostingRegressor(n_estimators=300, max_depth=3, random_state=seed)
-    g.fit(Xf, yf)
-    return lambda X: np.asarray(g.predict(X), dtype=float)
+    """Vrati funkciju X -> predvidjena uslovna sredina.
+
+    Jedno mesto, `models.predictive_mean`. Model se fituje po pozivu, pa se
+    predikcija racuna odjednom za sve delove koji je traze.
+    """
+    def pred(X):
+        return models.predictive_mean(MODEL, Xf, yf, X, seed=seed, n_est=N_EST)
+    return pred
 
 
 # ------------------------------------------------------------------ metrike
@@ -119,23 +121,8 @@ def sint(xi, n, rng):
 
 
 def ucitaj(ime):
-    if ime == "freMTPL2sev":
-        sev = fetch_openml("freMTPL2sev", as_frame=True, parser="auto").data
-        freq = fetch_openml("freMTPL2freq", as_frame=True, parser="auto").data
-        sev = sev.groupby("IDpol", as_index=False).ClaimAmount.sum()
-        df = sev.merge(freq.drop(columns=["ClaimNb"]), on="IDpol", how="inner")
-        y = df.pop("ClaimAmount").to_numpy(dtype=float)
-        X = df.drop(columns=["IDpol"])
-    else:
-        d = fetch_openml(ime, as_frame=True, parser="auto")
-        X = d.data.copy()
-        y = pd.to_numeric(pd.Series(np.asarray(d.target).ravel()),
-                          errors="coerce").to_numpy(dtype=float)
-    for c in X.select_dtypes(exclude="number").columns:
-        X[c] = X[c].astype("category").cat.codes
-    X = X.fillna(X.median(numeric_only=True))
-    ok = np.isfinite(y) & (y > 0)
-    return X.to_numpy(dtype=float)[ok], y[ok]
+    """Kroz `common.datasets`, pa svaki skup prolazi i kroz proveru otiska."""
+    return datasets.load(ime, positive_only=True)
 
 
 # ------------------------------------------------------------------- jedinica
@@ -151,6 +138,7 @@ def _pod(mu, yf):
 
 
 def jedan(oznaka, delovi, seed, prava_sredina, t0, rows):
+    t1 = time.time()
     (Xf, yf), (Xv, yv), (Xt, yt) = delovi
     pred = napravi_prediktor(Xf, yf, seed)
     sirovo_v, sirovo_t = pred(Xv), pred(Xt)
@@ -169,17 +157,22 @@ def jedan(oznaka, delovi, seed, prava_sredina, t0, rows):
     # sel0 vazi i za izotonu
     iso = IsotonicRegression(increasing=True, out_of_bounds="clip").fit(mv[sel0], yv[sel0])
 
-    var = {"raw": mt, "konstanta": c * mt, "odnos_proseka": c_ratio * mt,
-           "izotona": np.maximum(iso.predict(mt), 1e-9)}
+    # Kljucevi su engleski jer od njih nastaju imena kolona: `gdev_constant`,
+    # `rmse_mean_ratio`, `ratio_isotonic`. Migracija je prevela CSV i citanja
+    # ispod, a ovaj recnik nije, pa je `r["gdev_constant"]` dizao KeyError na
+    # prvom redu i skripta nije mogla da izmeri nista.
+    var = {"raw": mt, "constant": c * mt, "mean_ratio": c_ratio * mt,
+           "isotonic": np.maximum(iso.predict(mt), 1e-9)}
 
-    r = dict(dataset=oznaka, model=MODEL, seed=seed, c_val=c,
+    r = dict(dataset=oznaka, model=MODEL, seed=seed, n_est=N_EST, c_val=c,
              c_test=float(np.mean(yt / mt)),          # koliko bi bio idealan faktor
-             c_ratio=c_ratio, unknown_share=unknown_share)
+             c_ratio=c_ratio, unknown_share=unknown_share, reason="")
     for ime, mu in var.items():
         r[f"gdev_{ime}"] = gama_dev(mu, yt)
         r[f"rmse_{ime}"] = rmse(mu, yt)
         if prava_sredina is not None and np.all(np.isfinite(prava_sredina)):
-            r[f"odnos_{ime}"] = float(mu.mean() / prava_sredina.mean())
+            r[f"ratio_{ime}"] = float(mu.mean() / prava_sredina.mean())
+    r["seconds"] = round(time.time() - t1, 1)
     rows.append(r)
     d1 = 100 * (r["gdev_constant"] - r["gdev_raw"]) / r["gdev_raw"]
     d3 = 100 * (r["gdev_mean_ratio"] - r["gdev_raw"]) / r["gdev_raw"]
@@ -187,34 +180,25 @@ def jedan(oznaka, delovi, seed, prava_sredina, t0, rows):
     up = f" nepoz={unknown_share:.1%}" if unknown_share > 0 else ""
     print(f"  {oznaka:22s} s={seed}  c={c:5.2f} (idealno {r['c_test']:5.2f}){up}  "
           f"gdev: c_dev {d1:+6.1f}%  c_ratio {d3:+6.1f}%  izo {d2:+6.1f}%  "
-          f"[{time.time()-t0:.0f}s]",
+          f"[{r['seconds']}s]",
           flush=True)
-    upisi([r])
-
-
-def upisi(rows):
-    df = pd.DataFrame(rows)
-    if os.path.exists(paths.result(OUT)):
-        df = pd.concat([pd.read_csv(paths.result(OUT)), df], ignore_index=True)
-        df = df.drop_duplicates(subset=["dataset", "model", "seed"], keep="last")
-    df.to_csv(paths.result(OUT), index=False)
+    append.write(OUT, r, KOLONE)
 
 
 def gotovo():
-    if not os.path.exists(paths.result(OUT)):
-        return set()
-    d = pd.read_csv(paths.result(OUT))
-    return set(zip(d.dataset, d.model, d.seed))
+    return append.done(OUT, KLJUC)
 
 
 def main():
-    print(f"MODEL={MODEL}", flush=True)
+    print(f"MODEL={MODEL} N_EST={N_EST}", flush=True)
     rows, t0, g = [], time.time(), gotovo()
 
     print("=== SINTETICKI ===", flush=True)
     for xi in XI_SINT:
         for seed in SEEDS:
-            if (f"sint xi={xi}", MODEL, seed) in g:
+            k = dict(dataset=f"sint xi={xi}", model=MODEL, seed=seed,
+                     n_est=N_EST)
+            if append.key(k, KLJUC) in g:
                 continue
             rng = np.random.default_rng(3000 + seed * 100 + int(xi * 10))
             Xf, yf, _ = sint(xi, N_FIT, rng)
@@ -230,7 +214,8 @@ def main():
             print(f"  {ime}: preskacem ({type(e).__name__})", flush=True)
             continue
         for seed in SEEDS:
-            if (ime, MODEL, seed) in g:
+            k = dict(dataset=ime, model=MODEL, seed=seed, n_est=N_EST)
+            if append.key(k, KLJUC) in g:
                 continue
             n = len(y)
             Xr, Xt, yr, yt = train_test_split(X, y, test_size=min(N_TEST, int(0.25 * n)),

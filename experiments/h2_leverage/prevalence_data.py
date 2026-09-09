@@ -127,9 +127,14 @@ def izvestaj(d):
     if len(riz):
         print(riz[["dataset", "n_rows", "sd_shift_median", "sd_shift_max",
                    f"p_sd_{PRAGOVI[2]}", "hill_xi"]].to_string(index=False))
-        with open("prevalence_at_risk.json", "w", encoding="utf-8") as f:
+        # paths.data, ne golo ime: bez toga fajl zavrsi u direktorijumu iz kog je
+        # skripta pokrenuta, pored `data/prevalence_at_risk.json` koji je vec
+        # tamo, pa dve kopije iste liste zive na dva mesta i razilaze se.
+        izlaz = paths.data("prevalence_at_risk.json")
+        izlaz.parent.mkdir(parents=True, exist_ok=True)
+        with open(izlaz, "w", encoding="utf-8") as f:
             json.dump(list(riz.dataset), f, ensure_ascii=False, indent=1)
-        print(f"\n  -> {len(riz)} skupova upisano u prevalence_at_risk.json")
+        print(f"\n  -> {len(riz)} skupova upisano u {izlaz.relative_to(paths.ROOT)}")
     else:
         print("  nijedan, to je samo po sebi nalaz, i to jak")
 

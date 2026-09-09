@@ -49,4 +49,4 @@ Buzzinsocialmedia_Twitter,CPS1988,218_house_8L,superconduct,houses,house_16H"
 
 MODELS=${MODELS:-GBM,XGB,TabICLv2,TabPFN-V3} DATASETS="$SETS" \
   DOSES=0,100 SEEDS=3 N_EST=1 OUTPUT=coverage.csv \
-  $PY -u experiments/h1_shape_vs_scale/coverage.py
+  $PY -u experiments/h1_shape_vs_scale/empirical_coverage.py

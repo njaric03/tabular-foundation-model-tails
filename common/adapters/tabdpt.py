@@ -69,8 +69,16 @@ def quantiles(Xtr, ytr, Xte, seed, levels):
 
 
 def mean(Xtr, ytr, Xte, seed, n_est=1):
-    """(n_test,) point prediction, the published output."""
+    """(n_test,) point prediction, the published output.
+
+    `seed` and `n_est` reach `predict`, which they did not before: its defaults
+    are `n_ensembles=8, seed=None`, so this function ignored both arguments and
+    TabDPT was the one model in the repository running unseeded. That is rule 4
+    of RULES.md, every model gets the seed, no exceptions. `quantiles` above
+    always passed it; only this path did not.
+    """
     from tabdpt import TabDPTRegressor
     m = TabDPTRegressor(device="cpu")
     m.fit(np.asarray(Xtr, float), np.asarray(ytr, float))
-    return np.asarray(m.predict(np.asarray(Xte, float)), dtype=float)
+    return np.asarray(m.predict(np.asarray(Xte, float),
+                                n_ensembles=n_est, seed=seed), dtype=float)

@@ -110,9 +110,9 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
 
     if name == "EXAONE":
         from common.adapters import exaone
-        m = exaone.napravi(seed=seed, n_est=n_est)
+        m = exaone.create(seed=seed, n_est=n_est)
         m.fit(Xtr, ytr)
-        return np.asarray(exaone.kvantili(m, Xte, levels), dtype=float)
+        return np.asarray(exaone.quantiles(m, Xte, levels), dtype=float)
 
     if name == "TabDPT":
         from common.adapters import tabdpt
@@ -196,7 +196,7 @@ def mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.ndarray:
 
     if name == "EXAONE":
         from common.adapters import exaone
-        m = exaone.napravi(seed=seed, n_est=n_est)
+        m = exaone.create(seed=seed, n_est=n_est)
         m.fit(Xtr, ytr)
         return np.asarray(m.predict(Xte), dtype=float)
 
@@ -224,3 +224,46 @@ def mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.ndarray:
     # The rest have a quantile head; the median is the closest point summary
     # without extra assumptions.
     return quantiles(name, Xtr, ytr, Xte, seed, [0.5], n_est)[:, 0]
+
+
+def predictive_mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.ndarray:
+    """(n_test,) the model's OWN mean, asked for wherever it publishes one.
+
+    Not the same thing as `mean` above. That one falls back to the median for a
+    model with a quantile head, reasoning that the median is the closest point
+    summary without extra assumptions, and it is the right default when a point
+    prediction is merely needed. It is the wrong one when the mean itself is the
+    quantity under study: `experiments/h3_repair/mean_correction.py` measures a
+    deficit in the conditional mean, and a median would answer a different
+    question.
+
+    So TabICL and TabPFN are asked for `output_type="mean"` here, which is what
+    they compute from their own head, rather than being read at 0.5. Everything
+    else already returns a mean and is dispatched exactly as in `mean`.
+
+    Keeping the two apart is deliberate. Changing `mean` to return the true mean
+    would silently move `truncated_support`, `repair_mean` and `credibility`,
+    which ask for a point prediction and get the median today.
+    """
+    name = normalise(name)
+    Xtr, Xte = np.asarray(Xtr, float), np.asarray(Xte, float)
+    ytr = np.asarray(ytr, float)
+
+    if name == "TabICLv2":
+        from tabicl import TabICLRegressor
+        m = TabICLRegressor(n_estimators=n_est, device="cpu", random_state=seed)
+        m.fit(Xtr, ytr)
+        return np.asarray(m.predict(Xte, output_type="mean"), dtype=float)
+
+    if name.startswith("TabPFN"):
+        from tabpfn import TabPFNRegressor
+        kw = dict(n_estimators=n_est, device="cpu", random_state=seed,
+                  ignore_pretraining_limits=True)
+        if name in TABPFN_PATHS:
+            kw["model_path"] = TABPFN_PATHS[name]
+        m = TabPFNRegressor(**kw)
+        m.fit(Xtr, ytr)
+        return np.asarray(m.predict(Xte, output_type="mean"), dtype=float)
+
+    # TabFM, TabDPT, EXAONE and the tree controls publish a mean already.
+    return mean(name, Xtr, ytr, Xte, seed, n_est)

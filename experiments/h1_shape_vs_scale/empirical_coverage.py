@@ -45,8 +45,8 @@ KAKO CITATI
 
 POKRETANJE
 ----------
-    python -u experiments/h1_shape_vs_scale/coverage.py
-    MODELS=TabICLv2 DATASETS=freMTPL2sev DOSES=0,100 python -u coverage.py
+    python -u experiments/h1_shape_vs_scale/empirical_coverage.py
+    MODELS=TabICLv2 DATASETS=freMTPL2sev DOSES=0,100 python -u empirical_coverage.py
 """
 import os
 import time
