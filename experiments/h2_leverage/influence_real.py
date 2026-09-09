@@ -31,7 +31,7 @@ Rezultati u `influence_real.csv`.
 POKRETANJE
 ----------
     python -u influence_real.py
-    SKUPOVI=freMTPL2sev SEEDOVA=3 MODELI=TabICLv2 python -u influence_real.py
+    DATASETS=freMTPL2sev SEEDS=3 MODELS=TabICLv2 python -u influence_real.py
 """
 import importlib.util
 import json
@@ -121,7 +121,8 @@ def main():
     for skup in SKUPOVI:
         for ime in MODELI:
             for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-                if append.key(dict(dataset=skup, model=ime, seed=seed), KEY[:3]) in gotovi:
+                if append.key(dict(dataset=skup, model=ime, seed=seed,
+                                   n_est=N_EST), KEY) in gotovi:
                     continue
                 t1 = time.time()
                 try:

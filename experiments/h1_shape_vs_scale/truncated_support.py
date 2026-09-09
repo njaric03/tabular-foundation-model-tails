@@ -40,7 +40,7 @@ Rezultati u `truncated_support.csv`.
 POKRETANJE
 ----------
     python -u truncated_support.py
-    XI=0.7,0.9 SEEDOVA=3 python -u truncated_support.py
+    XI=0.7,0.9 SEEDS=3 python -u truncated_support.py
 """
 import importlib.util
 import os
@@ -88,7 +88,8 @@ def main():
     for xi in XI_LISTA:
         for ime in MODELI:
             for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-                if append.key(dict(xi=xi, model=ime, seed=seed), KEY[:3]) in gotovi:
+                if append.key(dict(xi=xi, model=ime, seed=seed,
+                                   n_est=N_EST), KEY) in gotovi:
                     continue
                 t1 = time.time()
                 try:

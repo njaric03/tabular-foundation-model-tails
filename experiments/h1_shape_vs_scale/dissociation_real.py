@@ -38,7 +38,7 @@ Rezultati u `dissociation_real.csv`.
 POKRETANJE
 ----------
     python -u dissociation_real.py
-    SKUPOVI=diamonds,houses SEEDOVA=1 MODELI=TabICLv2 python -u dissociation_real.py
+    DATASETS=diamonds,houses SEEDS=1 MODELS=TabICLv2 python -u dissociation_real.py
 """
 import importlib.util
 import json

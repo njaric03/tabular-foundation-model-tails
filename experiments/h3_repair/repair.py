@@ -35,7 +35,7 @@ Kvantili su ekvivarijantni pod monotonom transformacijom, pa su sve cetiri legit
 POKRETANJE
 ----------
     python -u repair.py
-    XI=0.9 SEEDOVA=3 MODELI=TabICLv2 python -u repair.py
+    XI=0.9 SEEDS=3 MODELS=TabICLv2 python -u repair.py
 """
 import importlib.util
 import os
@@ -163,7 +163,8 @@ def main():
         for ime in MODELI:
             for varijanta in VARIJANTE:
                 for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-                    if append.key(dict(xi=xi, model=ime, variant=varijanta, seed=seed), KEY[:4]) in gotovi:
+                    if append.key(dict(xi=xi, model=ime, variant=varijanta, seed=seed,
+                                       n_est=N_EST), KEY) in gotovi:
                         continue
                     t1 = time.time()
                     try:

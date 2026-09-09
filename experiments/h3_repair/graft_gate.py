@@ -53,13 +53,13 @@ XI_SINT = [0.0, 0.3, 0.5, 0.7, 0.9]
 SEEDS = [0, 1, 2]
 # DEKONTAMINACIJA (vidi `findings/h1/vincentization.md` i `findings/side/coherence.md`):
 #   N_EST=1     jer agregacija spusta implicirano xi za 0.167 pri xi=0.9
-#   LOG_SKALA=1 jer je fit na log skali bolji 5/5 i smanjuje neslaganje modela
+#   LOG_SCALE=1 jer je fit na log skali bolji 5/5 i smanjuje neslaganje modela
 # Podrazumevano ostaje staro ponasanje, da se ranije brojke reprodukuju.
 import os as _os
 
 from common import datasets, generator, metrics, paths, quiet
 N_EST = int(_os.environ.get("N_EST", "4"))
-LOG_SKALA = _os.environ.get("LOG_SKALA", "0") == "1"
+LOG_SKALA = _os.environ.get("LOG_SCALE", "0") == "1"
 N_FIT, N_VAL, N_TEST = 2000, 800, 1000
 MODELI = ["TabICLv2", "TabPFN-V3"]
 OUT = _os.environ.get("OUTPUT", "graft_gate.csv")
@@ -68,7 +68,7 @@ PRAGOVI_XI = (0.05, 0.10, 0.20)
 
 # ------------------------------------------------------------------ modeli
 def kvantili_fn(model, Xfit, yfit, seed):
-    """Uz LOG_SKALA=1 model se fituje na log(y), a kvantili se vracaju eksponenciranjem.
+    """Uz LOG_SCALE=1 model se fituje na log(y), a kvantili se vracaju eksponenciranjem.
     Kvantili su ekvivarijantni pod monotonom transformacijom, pa je to legitimno."""
     if LOG_SKALA:
         unutra = _kvantili_fn_sirovo(model, Xfit, np.log(np.maximum(yfit, 1e-12)), seed)

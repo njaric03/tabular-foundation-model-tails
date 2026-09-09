@@ -37,7 +37,7 @@ Rezultati u `scale_of_x.csv`.
 
 POKRETANJE
 ----------
-    BROJ_SEEDOVA=20 python -u scale_of_x.py
+    SEEDS=20 python -u scale_of_x.py
 """
 import importlib.util
 import os

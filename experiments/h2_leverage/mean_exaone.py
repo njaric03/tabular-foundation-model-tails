@@ -33,7 +33,7 @@ maksimuma bi trebalo da stoji oko 1,0 prema odsecenoj sredini, a ispod 1,0 prema
 POKRETANJE
 ----------
     python -u mean_exaone.py
-    XI=0.9 SEEDOVA=5 N_TRAIN=2000 python -u mean_exaone.py
+    XI=0.9 SEEDS=5 N_TRAIN=2000 python -u mean_exaone.py
 """
 import importlib.util
 import os
@@ -53,7 +53,7 @@ SEEDOVA = int(os.environ.get("SEEDS", "3"))
 N_TRAIN = int(os.environ.get("N_TRAIN", "1000"))
 N_TEST = int(os.environ.get("N_TEST", "200"))
 N_EST = int(os.environ.get("N_EST", "1"))
-DOZA = float(os.environ.get("DOZA", "100"))
+DOZA = float(os.environ.get("DOSE", "100"))
 OUT = os.environ.get("OUTPUT", "mean_exaone.csv")
 KLJUC = ["xi", "seed", "n_train", "n_est", "dose"]
 KOLONE = ["xi", "model", "seed", "n_train", "n_est", "dose",

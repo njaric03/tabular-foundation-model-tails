@@ -36,7 +36,7 @@ se preskacu.
 POKRETANJE
 ----------
     python -u prevalence_data.py
-    UZORAKA=50 SKUPOVI=freMTPL2sev,Allstate_Claims_Severity python -u prevalence_data.py
+    N_SUBSAMPLES=50 DATASETS=freMTPL2sev,Allstate_Claims_Severity python -u prevalence_data.py
 """
 import importlib.util
 import json
@@ -51,7 +51,7 @@ from common import append, datasets, metrics, models, paths, quiet
 quiet.silence()
 
 
-UZORAKA = int(os.environ.get("UZORAKA", "40"))
+UZORAKA = int(os.environ.get("N_SUBSAMPLES", "40"))
 N_FIT = int(os.environ.get("N_FIT", "2000"))
 PRAGOVI = [1.5, 2.0, 4.0, 10.0]
 OUT = os.environ.get("OUTPUT", "prevalence_data.csv")
@@ -62,7 +62,7 @@ SKUPOVI = os.environ.get("DATASETS", "").split(",") if os.environ.get("DATASETS"
 KOLONE = (["dataset", "n_rows", "n_subsamples", "leverage_median", "leverage_p90",
            "sd_shift_median", "sd_shift_max"]
           + [f"p_sd_{p}" for p in PRAGOVI]
-          + [f"p_poluga_{p}" for p in (3, 5, 10, 100)]
+          + [f"p_leverage_{p}" for p in (3, 5, 10, 100)]
           + ["hill_xi", "n_fit", "seconds", "reason"])
 # n_fit is a knob that changes the result, so it is a column and part of the key
 # (rule 2 in RULES.md); UZORAKA is already recorded as n_subsamples.
@@ -100,7 +100,7 @@ def jedan(skup, ids):
     for p in PRAGOVI:
         r[f"p_sd_{p}"] = float((pomeraji >= p).mean())
     for p in (3, 5, 10, 100):
-        r[f"p_poluga_{p}"] = float((poluge >= p).mean())
+        r[f"p_leverage_{p}"] = float((poluge >= p).mean())
     return r
 
 
@@ -118,7 +118,7 @@ def izvestaj(d):
               f"({ima/len(d):5.1%}) | u >=5% uzoraka: {cest:>3} skupova")
     print("\n  --- za poredjenje, stara mera (poluga max/drugi) ---")
     for p in (3, 5, 10, 100):
-        kol = f"p_poluga_{p}"
+        kol = f"p_leverage_{p}"
         ima = (d[kol] > 0).sum()
         print(f"  poluga >= {p:>4}x     : postoji u {ima:>3}/{len(d)} skupova ({ima/len(d):5.1%})")
 

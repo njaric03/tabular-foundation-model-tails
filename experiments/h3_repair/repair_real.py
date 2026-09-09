@@ -21,7 +21,7 @@ tvoja baza ima kvaran red, pa winsorizujes uvek.
 POKRETANJE
 ----------
     python -u repair_real.py
-    SKUPOVI=freMTPL2sev DOZE=10 SEEDOVA=3 python -u repair_real.py
+    DATASETS=freMTPL2sev DOSES=10 SEEDS=3 python -u repair_real.py
 """
 import importlib.util
 import json
@@ -103,7 +103,9 @@ def main():
             for doza in DOZE:
                 for varijanta in ["raw", "winsor"]:
                     for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-                        if append.key(dict(dataset=skup, model=ime, dose=doza, variant=varijanta, seed=seed), KEY[:5]) in gotovi:
+                        if append.key(dict(dataset=skup, model=ime, dose=doza,
+                                           variant=varijanta, seed=seed,
+                                           n_est=N_EST), KEY) in gotovi:
                             continue
                         t1 = time.time()
                         try:

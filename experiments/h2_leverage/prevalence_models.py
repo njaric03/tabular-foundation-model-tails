@@ -34,7 +34,7 @@ PREDVIDJANJE, ZAPISANO PRE MERENJA (isto kao u findings/h2/prevalence_data.md)
 POKRETANJE
 ----------
     python -u prevalence_models.py
-    SKUPOVI=freMTPL2sev MODELI=GBM KVOTA=5 python -u prevalence_models.py
+    DATASETS=freMTPL2sev MODELS=GBM N_PER_BIN=5 python -u prevalence_models.py
 """
 import importlib.util
 import json
@@ -52,8 +52,8 @@ quiet.silence()
 N_FIT = int(os.environ.get("N_FIT", "2000"))
 N_TEST = int(os.environ.get("N_TEST", "1000"))
 N_EST = int(os.environ.get("N_EST", "1"))
-KVOTA = int(os.environ.get("KVOTA", "8"))
-MAKS_POKUSAJA = int(os.environ.get("MAKS_POKUSAJA", "4000"))
+KVOTA = int(os.environ.get("N_PER_BIN", "8"))
+MAKS_POKUSAJA = int(os.environ.get("MAX_ATTEMPTS", "4000"))
 MODELI = models.parse_list(os.environ.get("MODELS", "GBM,XGBoost,TabICLv2,TabPFN-V3"))
 NIVOI = [0.5, 0.9, 0.99]
 KORPE = [(0.0, 1.2), (1.2, 2.0), (2.0, 4.0), (4.0, 1e9)]

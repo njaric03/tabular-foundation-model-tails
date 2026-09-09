@@ -14,8 +14,8 @@ Metrike su u `posthoc-evt.py`; namerno ih je vise od implicirano-xi, jer to nije
 standardna mera. Glavna je twCRPS, koja jedina zapravo tezi rep.
 
     python evt_graft_experiment.py            # sve
-    DEO=sint python evt_graft_experiment.py   # samo sinteticki
-    DEO=real python evt_graft_experiment.py   # samo stvarni
+    PARTS=sint python evt_graft_experiment.py   # samo sinteticki
+    PARTS=real python evt_graft_experiment.py   # samo stvarni
 
 Rezultati u `evt_graft.csv`.
 """
@@ -147,7 +147,7 @@ def jedan(oznaka, Xtr, ytr, Xte, yte, model, seed, xi_pravo, t0, rows):
 
 
 def main():
-    deo = os.environ.get("DEO", "sve")
+    deo = os.environ.get("PARTS", "sve")
     rows, t0 = [], time.time()
     gotovo = vec_uradjeno()
     if gotovo:

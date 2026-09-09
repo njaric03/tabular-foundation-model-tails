@@ -79,7 +79,8 @@ def main():
 
     for xi in XI_LISTA:
         for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-            if append.key(dict(xi=xi, seed=seed), KEY[:2]) in gotovi:
+            if append.key(dict(xi=xi, seed=seed, n_est=N_EST, n_train=N_TRAIN,
+                               n_test=N_TEST), KEY) in gotovi:
                 continue
             t1 = time.time()
             try:

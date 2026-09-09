@@ -39,7 +39,7 @@ Rezultati u `mixture.csv`.
 POKRETANJE
 ----------
     python -u mixture.py
-    XI=0.9 CLANOVA=4 SEEDOVA=3 python -u mixture.py
+    XI=0.9 MEMBERS=4 SEEDS=3 python -u mixture.py
 """
 import importlib.util
 import os
@@ -146,7 +146,8 @@ def main():
     for xi in XI_LISTA:
         for ime in MODELI:
             for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-                if append.key(dict(xi=xi, model=ime, seed=seed), KEY[:3]) in gotovi:
+                if append.key(dict(xi=xi, model=ime, seed=seed,
+                                   members=CLANOVA), KEY) in gotovi:
                     continue
                 t1 = time.time()
                 try:

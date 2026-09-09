@@ -40,7 +40,7 @@ samo izrazena u jeziku koji aktuari koriste sezdeset godina.
 POKRETANJE
 ----------
     python -u credibility.py
-    N_PO_GRUPI=5,20 K=4 PONAVLJANJA=5 MODELI=TabICLv2 python -u credibility.py
+    N_PER_GROUP=5,20 K=4 N_REPEATS=5 MODELS=TabICLv2 python -u credibility.py
 """
 import os
 import time
@@ -52,9 +52,9 @@ from common import append, models, paths, quiet
 
 quiet.silence()
 
-N_PO_GRUPI = [int(v) for v in os.environ.get("N_PO_GRUPI", "2,5,10,20,50").split(",")]
+N_PO_GRUPI = [int(v) for v in os.environ.get("N_PER_GROUP", "2,5,10,20,50").split(",")]
 K_LISTA = [float(v) for v in os.environ.get("K", "1,4,25").split(",")]
-PONAVLJANJA = int(os.environ.get("PONAVLJANJA", "20"))
+PONAVLJANJA = int(os.environ.get("N_REPEATS", "20"))
 MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 G = int(os.environ.get("N_GROUPS", "40"))
 MU, TAU2 = 100.0, 25.0
@@ -108,7 +108,8 @@ def main():
         for k in K_LISTA:
             for ime in MODELI:
                 for rep in range(PONAVLJANJA):
-                    if append.key(dict(n_per_group=n, k=k, model=ime, repeat=rep), KEY[:4]) in gotovi:
+                    if append.key(dict(n_per_group=n, k=k, model=ime, repeat=rep,
+                                       n_groups=G), KEY) in gotovi:
                         continue
                     t1 = time.time()
                     try:

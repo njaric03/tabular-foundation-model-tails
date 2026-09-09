@@ -38,9 +38,28 @@ PACKAGES = ["numpy", "pandas", "scipy", "scikit-learn", "torch", "tabpfn",
 
 # Knobs read from the environment by the experiment scripts. Every one of them
 # changes a measurement, and several are not columns in every output.
+#
+# The second row is what the list was missing. `MAX_ATTEMPTS` is the worst of
+# them: it is how many draws `prevalence_models.py` rejects while hunting the
+# high leverage bins, so it sets the treatment size in the second part, and it
+# reaches neither a column nor this list. `PARTS`, `N_BOOT`, `N_PERM`, `N_GRID`,
+# `N_FIT` and `N_TEST` are the same kind of gap. The rest do land in a column of
+# their own output, and are recorded here as well because rule 2 asks that a
+# knob be reconstructable from the row, not from the reader's memory of which
+# script wrote it.
 ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              "SD_SHIFTS", "DATASETS", "POSITION", "VARIANTS", "LEVELS",
-             "MEMBERS", "N_GROUPS", "N_TRAIN", "OUTPUT", "TFM_STRICT"]
+             "MEMBERS", "N_GROUPS", "N_TRAIN", "OUTPUT", "TFM_STRICT",
+             "ARM", "D", "PARTS", "DOSE", "FAMILIES", "GENERATOR", "K",
+             "N_PER_BIN", "K_SHARE", "LOG_SCALE", "MAX_ATTEMPTS", "MASS",
+             "N_BOOT", "N_FIT", "N_GRID", "N_PERM", "N_PER_GROUP", "N_TEST",
+             "OUTPUT1", "OUTPUT2", "N_REPEATS", "TRANSFORMS", "N_SUBSAMPLES",
+             # Not read by any script here: TabPFN's own package setting, whose
+             # `env_prefix="TABPFN_"` picks the generation. `mean_correction.py`
+             # builds TabPFNRegressor itself, without `model_path`, so this is
+             # what chose the checkpoint for the `TabPFN-V2` rows, and nothing
+             # recorded it. `run/run_mean_correction.sh` still sets it.
+             "TABPFN_MODEL_VERSION"]
 
 COLUMNS = (["utc", "output", "script", "git_sha", "git_dirty", "python",
             "platform", "venv"]
@@ -88,6 +107,39 @@ def row(output: str) -> dict:
     return r
 
 
+def _widen(path: Path) -> None:
+    """Give an existing file the columns COLUMNS has gained since it was written.
+
+    `DictWriter` writes the header only when it creates the file, so adding a
+    knob to ENV_KNOBS would append wider rows under a narrower header and shift
+    every value after the first new column. `append._reconcile` guards its own
+    outputs against exactly that; provenance had no such guard, and its rows are
+    the record of what produced a measurement, so a silent shift there is worse
+    than in a result file. Old rows get blanks, which is the truth: the knob was
+    not recorded when they were written.
+    """
+    if not path.exists() or path.stat().st_size == 0:
+        return
+    with open(path, encoding="utf-8", newline="") as fh:
+        old = next(csv.reader(fh), None)
+    if old is None or old == COLUMNS:
+        return
+    added = [c for c in COLUMNS if c not in old]
+    dropped = [c for c in old if c not in COLUMNS]
+    if dropped or not added:
+        # A column disappeared, or the order changed. Not something to guess at.
+        print(f"[provenance] header differs and cannot be widened; "
+              f"missing from COLUMNS: {dropped}", flush=True)
+        return
+    import pandas as pd
+    d = pd.read_csv(path)
+    for c in added:
+        d[c] = ""
+    d[COLUMNS].to_csv(path, index=False)
+    print(f"[provenance] added columns {added}, {len(d)} existing rows blank there",
+          flush=True)
+
+
 def record(output: str) -> None:
     """Append one provenance row, at most once per output per process."""
     key = str(output)
@@ -98,7 +150,8 @@ def record(output: str) -> None:
     path = paths.result("provenance.csv")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        new = not path.exists()
+        _widen(path)
+        new = not path.exists() or path.stat().st_size == 0
         with open(path, "a", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(fh, fieldnames=COLUMNS, extrasaction="ignore")
             if new:

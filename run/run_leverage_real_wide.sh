@@ -35,5 +35,5 @@ Job_Profitability,stock_fardamento02,Buzzinsocialmedia_Twitter,\
 Airlines_DepDelay_10M,particulate-matter-ukair-2017"
 
 MODELS=GBM,XGB,TabICLv2,TabPFN-V3 DATASETS="$SETS" \
-  N_EST=1 KVOTA=5 OUTPUT=prevalence_models_wide.csv \
+  N_EST=1 N_PER_BIN=5 OUTPUT=prevalence_models_wide.csv \
   $PY -u experiments/h2_leverage/prevalence_models.py

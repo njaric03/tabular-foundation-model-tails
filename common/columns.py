@@ -56,7 +56,12 @@ COLUMNS = {
 PREFIXES = {
     "odgovor_": "response_", "odnos_": "ratio_", "gr_": "grad_",
     "xi_rezid": "xi_residual", "xi_sirovi": "xi_raw", "xi_pravo": "xi_true",
-    "d_q": "dq", "k_q": "kq", "oraklS_": "oracle_s_", "oraklR_": "oracle_r_",
+    # These two are not a translation. `d_q` and `k_q` are English already, and
+    # the migration mapped them to `dq`/`kq` by mistake: it renamed the columns
+    # in the files it found, while every script kept declaring `d_q`/`k_q`, so
+    # each new output came back under the original name and the two drifted
+    # apart. The direction is reversed here, old name to current one.
+    "dq": "d_q", "kq": "k_q", "oraklS_": "oracle_s_", "oraklR_": "oracle_r_",
     "empir_": "empirical_", "odst_": "deviation_",
     "lok_q": "local_q", "glob_q": "global_q",
     "p_poluga_": "p_leverage_", "p_sd_": "p_sd_", "pravo_": "true_",
@@ -70,6 +75,13 @@ ENV = {
     "DOZE": "DOSES", "SKUPOVI": "DATASETS", "CLANOVA": "MEMBERS",
     "BROJ_GRUPA": "N_GROUPS", "POZICIJA": "POSITION", "VARIJANTE": "VARIANTS",
     "NIVOI": "LEVELS", "MODEL": "MODEL",
+    # The ten the first pass left behind, because the scripts read them rather
+    # than only documenting them. Renaming those changed the interface, so it
+    # waited until the docstrings agreed with the code.
+    "UZORAKA": "N_SUBSAMPLES", "KVOTA": "N_PER_BIN",
+    "MAKS_POKUSAJA": "MAX_ATTEMPTS", "FAMILIJE": "FAMILIES", "DOZA": "DOSE",
+    "N_PO_GRUPI": "N_PER_GROUP", "PONAVLJANJA": "N_REPEATS",
+    "TRANSF": "TRANSFORMS", "DEO": "PARTS", "LOG_SKALA": "LOG_SCALE",
 }
 
 

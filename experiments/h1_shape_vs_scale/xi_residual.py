@@ -42,7 +42,7 @@ PREDVIDJANJE, ZAPISANO PRE MERENJA
 POKRETANJE
 ----------
     python -u xi_residual.py
-    DEO=1 python -u xi_residual.py
+    PARTS=1 python -u xi_residual.py
 """
 import importlib.util
 import os
@@ -61,7 +61,7 @@ HI, LO = 0.99, 0.9
 N_EST = int(os.environ.get("N_EST", "4"))
 
 
-DEO = os.environ.get("DEO", "12")
+DEO = os.environ.get("PARTS", "12")
 SEEDOVA = int(os.environ.get("SEEDS", "10"))
 N_FIT = int(os.environ.get("N_FIT", "2000"))
 N_TEST = int(os.environ.get("N_TEST", "1000"))

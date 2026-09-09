@@ -33,7 +33,7 @@ Rezultati u `tail_families.csv`.
 POKRETANJE
 ----------
     python -u tail_families.py
-    FAMILIJE=frechet,burr SEEDOVA=3 python -u tail_families.py
+    FAMILIES=frechet,burr SEEDS=3 python -u tail_families.py
 """
 import importlib.util
 import os
@@ -53,7 +53,7 @@ N_EST = int(os.environ.get("N_EST", "4"))
 N_TRAIN, N_TEST = 2000, 900
 
 
-FAMILIJE = os.environ.get("FAMILIJE", "gpd,frechet,burr,studentt").split(",")
+FAMILIJE = os.environ.get("FAMILIES", "gpd,frechet,burr,studentt").split(",")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
 MODELI = models.parse_list(os.environ.get("MODELS", "GBM,TabICLv2,TabPFN-V3"))
 SEEDS = [7000 + 1000 * i for i in range(SEEDOVA)]
@@ -151,7 +151,8 @@ def main():
     for fam in FAMILIJE:
         for ime in MODELI:
             for seed in SEEDS:
-                if append.key(dict(family=fam, model=ime, seed=seed), KEY[:3]) in gotovi:
+                if append.key(dict(family=fam, model=ime, seed=seed,
+                                   n_est=N_EST), KEY) in gotovi:
                     continue
                 t1 = time.time()
                 try:

@@ -26,7 +26,7 @@ Rezultati u `vincentization.csv`.
 POKRETANJE
 ----------
     python -u vincentization.py
-    XI=0.7 SEEDOVA=5 python -u vincentization.py
+    XI=0.7 SEEDS=5 python -u vincentization.py
 """
 import importlib.util
 import os
@@ -76,7 +76,7 @@ def main():
         for ime in MODELI:
             for ne in N_EST:
                 for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-                    if append.key(dict(xi_true=xi, model=ime, n_estimators=ne, seed=seed), KEY[:4]) in gotovi:
+                    if append.key(dict(xi_true=xi, model=ime, n_estimators=ne, seed=seed), KEY) in gotovi:
                         continue
                     t1 = time.time()
                     try:

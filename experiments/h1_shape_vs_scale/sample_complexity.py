@@ -29,7 +29,7 @@ Pise red po red u `sample_complexity.csv` i preskace vec uradjene (n, model, see
 POKRETANJE
 ----------
     python -u sample_complexity.py
-    N_GRID=500,1000,2000 SEEDOVA=3 python -u sample_complexity.py
+    N_GRID=500,1000,2000 SEEDS=3 python -u sample_complexity.py
 """
 import importlib.util
 import os

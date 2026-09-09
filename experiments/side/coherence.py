@@ -42,7 +42,7 @@ Rezultati u `coherence.csv`.
 POKRETANJE
 ----------
     python -u coherence.py
-    XI=0.7 TRANSF=log SEEDOVA=3 python -u coherence.py
+    XI=0.7 TRANSFORMS=log SEEDS=3 python -u coherence.py
 """
 import importlib.util
 import os
@@ -57,7 +57,7 @@ quiet.silence()
 
 
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.3,0.7,0.9").split(",")]
-TRANSF = os.environ.get("TRANSF", "log,koren3,koren").split(",")
+TRANSF = os.environ.get("TRANSFORMS", "log,cbrt,sqrt").split(",")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
 MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3,GBM"))
 N_EST = int(os.environ.get("N_EST", "1"))     # 1, da se izbegne efekat iz findings/h1/vincentization.md
@@ -65,7 +65,7 @@ N_TRAIN, N_TEST = 2000, 900
 NIVOI = [0.5, 0.9, 0.99]
 OUT = os.environ.get("OUTPUT", "coherence.csv")
 KOLONE = ["n_est", "generator", "xi", "model", "transform", "seed", "xi_raw", "xi_transformed",
-          "deviation", "odst_q50", "odst_q90", "odst_q99", "seconds", "reason"]
+          "deviation", "deviation_q50", "deviation_q90", "deviation_q99", "seconds", "reason"]
 KEY = ["xi", "model", "transform", "seed", "n_est", "generator"]
 
 TRANSFORMACIJE = {
@@ -123,7 +123,8 @@ def jedan(xi, ime, naziv_t, seed):
         odst[a] = float(np.median(np.abs(np.log(q_tr[m, i] / q_sir[m, i])))) if m.any() else np.nan
     return dict(xi_raw=xi_iz(q_sir), xi_transformed=xi_iz(q_tr),
                 deviation=float(np.nanmean(list(odst.values()))),
-                odst_q50=odst[0.5], odst_q90=odst[0.9], odst_q99=odst[0.99],
+                deviation_q50=odst[0.5], deviation_q90=odst[0.9],
+                deviation_q99=odst[0.99],
                 reason="")
 
 
@@ -136,7 +137,8 @@ def main():
         for ime in MODELI:
             for naziv_t in TRANSF:
                 for seed in [7000 + 1000 * i for i in range(SEEDOVA)]:
-                    if append.key(dict(xi=xi, model=ime, transform=naziv_t, seed=seed), KEY[:4]) in gotovi:
+                    if append.key(dict(xi=xi, model=ime, transform=naziv_t, seed=seed,
+                                       n_est=N_EST, generator=GENERATOR), KEY) in gotovi:
                         continue
                     t1 = time.time()
                     try:
@@ -167,7 +169,8 @@ def main():
     print(d.pivot_table(index=["transform", "xi"], columns="model",
                         values="deviation", aggfunc="median").round(3).to_string())
     print("\n=== nekoherentnost po nivou kvantila (prosek preko svega) ===")
-    print(d.groupby("model")[["odst_q50", "odst_q90", "odst_q99"]].median().round(3).to_string())
+    print(d.groupby("model")[["deviation_q50", "deviation_q90", "deviation_q99"]]
+          .median().round(3).to_string())
     print(f"\nukupno {time.time()-t0:.0f}s -> {OUT}")
 
 
