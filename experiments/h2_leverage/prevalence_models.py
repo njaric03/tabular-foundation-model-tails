@@ -137,7 +137,10 @@ def main():
                 jmax = int(np.argmax(yf))
                 maska = np.ones(len(yf), bool); maska[jmax] = False
                 for model in MODELI:
-                    if append.key(dict(dataset=dataset, model=model, bin=ime_korpe, repeat=j), KEY[:4]) in gotovi:
+                    # KEY, not KEY[:4]: `gotovi` holds full keys, so a short
+                    # tuple never matches and nothing is ever skipped.
+                    if append.key(dict(dataset=dataset, model=model, bin=ime_korpe,
+                                       repeat=j, n_est=N_EST), KEY) in gotovi:
                         continue
                     t1 = time.time()
                     try:
@@ -148,7 +151,7 @@ def main():
                     except Exception as e:
                         r = dict(reason=f"{type(e).__name__}: {e}"[:110])
                     r.update(dataset=dataset, model=model, bin=ime_korpe, repeat=j,
-                             sd_shift=pom, leverage=pol,
+                             n_est=N_EST, sd_shift=pom, leverage=pol,
                              seconds=round(time.time() - t1, 1))
                     append.write(OUT, r, KOLONE)
                     por = r["reason"] or f"q99 {r['d_q99']:+7.1%} q50 {r['d_q50']:+6.1%}"

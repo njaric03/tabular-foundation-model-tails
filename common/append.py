@@ -156,9 +156,11 @@ def _norm(v):
 def done(output, columns: list[str]) -> set[tuple]:
     """Keys already present in the file.
 
-    Raises when a key column is absent: that means earlier rows were written
-    without the parameter, so old and new rows cannot be told apart. Failing is
-    better than skipping silently.
+    Raises when a key column is absent, or present but empty in every row: both
+    mean earlier rows were written without the parameter, so old and new rows
+    cannot be told apart. A column of NaN is the worse of the two, because NaN
+    does not even equal itself, so every lookup misses and a re-run silently
+    duplicates the whole file instead of resuming. Failing is better.
     """
     p = _path(output)
     if not p.exists() or p.stat().st_size == 0:
@@ -170,4 +172,12 @@ def done(output, columns: list[str]) -> set[tuple]:
             f"{p.name}: key columns {missing} are absent, so it is unknown which "
             f"parameters the existing rows were measured with.\n"
             f"Either write a new OUTPUT, or fill the column in if the values are known.")
+    empty = [c for c in columns if len(d) and d[c].isna().all()]
+    if empty:
+        raise Shifted(
+            f"{p.name}: key columns {empty} exist but are empty in every row, so the "
+            f"script keys on a parameter it never writes. Every lookup would miss and "
+            f"a re-run would duplicate the file instead of resuming.\n"
+            f"Write the column, then backfill the existing rows with the value they "
+            f"were measured at.")
     return {key(r, columns) for r in d[list(columns)].to_dict("records")}

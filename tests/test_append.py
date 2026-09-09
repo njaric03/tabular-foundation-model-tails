@@ -54,6 +54,16 @@ def test_done_refuses_a_key_column_the_file_does_not_have(out):
         append.done(out, ["model", "seed", "n_est"])
 
 
+def test_done_refuses_a_key_column_that_is_empty_in_every_row(out):
+    """The worse half of the same failure: the column exists, so the check above
+    passes, but nothing writes it. NaN does not equal itself, so every lookup
+    misses and a re-run duplicates the file instead of resuming. This cost the
+    wide leverage sweep a silent double-measurement."""
+    append.write(out, dict(model="GBM", seed=1, n_est=None), ["model", "seed", "n_est"])
+    with pytest.raises(append.Shifted):
+        append.done(out, ["model", "seed", "n_est"])
+
+
 def test_a_second_writer_waits_rather_than_interleaving(out, monkeypatch):
     monkeypatch.setattr(append, "WAIT_S", 0)
     p = append._path(out)

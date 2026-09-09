@@ -1,5 +1,7 @@
 # The upper tail of the predictive distribution in tabular foundation models
 
+[![tests](https://github.com/njaric03/tabular-foundation-model-tails/actions/workflows/tests.yml/badge.svg)](https://github.com/njaric03/tabular-foundation-model-tails/actions/workflows/tests.yml)
+
 Master's thesis, Department of Mathematics and Informatics, University of Novi Sad.
 Measurements, results and text.
 

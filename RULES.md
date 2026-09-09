@@ -2,11 +2,21 @@
 
 Each one has been broken once already and cost measurements.
 
-1. One process writes one output file. Every parallel stream gets its own `OUTPUT=`.
+1. One process writes one output file, and nothing else touches that file while the run
+   is going. Every parallel stream gets its own `OUTPUT=`. Git counts as something else:
+   a `checkout` or a `reset` over a CSV a run is appending to restores it to the committed
+   state, and the run then appends to the truncated file. The wide leverage sweep lost
+   three of freMTPL2sev's four buckets that way, after measuring them: the log holds hours
+   of work the CSV does not. Commit a result file when its run has finished, not while it
+   is still writing.
 2. Every adjustable parameter is a column in the CSV and part of the resume key. `N_EST`
    moves the captured shape share for TabPFN from 19% to 42%; when it is not in the key,
-   a re-run with a different value silently skips the work. `common/append.py` now
-   refuses to resume when a key column is missing rather than skipping quietly.
+   a re-run with a different value silently skips the work. `common/append.py` refuses to
+   resume when a key column is missing, and also when it exists but is empty in every row.
+   The second is the worse half, because the first check passes: the column is declared,
+   nothing writes it, and NaN does not equal itself, so every lookup misses and a re-run
+   duplicates the file instead of resuming it. `prevalence_models.py` keyed on `n_est` and
+   never wrote it, which is a bug that hides until the day a run is repeated.
 3. A result enters the repo only when a finding cites it or a script reads it. Everything
    else stays in `archive/`.
 4. The same seed for every model in the same comparison, and `random_state=seed` for all
