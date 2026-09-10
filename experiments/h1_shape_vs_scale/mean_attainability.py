@@ -19,12 +19,17 @@ Mere se dve referentne vrednosti, obe kao odnos prema pravoj uslovnoj sredini:
 
 Rezultati u `mean_attainability.csv`. Traje oko pola minuta.
 """
+import os
 import time
 import numpy as np
 import pandas as pd
 from scipy.stats import genpareto
 
 from common import generator, paths
+
+# Ime izlaza je bilo ukucano, pa je `OUTPUT=` bio tiho ignorisan i svako probno
+# pokretanje pisalo preko pracenog fajla.
+OUT = os.environ.get("OUTPUT", "mean_attainability.csv")
 
 XI_RUN = [0.0, 0.3, 0.5, 0.7, 0.9]
 N_TRAIN = 2000
@@ -80,7 +85,7 @@ def main():
               f"r_orakl={rows[-1]['r_oracle_median']:.3f}  [{time.time()-t0:.0f}s]", flush=True)
 
     df = pd.DataFrame(rows)
-    df.to_csv(paths.result("mean_attainability.csv"), index=False)
+    df.to_csv(paths.result(OUT), index=False)
     pd.set_option("display.width", 250)
     print("\n=== DOSTIZNOST SREDINE IZ 2000 REDOVA (odnos prema pravoj) ===")
     print(df.round(3).to_string(index=False))

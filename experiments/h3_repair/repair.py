@@ -51,7 +51,10 @@ quiet.silence()
 
 
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.7,0.9").split(",")]
-VARIJANTE = os.environ.get("VARIANTS", "sirovo,log,winsor,rang,asinh").split(",")
+# Imena su engleska jer se po njima grana ispod i jer su ona u koloni `variant`.
+# Default je nosio `sirovo` i `rang`, koje nijedna grana ne zna, pa je 40 od 100
+# celija padalo na ValueError umesto da se izmeri.
+VARIJANTE = os.environ.get("VARIANTS", "raw,log,winsor,rank,asinh").split(",")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
 MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3"))
 N_EST = int(os.environ.get("N_EST", "1"))
