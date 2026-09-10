@@ -15,16 +15,18 @@ if [ "${slobodno:-99}" -lt 5 ]; then
 fi
 echo "slobodno na disku: ${slobodno} GB"
 
+PY=${PY:-venv-tfm/Scripts/python.exe}   # another environment: PY=... sh run/...
+
 run() { echo "########## $1 ##########"; shift; "$@" || echo "  (proces pao, nastavljam)"; }
 
-run GBM          env MODEL=GBM         python -u experiments/h3_repair/mean_correction.py
-run TabICLv2     env MODEL=TabICLv2    python -u experiments/h3_repair/mean_correction.py
-run TabPFN-V3    env MODEL=TabPFN-V3   python -u experiments/h3_repair/mean_correction.py
+run GBM          env MODEL=GBM         $PY    -u experiments/h3_repair/mean_correction.py
+run TabICLv2     env MODEL=TabICLv2    $PY    -u experiments/h3_repair/mean_correction.py
+run TabPFN-V3    env MODEL=TabPFN-V3   $PY    -u experiments/h3_repair/mean_correction.py
 # TabPFN-V2 je ranije biran preko TABPFN_MODEL_VERSION, promenljive samog paketa,
 # koju provenance nije belezio, pa ti redovi nisu imenovali checkpoint. Generacija
 # sada ide kroz TABPFN_PATHS u `common/models.py`, pa se mere obe imenovano.
-run TabPFN-v2.5  env MODEL=TabPFN-v2.5 python -u experiments/h3_repair/mean_correction.py
-run TabPFN-v2.6  env MODEL=TabPFN-v2.6 python -u experiments/h3_repair/mean_correction.py
+run TabPFN-v2.5  env MODEL=TabPFN-v2.5 $PY -u experiments/h3_repair/mean_correction.py
+run TabPFN-v2.6  env MODEL=TabPFN-v2.6 $PY -u experiments/h3_repair/mean_correction.py
 run TabDPT       env MODEL=TabDPT      ./venv-tabdpt/Scripts/python.exe -u experiments/h3_repair/mean_correction.py
 run EXAONE       env MODEL=EXAONE      ./venv-tabfm/Scripts/python.exe -u experiments/h3_repair/mean_correction.py
 # TabFM ide poslednji: 6,6 GB tezina i oko dva i po minuta po fitu, na smanjenom

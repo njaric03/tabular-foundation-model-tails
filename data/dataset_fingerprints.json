@@ -55,6 +55,13 @@
   "y_min": 1.0,
   "y_sha1": "b1ef84148bd35b5c"
  },
+ "delays_zurich_transport": {
+  "n_cols": 14,
+  "n_rows": 5465575,
+  "y_max": 7190.0,
+  "y_min": -121830.0,
+  "y_sha1": "934ad47cc71874df"
+ },
  "diamonds": {
   "n_cols": 9,
   "n_rows": 53940,
