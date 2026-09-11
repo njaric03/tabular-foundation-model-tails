@@ -59,7 +59,11 @@ PRAGOVI = [1.5, 2.0, 4.0, 10.0]
 OUT = os.environ.get("OUTPUT", "prevalence_data.csv")
 
 _svi = paths.load_json("sb_datasets.json")
-SKUPOVI = os.environ.get("DATASETS", "").split(",") if os.environ.get("DATASETS") else _svi
+# freMTPL2sev nije u ScoringBench listi, a citirani fajl ga ima: bio je dodat
+# posebnim pokretanjem, i bas on nosi "pomeraj 4x u 2 od 99" i "10x u 1 od 99".
+# Bez njega obicno pokretanje ne reprodukuje ono sto rad citira.
+_podrazumevani = _svi + [s for s in ["freMTPL2sev"] if s not in _svi]
+SKUPOVI = os.environ.get("DATASETS", "").split(",") if os.environ.get("DATASETS") else _podrazumevani
 
 KOLONE = (["dataset", "n_rows", "n_subsamples", "leverage_median", "leverage_p90",
            "sd_shift_median", "sd_shift_max"]

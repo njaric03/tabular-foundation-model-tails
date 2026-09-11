@@ -1,10 +1,157 @@
 {
+ "1000-Cameras-Dataset": {
+  "n_cols": 12,
+  "n_rows": 1038,
+  "y_max": 7999.0,
+  "y_min": 14.0,
+  "y_sha1": "ea2998dc5d9c42cd"
+ },
+ "1027_ESL": {
+  "n_cols": 4,
+  "n_rows": 488,
+  "y_max": 9.0,
+  "y_min": 1.0,
+  "y_sha1": "3919adbe7db605bd"
+ },
+ "1028_SWD": {
+  "n_cols": 10,
+  "n_rows": 1000,
+  "y_max": 5.0,
+  "y_min": 2.0,
+  "y_sha1": "e25ae7a6188f884b"
+ },
+ "1029_LEV": {
+  "n_cols": 4,
+  "n_rows": 1000,
+  "y_max": 4.0,
+  "y_min": 0.0,
+  "y_sha1": "8ec2d0072419667a"
+ },
+ "1030_ERA": {
+  "n_cols": 4,
+  "n_rows": 1000,
+  "y_max": 9.0,
+  "y_min": 1.0,
+  "y_sha1": "8103ce6ea235091c"
+ },
+ "1193_BNG_lowbwt": {
+  "n_cols": 9,
+  "n_rows": 31104,
+  "y_max": 4859.44580078125,
+  "y_min": 446.09814453125,
+  "y_sha1": "0efa4a6dd7ef817f"
+ },
+ "1199_BNG_echoMonths": {
+  "n_cols": 9,
+  "n_rows": 17496,
+  "y_max": 74.55542755126953,
+  "y_min": -4.399571895599365,
+  "y_sha1": "eca36cbefc1ee283"
+ },
+ "1201_BNG_breastTumor": {
+  "n_cols": 9,
+  "n_rows": 116640,
+  "y_max": 62.008262634277344,
+  "y_min": -8.526242256164549,
+  "y_sha1": "0d92ba75ef65d7d7"
+ },
+ "1203_BNG_pwLinear": {
+  "n_cols": 10,
+  "n_rows": 177147,
+  "y_max": 15.219289779663086,
+  "y_min": -13.844379425048828,
+  "y_sha1": "044fc386b2d88bc2"
+ },
+ "215_2dplanes": {
+  "n_cols": 10,
+  "n_rows": 40768,
+  "y_max": 12.20259952545166,
+  "y_min": -12.694299697875977,
+  "y_sha1": "7b5db2326f680abc"
+ },
  "218_house_8L": {
   "n_cols": 8,
   "n_rows": 22784,
   "y_max": 500001.0,
   "y_min": 0.0,
   "y_sha1": "910b3c22d3c9ca53"
+ },
+ "225_puma8NH": {
+  "n_cols": 8,
+  "n_rows": 8192,
+  "y_max": 11.876190185546877,
+  "y_min": -12.415322303771973,
+  "y_sha1": "401dd2595816567c"
+ },
+ "227_cpu_small": {
+  "n_cols": 12,
+  "n_rows": 8192,
+  "y_max": 99.0,
+  "y_min": 0.0,
+  "y_sha1": "5e37574489c9fe07"
+ },
+ "294_satellite_image": {
+  "n_cols": 36,
+  "n_rows": 6435,
+  "y_max": 7.0,
+  "y_min": 1.0,
+  "y_sha1": "20052c9dcf4bccef"
+ },
+ "344_mv": {
+  "n_cols": 10,
+  "n_rows": 40768,
+  "y_max": 2.4997799396514893,
+  "y_min": -41.82220077514648,
+  "y_sha1": "45bf919a1696b680"
+ },
+ "503_wind": {
+  "n_cols": 14,
+  "n_rows": 6574,
+  "y_max": 42.540000915527344,
+  "y_min": 0.6700000166893005,
+  "y_sha1": "5e439fa9d6d184ff"
+ },
+ "529_pollen": {
+  "n_cols": 4,
+  "n_rows": 3848,
+  "y_max": 10.867300033569336,
+  "y_min": -12.03909969329834,
+  "y_sha1": "ab6a56d402f0168e"
+ },
+ "547_no2": {
+  "n_cols": 7,
+  "n_rows": 500,
+  "y_max": 6.395090103149414,
+  "y_min": 1.2237800359725952,
+  "y_sha1": "4daa241ed5d70bcd"
+ },
+ "564_fried": {
+  "n_cols": 10,
+  "n_rows": 40768,
+  "y_max": 30.52199935913086,
+  "y_min": -1.2280000448226929,
+  "y_sha1": "082a7d4e45f15711"
+ },
+ "595_fri_c0_1000_10": {
+  "n_cols": 10,
+  "n_rows": 1000,
+  "y_max": 2.8341217041015625,
+  "y_min": -2.6269795894622803,
+  "y_sha1": "82f13282009c62a0"
+ },
+ "AIRFOIL": {
+  "n_cols": 5,
+  "n_rows": 1503,
+  "y_max": 140.987,
+  "y_min": 103.38,
+  "y_sha1": "b011604ffd7a081c"
+ },
+ "Ailerons": {
+  "n_cols": 40,
+  "n_rows": 13750,
+  "y_max": 0.0,
+  "y_min": -0.0036,
+  "y_sha1": "eb286ca3482f6061"
  },
  "Airlines_DepDelay_10M": {
   "n_cols": 9,
@@ -19,6 +166,41 @@
   "y_max": 121012.25,
   "y_min": 0.67,
   "y_sha1": "37b15b7cdc23aaf4"
+ },
+ "Another-Dataset-on-used-Fiat-500-(1538-rows)": {
+  "n_cols": 7,
+  "n_rows": 1538,
+  "y_max": 11100.0,
+  "y_min": 2500.0,
+  "y_sha1": "c44a8719b421513b"
+ },
+ "BIAS_CORRECTION": {
+  "n_cols": 24,
+  "n_rows": 7725,
+  "y_max": 29.8,
+  "y_min": 11.3,
+  "y_sha1": "6b7202563e3e6b5d"
+ },
+ "BNG(mv)": {
+  "n_cols": 10,
+  "n_rows": 78732,
+  "y_max": 3.765447,
+  "y_min": -42.450294,
+  "y_sha1": "5ae58083f303b3ea"
+ },
+ "BNG(stock)": {
+  "n_cols": 9,
+  "n_rows": 59049,
+  "y_max": 63.357831,
+  "y_min": 31.752548,
+  "y_sha1": "0a7bb8902a99b611"
+ },
+ "Bike_Sharing_Demand": {
+  "n_cols": 12,
+  "n_rows": 17379,
+  "y_max": 977.0,
+  "y_min": 1.0,
+  "y_sha1": "550fcd8a27af9445"
  },
  "Brazilian_houses": {
   "n_cols": 12,
@@ -41,6 +223,48 @@
   "y_min": 50.05,
   "y_sha1": "dbd96351468ff320"
  },
+ "CookbookReviews": {
+  "n_cols": 13,
+  "n_rows": 18182,
+  "y_max": 5.0,
+  "y_min": 0.0,
+  "y_sha1": "f39960bb459f22be"
+ },
+ "Ele2": {
+  "n_cols": 4,
+  "n_rows": 1056,
+  "y_max": 8546.030273,
+  "y_min": 64.470001,
+  "y_sha1": "4687536da9cee763"
+ },
+ "Energy_Efficiency": {
+  "n_cols": 8,
+  "n_rows": 768,
+  "y_max": 43.1,
+  "y_min": 6.01,
+  "y_sha1": "af92326923861e52"
+ },
+ "Goodreads-Computer-Books": {
+  "n_cols": 8,
+  "n_rows": 1234,
+  "y_max": 5.0,
+  "y_min": 0.0,
+  "y_sha1": "d4f3b19a94373b89"
+ },
+ "IEEE80211aa-GATS": {
+  "n_cols": 33,
+  "n_rows": 4046,
+  "y_max": 1.5,
+  "y_min": 0.1430926222222222,
+  "y_sha1": "f5eaf91f89b92b9b"
+ },
+ "Infrared_Thermography_Temperature": {
+  "n_cols": 33,
+  "n_rows": 1020,
+  "y_max": 39.6,
+  "y_min": 35.75,
+  "y_sha1": "3d6af0a2f3f042d8"
+ },
  "Job_Profitability": {
   "n_cols": 29,
   "n_rows": 14480,
@@ -48,12 +272,215 @@
   "y_min": -638.6337,
   "y_sha1": "298424b62a2376eb"
  },
+ "Laser": {
+  "n_cols": 4,
+  "n_rows": 993,
+  "y_max": 255.0,
+  "y_min": 0.0,
+  "y_sha1": "d70c88651e061d9a"
+ },
+ "MIP-2016-regression": {
+  "n_cols": 147,
+  "n_rows": 1090,
+  "y_max": 73296.15,
+  "y_min": 1.009109,
+  "y_sha1": "092fb3c482a13da1"
+ },
+ "Mercedes_Benz_Greener_Manufacturing": {
+  "n_cols": 376,
+  "n_rows": 4209,
+  "y_max": 265.32,
+  "y_min": 72.11,
+  "y_sha1": "ae71019d59e1bbdd"
+ },
+ "MiamiHousing2016": {
+  "n_cols": 16,
+  "n_rows": 13932,
+  "y_max": 2650000.0,
+  "y_min": 72000.0,
+  "y_sha1": "ffd658339f087469"
+ },
+ "Moneyball": {
+  "n_cols": 14,
+  "n_rows": 1232,
+  "y_max": 1009.0,
+  "y_min": 463.0,
+  "y_sha1": "ef7be6b426618bbd"
+ },
+ "NASA_PHM2008": {
+  "n_cols": 21,
+  "n_rows": 45918,
+  "y_max": 356.0,
+  "y_min": 0.0,
+  "y_sha1": "b5dcbdb505565e0b"
+ },
  "OnlineNewsPopularity": {
   "n_cols": 60,
   "n_rows": 39644,
   "y_max": 843300.0,
   "y_min": 1.0,
   "y_sha1": "b1ef84148bd35b5c"
+ },
+ "PRODUCTIVITY": {
+  "n_cols": 14,
+  "n_rows": 1197,
+  "y_max": 1.1204375,
+  "y_min": 0.233705476,
+  "y_sha1": "20986179b3f8901c"
+ },
+ "Parkinsons_Telemonitoring": {
+  "n_cols": 21,
+  "n_rows": 5875,
+  "y_max": 0.73173,
+  "y_min": 0.021983,
+  "y_sha1": "141cb66efa20c4d3"
+ },
+ "QSAR-TID-10980": {
+  "n_cols": 1024,
+  "n_rows": 5766,
+  "y_max": 9.886,
+  "y_min": 4.0,
+  "y_sha1": "65c742ccdedc7898"
+ },
+ "QSAR-TID-11": {
+  "n_cols": 1024,
+  "n_rows": 5742,
+  "y_max": 11.0,
+  "y_min": -6.24,
+  "y_sha1": "3fe5faed2ed96dc0"
+ },
+ "QsarFishToxicity": {
+  "n_cols": 6,
+  "n_rows": 908,
+  "y_max": 9.612,
+  "y_min": 0.053,
+  "y_sha1": "ded5ca1b75c9177b"
+ },
+ "SAT11-HAND-runtime-regression": {
+  "n_cols": 116,
+  "n_rows": 4440,
+  "y_max": 5130.43,
+  "y_min": 1.211995,
+  "y_sha1": "e1c874cb24bbf957"
+ },
+ "SGEMM_GPU_kernel_performance": {
+  "n_cols": 17,
+  "n_rows": 241600,
+  "y_max": 3339.63,
+  "y_min": 13.29,
+  "y_sha1": "06c46d2960e10b35"
+ },
+ "Santander_transaction_value": {
+  "n_cols": 4991,
+  "n_rows": 4459,
+  "y_max": 40000000.0,
+  "y_min": 30000.0,
+  "y_sha1": "d70130e625fb1a4d"
+ },
+ "Student_Performance": {
+  "n_cols": 32,
+  "n_rows": 395,
+  "y_max": 20.0,
+  "y_min": 0.0,
+  "y_sha1": "072eb542923b8790"
+ },
+ "Treasury": {
+  "n_cols": 15,
+  "n_rows": 1049,
+  "y_max": 20.76,
+  "y_min": 3.02,
+  "y_sha1": "f7a428bba997d3b0"
+ },
+ "abalone": {
+  "n_cols": 8,
+  "n_rows": 4177,
+  "y_max": 29.0,
+  "y_min": 1.0,
+  "y_sha1": "40038b0f573c72c3"
+ },
+ "analcatdata_supreme": {
+  "n_cols": 7,
+  "n_rows": 4052,
+  "y_max": 2.3,
+  "y_min": 0.0,
+  "y_sha1": "1b01480b20d42a68"
+ },
+ "avocado_sales": {
+  "n_cols": 13,
+  "n_rows": 18249,
+  "y_max": 3.25,
+  "y_min": 0.44,
+  "y_sha1": "78b982da4857e259"
+ },
+ "bank32nh": {
+  "n_cols": 32,
+  "n_rows": 8192,
+  "y_max": 0.819665,
+  "y_min": 0.0,
+  "y_sha1": "54fe2e0c0d368a9e"
+ },
+ "bank8FM": {
+  "n_cols": 8,
+  "n_rows": 8192,
+  "y_max": 0.802263,
+  "y_min": 0.0,
+  "y_sha1": "6c09749ac84319d7"
+ },
+ "black_friday": {
+  "n_cols": 9,
+  "n_rows": 166821,
+  "y_max": 23959.0,
+  "y_min": 185.0,
+  "y_sha1": "98ff64b9a6d23232"
+ },
+ "boston": {
+  "n_cols": 13,
+  "n_rows": 506,
+  "y_max": 50.0,
+  "y_min": 5.0,
+  "y_sha1": "cf18b060d505d3a2"
+ },
+ "california": {
+  "n_cols": 7,
+  "n_rows": 20634,
+  "y_max": -114.31,
+  "y_min": -124.35,
+  "y_sha1": "abfdd3467b21957f"
+ },
+ "colleges": {
+  "n_cols": 44,
+  "n_rows": 7063,
+  "y_max": 1.0,
+  "y_min": 0.0,
+  "y_sha1": "6dd12ca86aae8bc5"
+ },
+ "concrete_compressive_strength": {
+  "n_cols": 8,
+  "n_rows": 1030,
+  "y_max": 82.5992248,
+  "y_min": 2.331807832,
+  "y_sha1": "ef92762d2a3fb62f"
+ },
+ "cpu_act": {
+  "n_cols": 21,
+  "n_rows": 8192,
+  "y_max": 99.0,
+  "y_min": 0.0,
+  "y_sha1": "5e37574489c9fe07"
+ },
+ "dataset_sales": {
+  "n_cols": 14,
+  "n_rows": 10738,
+  "y_max": 85.0,
+  "y_min": 3.0,
+  "y_sha1": "ea5caae3357fb089"
+ },
+ "debutanizer": {
+  "n_cols": 7,
+  "n_rows": 2394,
+  "y_max": 1.0,
+  "y_min": 0.0,
+  "y_sha1": "30b2f8cf1c81f0cc"
  },
  "delays_zurich_transport": {
   "n_cols": 14,
@@ -69,6 +496,20 @@
   "y_min": 326.0,
   "y_sha1": "d0b56d04f7fb87d2"
  },
+ "elevators": {
+  "n_cols": 18,
+  "n_rows": 16599,
+  "y_max": 0.078,
+  "y_min": 0.012,
+  "y_sha1": "a5b61c100718e053"
+ },
+ "fifa": {
+  "n_cols": 5,
+  "n_rows": 18063,
+  "y_max": 12.765691290604371,
+  "y_min": 6.2166061010848646,
+  "y_sha1": "cb0bb08c113d95ec"
+ },
  "freMTPL2sev": {
   "n_cols": 10,
   "n_rows": 24944,
@@ -83,12 +524,54 @@
   "y_min": 0.0,
   "y_sha1": "910b3c22d3c9ca53"
  },
+ "house_prices_nominal": {
+  "n_cols": 79,
+  "n_rows": 1460,
+  "y_max": 755000.0,
+  "y_min": 34900.0,
+  "y_sha1": "5cada4cc1b20652f"
+ },
+ "house_sales": {
+  "n_cols": 19,
+  "n_rows": 21613,
+  "y_max": 871200.0,
+  "y_min": 651.0,
+  "y_sha1": "fd622c7647cd2c9e"
+ },
  "houses": {
   "n_cols": 8,
   "n_rows": 20640,
   "y_max": 500001.0,
   "y_min": 14999.0,
   "y_sha1": "df8e648d1634ab1e"
+ },
+ "isolet": {
+  "n_cols": 617,
+  "n_rows": 7797,
+  "y_max": 26.0,
+  "y_min": 1.0,
+  "y_sha1": "929852ca4062f3e9"
+ },
+ "kin8nm": {
+  "n_cols": 8,
+  "n_rows": 8192,
+  "y_max": 1.4585206,
+  "y_min": 0.040165378,
+  "y_sha1": "9ccdfc849b2733e7"
+ },
+ "mauna-loa-atmospheric-co2": {
+  "n_cols": 6,
+  "n_rows": 2225,
+  "y_max": 373.9,
+  "y_min": 313.0,
+  "y_sha1": "309144b4a385668b"
+ },
+ "medical_charges": {
+  "n_cols": 11,
+  "n_rows": 163065,
+  "y_max": 156158.1818,
+  "y_min": 2673.0,
+  "y_sha1": "446361c26fddd704"
  },
  "nyc-taxi-green-dec-2016": {
   "n_cols": 14,
@@ -104,6 +587,48 @@
   "y_min": -4.166,
   "y_sha1": "60ed780bdcb19df2"
  },
+ "pol": {
+  "n_cols": 48,
+  "n_rows": 15000,
+  "y_max": 100.0,
+  "y_min": 0.0,
+  "y_sha1": "c7a27244f6fcb862"
+ },
+ "puma32H": {
+  "n_cols": 32,
+  "n_rows": 8192,
+  "y_max": 0.089805,
+  "y_min": -0.086661,
+  "y_sha1": "8bfd04ccd7702e7b"
+ },
+ "quake": {
+  "n_cols": 3,
+  "n_rows": 2178,
+  "y_max": 6.9,
+  "y_min": 5.8,
+  "y_sha1": "a8b8cfdfeaf9a9bd"
+ },
+ "sensory": {
+  "n_cols": 11,
+  "n_rows": 576,
+  "y_max": 17.5,
+  "y_min": 12.5,
+  "y_sha1": "64cd43a4385c4a91"
+ },
+ "socmob": {
+  "n_cols": 5,
+  "n_rows": 1156,
+  "y_max": 414.0,
+  "y_min": 0.0,
+  "y_sha1": "34c1e6af3e69fe29"
+ },
+ "space_ga": {
+  "n_cols": 6,
+  "n_rows": 3107,
+  "y_max": 0.10008345855698232,
+  "y_min": -3.0570450190096023,
+  "y_sha1": "325576bf9daab97c"
+ },
  "stock_fardamento02": {
   "n_cols": 6,
   "n_rows": 6277,
@@ -111,11 +636,74 @@
   "y_min": 1.0,
   "y_sha1": "cfaedc79fc7f5407"
  },
+ "sulfur": {
+  "n_cols": 6,
+  "n_rows": 10081,
+  "y_max": 1.0,
+  "y_min": 0.0,
+  "y_sha1": "91811abfb886bfbd"
+ },
  "superconduct": {
   "n_cols": 81,
   "n_rows": 21263,
   "y_max": 185.0,
   "y_min": 0.00021,
   "y_sha1": "a7e3880f5cf8057f"
+ },
+ "tecator": {
+  "n_cols": 124,
+  "n_rows": 240,
+  "y_max": 58.5,
+  "y_min": 0.9,
+  "y_sha1": "666c1917a3770c6e"
+ },
+ "topo_2_1": {
+  "n_cols": 266,
+  "n_rows": 8885,
+  "y_max": 1.0,
+  "y_min": 0.0,
+  "y_sha1": "a8287369e1f76933"
+ },
+ "us_crime": {
+  "n_cols": 127,
+  "n_rows": 1994,
+  "y_max": 1.0,
+  "y_min": 0.0,
+  "y_sha1": "485d6e8152f6e990"
+ },
+ "visualizing_soil": {
+  "n_cols": 4,
+  "n_rows": 8641,
+  "y_max": 40.0,
+  "y_min": 1.0,
+  "y_sha1": "2cd2a10b8fe894f2"
+ },
+ "weather_izmir": {
+  "n_cols": 9,
+  "n_rows": 1461,
+  "y_max": 89.9,
+  "y_min": 29.4,
+  "y_sha1": "4013e77878148dba"
+ },
+ "wine_quality": {
+  "n_cols": 11,
+  "n_rows": 6497,
+  "y_max": 9.0,
+  "y_min": 3.0,
+  "y_sha1": "c4f377026e939ce5"
+ },
+ "year": {
+  "n_cols": 90,
+  "n_rows": 515345,
+  "y_max": 2011.0,
+  "y_min": 1922.0,
+  "y_sha1": "fe4764b1df76cb10"
+ },
+ "yprop_4_1": {
+  "n_cols": 251,
+  "n_rows": 8885,
+  "y_max": 1.0,
+  "y_min": 0.0,
+  "y_sha1": "a8287369e1f76933"
  }
 }
