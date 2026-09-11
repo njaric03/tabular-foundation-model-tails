@@ -1,0 +1,9 @@
+dataset,domain,n_rows,n_pos,n_cov,n_categorical,hill_xi,duplicate_of,sd_shift_median,sd_shift_max,p_sd_2.0,p_sd_4.0,p_sd_10.0,passed,failed_gates,n_fit,n_subsamples,seconds,reason
+beMTPL97,"motor third-party liability, Belgium 1997, average claim amount",18276,18276,13,4,0.6698867717110722,,1.0993754684831103,1.195459587340107,0.0,0.0,0.0,True,,2000,200,0.5,
+ausprivauto0405,"private motor, Australia 2004-05, claim amount",67856,4624,6,4,0.5982678163563483,,1.047532033623174,1.0730544945589278,0.0,0.0,0.0,True,,2000,200,0.1,
+freMPL1,"motor personal line, France, claim amount",20600,2205,18,12,0.7486060205678311,,1.3126602873404876,1.8063748084899465,0.0,0.0,0.0,False,G1,2000,200,0.1,
+norauto,"motor, Norway, claim amount",183999,8444,5,2,0.4826398491254858,,1.0702775191740783,1.192499704354967,0.0,0.0,0.0,True,,2000,200,0.2,
+swmotorcycle,"motorcycle, Sweden 1994-98, claim amount",64548,670,7,4,0.4018781030336614,,1.1025072704125745,1.1754661565290436,0.0,0.0,0.0,False,G1,2000,200,0.1,
+AutoClaims,"automobile claims paid, US",6773,6773,4,3,0.5170393576305458,,1.0459255064225017,1.162437377408194,0.0,0.0,0.0,True,,2000,200,0.0,
+MEPS_2016_TOTEXP,"total health expenditure per person, US 2016 (MEPS HC-192)",34655,34655,23,0,0.8096478939658276,,1.0913443903843951,1.7506878647806279,0.0,0.0,0.0,True,,2000,200,0.2,
+BlogFeedback,comments a blog post receives in the next 24 hours (UCI),52397,18838,280,0,1.0451963704804592,,1.0533765821827232,1.1919099419325512,0.0,0.0,0.0,True,,2000,200,1.4,

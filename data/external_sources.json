@@ -1,0 +1,10 @@
+{
+ "https://archive.ics.uci.edu/static/public/304/blogfeedback.zip": "1ba74e5ad920f7cd037502b2968581cc695146a226a73eff52fe8ad875ed4bcf",
+ "https://cran.r-project.org/src/contrib/insuranceData_1.0.tar.gz": "dca49e4325d02a0ffe8b65b1026d3594f39572bfcd3463f1ba768d1d22823e73",
+ "https://github.com/dutangc/CASdatasets/raw/master/data/ausprivauto0405.rda": "c8aeabd0b75e16a2b9a7452cfb3e8e2b3ec36a27171d35c2862bc8278777461c",
+ "https://github.com/dutangc/CASdatasets/raw/master/data/beMTPL97.rda": "955a821a7a693bf18076c425e4d5a5a99889f3c89e1fbd99eca6239c11e963a6",
+ "https://github.com/dutangc/CASdatasets/raw/master/data/freMPL1.rda": "0c8e40bcd7e416842953bd72a7f23883ce4794b97a49b3e1d68c472159da7264",
+ "https://github.com/dutangc/CASdatasets/raw/master/data/norauto.rda": "86ddbe1f8c6c8e73ab7fdcaf637d16a8d4b724b7bdcd3c77f38ba64117d86928",
+ "https://github.com/dutangc/CASdatasets/raw/master/data/swmotorcycle.rda": "9f3bc75279e9dd6fac607d03e7fb052197142614067b996be1052c17a1f54d2d",
+ "https://meps.ahrq.gov/mepsweb/data_files/pufs/h192ssp.zip": "b209ef944d82240676c1112fd949e05e2900aeb925f00797f89ac38ec7ed1128"
+}

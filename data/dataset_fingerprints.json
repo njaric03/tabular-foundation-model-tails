@@ -174,6 +174,13 @@
   "y_min": 2500.0,
   "y_sha1": "c44a8719b421513b"
  },
+ "AutoClaims": {
+  "n_cols": 4,
+  "n_rows": 6773,
+  "y_max": 60000.0,
+  "y_min": 9.5,
+  "y_sha1": "f1e0996f71f33b01"
+ },
  "BIAS_CORRECTION": {
   "n_cols": 24,
   "n_rows": 7725,
@@ -201,6 +208,13 @@
   "y_max": 977.0,
   "y_min": 1.0,
   "y_sha1": "550fcd8a27af9445"
+ },
+ "BlogFeedback": {
+  "n_cols": 280,
+  "n_rows": 52397,
+  "y_max": 1424.0,
+  "y_min": 0.0,
+  "y_sha1": "8d1d819072b5f9cd"
  },
  "Brazilian_houses": {
   "n_cols": 12,
@@ -278,6 +292,13 @@
   "y_max": 255.0,
   "y_min": 0.0,
   "y_sha1": "d70c88651e061d9a"
+ },
+ "MEPS_2016_TOTEXP": {
+  "n_cols": 23,
+  "n_rows": 34655,
+  "y_max": 580640.0,
+  "y_min": 5.397605346934028e-79,
+  "y_sha1": "6deebfe5085bc766"
  },
  "MIP-2016-regression": {
   "n_cols": 147,
@@ -405,6 +426,13 @@
   "y_min": 0.0,
   "y_sha1": "1b01480b20d42a68"
  },
+ "ausprivauto0405": {
+  "n_cols": 6,
+  "n_rows": 67856,
+  "y_max": 55922.129883,
+  "y_min": 0.0,
+  "y_sha1": "cc5b1c99dd51a3b1"
+ },
  "avocado_sales": {
   "n_cols": 13,
   "n_rows": 18249,
@@ -425,6 +453,13 @@
   "y_max": 0.802263,
   "y_min": 0.0,
   "y_sha1": "6c09749ac84319d7"
+ },
+ "beMTPL97": {
+  "n_cols": 13,
+  "n_rows": 18276,
+  "y_max": 80499.60460982799,
+  "y_min": 0.0247893524773239,
+  "y_sha1": "5eea1e4d38e21b38"
  },
  "black_friday": {
   "n_cols": 9,
@@ -510,6 +545,13 @@
   "y_min": 6.2166061010848646,
   "y_sha1": "cb0bb08c113d95ec"
  },
+ "freMPL1": {
+  "n_cols": 18,
+  "n_rows": 20600,
+  "y_max": 163427.013897281,
+  "y_min": -1920.88549848943,
+  "y_sha1": "b01fdccf04638f09"
+ },
  "freMTPL2sev": {
   "n_cols": 10,
   "n_rows": 24944,
@@ -572,6 +614,13 @@
   "y_max": 156158.1818,
   "y_min": 2673.0,
   "y_sha1": "446361c26fddd704"
+ },
+ "norauto": {
+  "n_cols": 5,
+  "n_rows": 183999,
+  "y_max": 700000.0,
+  "y_min": 0.0,
+  "y_sha1": "47c4f3fae353f656"
  },
  "nyc-taxi-green-dec-2016": {
   "n_cols": 14,
@@ -649,6 +698,13 @@
   "y_max": 185.0,
   "y_min": 0.00021,
   "y_sha1": "a7e3880f5cf8057f"
+ },
+ "swmotorcycle": {
+  "n_cols": 7,
+  "n_rows": 64548,
+  "y_max": 365347.0,
+  "y_min": 0.0,
+  "y_sha1": "9818efafd8c3a949"
  },
  "tecator": {
   "n_cols": 124,

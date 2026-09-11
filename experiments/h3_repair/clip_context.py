@@ -91,6 +91,41 @@ own leverage, which touches part one and has not been followed up. The run is
 synthetic, one model, one leverage row at the centre of x, and has not been tried
 on real data.
 
+SECOND RUN: A RULE INSTEAD OF A PICKED C
+----------------------------------------
+Clipping cannot tell a unit error from a genuine extreme, and C is the knob that
+decides for it. Three arms replace the knob with something that has a reason,
+and the seeds go from 5 to 20 so the first run's numbers settle as well.
+
+    log        fit on log(y), exponentiate the quantiles. A monotone map, so
+               quantiles come back exactly; but it reshapes the whole body.
+    tail_log   identity up to median + C * robust_sd, logarithmic above it, and
+               inverted on the way out. The body is untouched, the leverage row
+               is compressed rather than cut, and a quantile above the cap is
+               still reachable. C = 50, the value at which hard clipping costs.
+    evt_trim   no C. The top five values are tested against the tail of the
+               rest: under a Pareto tail the scaled log spacings
+               i * (log X(i) - log X(i+1)) are independent exponentials with mean
+               xi (Renyi), so a spacing far above the mean of the others says the
+               value above it is not from that tail. xi is estimated from the
+               spacings below the candidates, the threshold is Bonferroni at 0.01
+               over five, and flagged values are pulled down to the largest one
+               not flagged. A simplified form of the trimmed-Hill outlier test of
+               Bhattacharya, Kallitsis and Stoev (2019). By construction it
+               flags a clean heavy-tailed context about 1% of the time.
+
+Predictions, written before the second run:
+  P5. evt_trim flags the injected row at shifts 20 and 50 in most seeds, and
+      touches a clean context in at most 5% of seeds.
+  P6. Where evt_trim flags, its xi_implied and pb999 are within noise of
+      clip_200; on the clean context its cost is close to zero because it
+      touches nothing.
+  P7. log keeps xi_implied positive under leverage, but on the clean context
+      costs pinball at 0.999 more than clip_200, because it reshapes the body
+      (`repair.py` saw +2 to +30% at 0.999 without any leverage).
+  P8. tail_log at C = 50 costs less than clip_50 on the clean context at 0.999,
+      because it is inverted on the way out.
+
 HOW TO READ IT
 --------------
   borders_in_data up, xi_implied positive     the fix works for the named reason
@@ -146,6 +181,64 @@ def pinball(y, q, a):
     return float(np.mean(np.maximum(a * d, (a - 1) * d)))
 
 
+# The cap of tail_log, in robust sd above the median. Fixed before the second
+# run at the value where hard clipping was seen to cost; a column, not a grid.
+TAIL_LOG_C = 50.0
+
+
+def evt_trim(y, k_share=0.05, k_min=50, j_max=5, alpha=0.01):
+    """Pull down the top values that the tail of the rest cannot have produced.
+
+    Returns the new target and how many values were changed. See the docstring
+    of this module for the test; `spacings[i - 1]` is i * (log X(i) - log
+    X(i+1)) with X(1) the largest.
+    """
+    y = np.asarray(y, dtype=float)
+    pos = np.sort(y[y > 0])[::-1]
+    k = max(k_min, int(k_share * len(pos)))
+    if len(pos) < k + 2:
+        return y.copy(), 0
+    logs = np.log(pos[:k + 1])
+    spacings = np.arange(1, k + 1) * (logs[:-1] - logs[1:])
+    xi_hat = float(spacings[j_max:].mean())
+    if xi_hat <= 0:
+        return y.copy(), 0
+    threshold = -np.log(alpha / j_max)
+    flagged = [i for i in range(1, j_max + 1) if spacings[i - 1] / xi_hat > threshold]
+    if not flagged:
+        return y.copy(), 0
+    cap = pos[max(flagged)]              # the largest value not flagged
+    return np.minimum(y, cap), int((y > cap).sum())
+
+
+def transform(arm, c, y):
+    """The context target an arm fits on, the map back for its quantiles, and how
+    many context values the arm changed."""
+    y = np.asarray(y, dtype=float)
+    med, rsd = float(np.median(y)), robust_sd(y)
+    same = lambda q: q
+    if arm == "raw":
+        return y, same, 0
+    if arm == "clip":
+        cap = med + c * rsd
+        return np.minimum(y, cap), same, int((y > cap).sum())
+    if arm == "log":
+        if (y <= 0).any():
+            raise ValueError("log needs a positive target")
+        return np.log(y), np.exp, 0
+    if arm == "tail_log":
+        cap, d = med + c * rsd, c * rsd
+        over = y > cap
+        z = y.copy()
+        z[over] = cap + d * np.log1p((y[over] - cap) / d)
+        back = lambda q: np.where(q > cap, cap + d * np.expm1((q - cap) / d), q)
+        return z, back, int(over.sum())
+    if arm == "evt_trim":
+        z, n = evt_trim(y)
+        return z, same, n
+    raise ValueError(arm)
+
+
 def fit_predict(Xc, yc, Xte, seed):
     """Quantiles in the target's own units, plus the fitted raw-space borders."""
     from tabpfn import TabPFNRegressor
@@ -187,10 +280,13 @@ def one(xi, variant, c, target, seed):
     elif variant == "robust":
         q, borders = fit_predict(Xc, (yc - med) / rsd, Xte, seed)
         q, borders = q * rsd + med, borders * rsd + med
-    elif variant == "clip":
-        cap = med + c * rsd
-        n_clipped = int((yc > cap).sum())
-        q, borders = fit_predict(Xc, np.minimum(yc, cap), Xte, seed)
+    elif variant in ("clip", "log", "tail_log", "evt_trim"):
+        y_fit, back, n_clipped = transform(variant, c, yc)
+        q, borders = fit_predict(Xc, y_fit, Xte, seed)
+        # exp and expm1 of the outer borders overflow to inf; that is where those
+        # borders are, and the counts below only compare against the data range.
+        with np.errstate(over="ignore", invalid="ignore"):
+            q, borders = back(q), back(borders)
     else:
         raise ValueError(variant)
 
@@ -232,6 +328,9 @@ def cells():
                 yield xi, "robust", 0.0, target, seed
                 for c in CLIP_C:
                     yield xi, "clip", c, target, seed
+                yield xi, "log", 0.0, target, seed
+                yield xi, "tail_log", TAIL_LOG_C, target, seed
+                yield xi, "evt_trim", 0.0, target, seed
 
 
 def main():

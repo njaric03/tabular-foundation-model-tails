@@ -186,6 +186,11 @@ def _load(name, ids=None):
         LAST["source"] = "openml-joined"
         return prepare(*_load_fremtpl2())
 
+    from common import external
+    if name in external.REGISTRY:
+        LAST["source"] = "external"
+        return prepare(*external.load(name))
+
     if re.match(r"^\d+_", name):
         LAST["source"] = "pmlb"
         return prepare(*_load_pmlb(name))

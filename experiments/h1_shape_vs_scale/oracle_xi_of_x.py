@@ -59,7 +59,9 @@ N_TERCILA = 3
 HI, LO = 0.99, 0.9
 
 N_GRID = [500, 1000, 2000, 5000, 20000, 100000]
-N_PONAVLJANJA = 20
+# The seed of repetition r depends only on (r, n), so a larger count keeps the
+# first twenty draws identical and only adds new ones.
+N_PONAVLJANJA = int(os.environ.get("N_REPEATS", "20"))
 POT_FRAC = 0.10
 OUT = os.environ.get("OUTPUT", "oracle_xi_of_x.csv")
 
