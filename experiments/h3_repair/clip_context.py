@@ -126,6 +126,36 @@ Predictions, written before the second run:
   P8. tail_log at C = 50 costs less than clip_50 on the clean context at 0.999,
       because it is inverted on the way out.
 
+OUTCOME OF THE SECOND RUN
+-------------------------
+TabPFN-V3, xi in {0.7, 0.9}, 20 seeds (the first five are the first run's),
+1280 cells. Pinball at 0.999 is compared with raw seed by seed; "better" counts
+seeds, p is a sign test over the 20.
+
+  P1 HELD again: robust equals raw to 8.0e-08.
+  P5 FAILED. evt_trim touches 1 of 20 seeds at every shift, clean or not (2 of
+     20 at xi 0.7 and a shift of 50). That is its false-alarm rate, not power:
+     a single value 30 times the second largest is within what a tail of 0.7
+     produces often enough at n = 2000, so the test cannot call it an error. An
+     honest form of the dilemma: the context's own order statistics cannot tell
+     an error from an extreme at this size.
+  P6 VACUOUS: where evt_trim does not fire it is raw.
+  P7 FAILED. log does not cost on the clean context (-0.7% at 0.7, -11.8% at
+     0.9, neither significant) and keeps xi_implied near 0.66 and 0.83 at every
+     shift. Under leverage it repairs, less reliably than clip_200: at a shift of
+     20, 13/20 (p = 0.26) at 0.7 and 15/20 at 0.9, against 16/20 and 18/20.
+  P8 FAILED, badly. tail_log reads the shape right (0.64, 0.80) but its pinball
+     at 0.999 is 1.5 to 1073 against raw's 0.3 to 2.0. Inverting the compression
+     re-expands whatever mass the model puts near the compressed top, and
+     exponentially. Compressing a tail and giving it back does not work.
+
+And the first run's numbers settle. clip_200 on a clean context is +0.0% (7/20)
+at 0.7 and -1.0% (11/20) at 0.9: no measurable cost. The "+9% at 0.9" of the
+first run was five seeds. Under leverage it is better in 15/20 to 20/20 seeds at
+every shift above 1, by 9% at a shift of 4 and 38 to 48% at 50. clip_50 does
+cost: +14% at 0.9 on the clean context, better in only 2 of 20 seeds
+(p = 0.0004). So the trade-off is real for a tight cap and not measurable at 200.
+
 HOW TO READ IT
 --------------
   borders_in_data up, xi_implied positive     the fix works for the named reason

@@ -70,6 +70,25 @@ OUTCOME, 11.9.2026
   P4. Wrong. GBM's raw d_q99 has a median of +13% at 2 to 4 sd, and GBM gains
       the most from the clip in pinball. Not all of the gain is the grid.
 
+SECOND RUN, 11.9.2026: THE ARMS THAT DO NOT NEED A PICKED C
+-----------------------------------------------------------
+log, tail_log (C = 50) and evt_trim from `clip_context.transform`, on the same
+60 cells. No separate predictions were written here; P5 to P8 of
+`clip_context.py` are the ones that apply. Pinball at 0.99 against raw, over
+the ten subsamples at 2 sd and above:
+
+    clip_200   TabICLv2 9/10 (p = 0.021)  TabPFN-V3 9/10 (0.021)  GBM 10/10 (0.002)
+    log                 8/10 (0.109)               9/10 (0.021)        8/10 (0.109)
+    tail_log            9/10 (0.021)               6/10 (0.754)        9/10 (0.021)
+    evt_trim   touches no context in any of the 60 cells; identical to raw
+
+log moves TabPFN-V3's Q(0.99) by +20 to +37% against without_max in every
+bin, the clean ones included: it gives a different model, not the reference
+back. For TabICLv2 at 4 sd and above it makes the loss larger (-19.7% against
+raw's -15.4%). tail_log costs TabPFN-V3 a pinball of 854 against 660 at 2 to 4
+sd. clip_200 stays the only arm that helps all three models where the leverage
+is and moves nothing where it is not.
+
 RUNNING
 -------
     python -u experiments/h3_repair/clip_context_real.py

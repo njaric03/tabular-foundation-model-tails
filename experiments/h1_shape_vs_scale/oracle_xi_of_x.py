@@ -46,7 +46,7 @@ import pandas as pd
 from scipy.optimize import brentq
 from scipy.stats import genpareto, norm
 
-from common import generator, metrics, paths, quiet
+from common import generator, metrics, paths, provenance, quiet
 
 quiet.silence()
 
@@ -122,6 +122,10 @@ def main():
               f"[{time.time()-t0:.0f}s]", flush=True)
 
     df = pd.DataFrame(rows)
+    # This script writes the whole file at once rather than through
+    # `append.write`, so it never left a provenance row; the 200-repeat run of
+    # 11.9.2026 had its row added by hand.
+    provenance.record(OUT)
     df.to_csv(paths.result(OUT), index=False)
 
     print("\n=== NAGIB (xi u 3. tercilu minus xi u 1.), prosek i rasipanje ===")
