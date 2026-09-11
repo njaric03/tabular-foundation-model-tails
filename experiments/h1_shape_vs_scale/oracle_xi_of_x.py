@@ -87,11 +87,11 @@ def jedno_ponavljanje(n, rng):
     out = {}
     for t in range(N_TERCILA):
         sel = terc == t
-        out[f"pravo_{t}"] = float(xi[sel].mean())
-        out[f"oraklS_{t}"] = metrics.gpd_mle(y[sel] / s[sel])
-        out[f"oraklR_{t}"] = metrics.gpd_mle(y[sel] / s_hat[sel])
+        out[f"true_{t}"] = float(xi[sel].mean())
+        out[f"oracle_s_{t}"] = metrics.gpd_mle(y[sel] / s[sel])
+        out[f"oracle_r_{t}"] = metrics.gpd_mle(y[sel] / s_hat[sel])
         q_lo, q_hi = np.quantile(y[sel], [LO, HI])
-        out[f"empir_{t}"] = metrics.xi_from_ratio(q_hi / q_lo) if q_lo > 1e-12 else np.nan
+        out[f"empirical_{t}"] = metrics.xi_from_ratio(q_hi / q_lo) if q_lo > 1e-12 else np.nan
     return out
 
 
@@ -112,10 +112,10 @@ def main():
             d.update(n=n, repeat=r)
             rows.append(d)
         df = pd.DataFrame([x for x in rows if x["n"] == n])
-        pr = np.nanmean([nagib(x, "pravo") for x in rows if x["n"] == n])
+        pr = np.nanmean([nagib(x, "true") for x in rows if x["n"] == n])
         print(f"  n={n:>7}  pravi nagib {pr:+.3f} | "
-              f"ORAKL-S {np.nanmean([nagib(x,'oraklS') for x in rows if x['n']==n]):+.3f} "
-              f"| ORAKL-R {np.nanmean([nagib(x,'oraklR') for x in rows if x['n']==n]):+.3f} "
+              f"ORAKL-S {np.nanmean([nagib(x,'oracle_s') for x in rows if x['n']==n]):+.3f} "
+              f"| ORAKL-R {np.nanmean([nagib(x,'oracle_r') for x in rows if x['n']==n]):+.3f} "
               f"| EMPIRIJA {np.nanmean([nagib(x,'empirical') for x in rows if x['n']==n]):+.3f} "
               f"[{time.time()-t0:.0f}s]", flush=True)
 
@@ -131,9 +131,9 @@ def main():
             v = np.array([nagib(x, p) for x in sub], dtype=float)
             # ddof=1: this is scatter over repetitions, matching every other script.
             return np.nanmean(v), np.nanstd(v, ddof=1)
-        pr, _ = st("pravo")
-        (ms, ss), (mr, sr), (me, se) = st("oraklS"), st("oraklR"), st("empirical")
-        udeo = np.nanmean(np.array([nagib(x, "oraklS") for x in sub], dtype=float) > 0.25)
+        pr, _ = st("true")
+        (ms, ss), (mr, sr), (me, se) = st("oracle_s"), st("oracle_r"), st("empirical")
+        udeo = np.nanmean(np.array([nagib(x, "oracle_s") for x in sub], dtype=float) > 0.25)
         print(f"{n:>8}{pr:>9.3f}{ms:>11.3f}+-{ss:<5.2f}{mr:>11.3f}+-{sr:<5.2f}"
               f"{me:>11.3f}+-{se:<5.2f}{udeo:>12.0%}")
 
@@ -141,10 +141,10 @@ def main():
     for n in N_GRID:
         sub = pd.DataFrame([x for x in rows if x["n"] == n])
         red = " | ".join(
-            f"T{t+1}: pravo {sub[f'pravo_{t}'].mean():.2f} "
-            f"S {sub[f'oraklS_{t}'].mean():.2f} "
-            f"R {sub[f'oraklR_{t}'].mean():.2f} "
-            f"E {sub[f'empir_{t}'].mean():.2f}"
+            f"T{t+1}: pravo {sub[f'true_{t}'].mean():.2f} "
+            f"S {sub[f'oracle_s_{t}'].mean():.2f} "
+            f"R {sub[f'oracle_r_{t}'].mean():.2f} "
+            f"E {sub[f'empirical_{t}'].mean():.2f}"
             for t in range(N_TERCILA))
         print(f"  n={n:>7}  {red}")
     print(f"\nukupno {time.time()-t0:.0f}s")

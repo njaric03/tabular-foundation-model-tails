@@ -21,6 +21,7 @@ freMTPL2sev imaju veliki deo mase na par tacaka, sto kvari i procenu i kvantilne
 
 Rezultati u `dataset_selection.csv`; oni koji prodju idu u `selected_datasets.txt`.
 """
+import os
 import time
 import numpy as np
 import pandas as pd
@@ -32,6 +33,10 @@ from common import datasets, metrics, paths, quiet
 
 quiet.silence()
 
+OUT = os.environ.get("OUTPUT", "dataset_selection.csv")
+# Ime liste izabranih skupova, pod data/. Knob, da provera ne prepise listu koju
+# citaju graft_gate, mean_correction i evt_graft_experiment.
+SELECTED = os.environ.get("SELECTED", "selected_datasets.txt")
 MAX_ROWS = 30000
 MIN_N = 3000
 MIN_XI = 0.15
@@ -97,7 +102,11 @@ def main():
         po_pragu = [metrics.gpd_mle(z, f) for f in FRACS]
         g10, h10 = po_pragu[1], metrics.hill(z)
         q50, q90, q99 = np.quantile(z, [0.5, 0.9, 0.99])
-        kv = metrics.xi_from_ratio((q99 - q50) / (q90 - q50)) if (q90 - q50) > 1e-12 else np.nan
+        # Rezidualni odnos (Q99-Q50)/(Q90-Q50) trazi rezidualni inverter. `xi_from_ratio`
+        # invertuje sirovi Q99/Q90 i ovde daje drugi broj: citirani CSV je napravljen
+        # ispravnim inverterom, a ova linija je od 28.8. tiho nosila pogresan.
+        kv = (metrics.xi_from_residual_ratio((q99 - q50) / (q90 - q50))
+              if (q90 - q50) > 1e-12 else np.nan)
 
         tri = np.array([g10, h10, kv], dtype=float)
         raspon_tri = float(np.nanmax(tri) - np.nanmin(tri))
@@ -118,12 +127,14 @@ def main():
               f"| vezanih {tied_share:.1%}  {znak}  [{time.time()-t0:.0f}s]", flush=True)
 
     df = pd.DataFrame(rows).sort_values(["passes", "gpd10"], ascending=[False, False])
-    df.to_csv(paths.result("dataset_selection.csv"), index=False)
+    df.to_csv(paths.result(OUT), index=False)
     pd.set_option("display.width", 240)
     print("\n=== SVI KANDIDATI ===")
     print(df.round(3).to_string(index=False))
     izabrani = list(df[df.passes].dataset)
-    with open("selected_datasets.txt", "w", encoding="utf-8") as f:
+    # Kroz paths.data, ne golo ime: bez toga lista zavrsi tamo odakle je skripta
+    # pokrenuta, a eksperimenti citaju `data/selected_datasets.txt`.
+    with open(paths.data(SELECTED), "w", encoding="utf-8") as f:
         f.write("\n".join(izabrani))
     print(f"\nPROLAZE ({len(izabrani)}): {izabrani}")
     print(f"ukupno {time.time()-t0:.0f}s")

@@ -60,7 +60,7 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              # float32 is used, PER_LEVEL whether the quantile bank is read in
              # one pass or one per level. (`N` in that adapter's __main__ demo is
              # left out: it writes no CSV.)
-             "DTYPE", "PER_LEVEL",
+             "DTYPE", "PER_LEVEL", "SELECTED",
              # Not read by any script here: TabPFN's own package setting, whose
              # `env_prefix="TABPFN_"` picks the generation. `mean_correction.py`
              # builds TabPFNRegressor itself, without `model_path`, so this is

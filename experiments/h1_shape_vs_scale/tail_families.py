@@ -159,7 +159,7 @@ def main():
                     r = jedan(fam, ime, seed)
                 except Exception as e:
                     r = dict(reason=f"{type(e).__name__}: {e}"[:100])
-                r.update(family=fam, model=ime, seed=seed,
+                r.update(n_est=N_EST, family=fam, model=ime, seed=seed,
                          seconds=round(time.time() - t1, 1))
                 append.write(OUT, r, KOLONE)
                 if r.get("reason"):

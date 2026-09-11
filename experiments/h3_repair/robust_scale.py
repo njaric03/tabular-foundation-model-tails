@@ -45,7 +45,10 @@ quiet.silence()
 
 
 XI_LISTA = [float(v) for v in os.environ.get("XI", "0.7,0.9").split(",")]
-VARIJANTE = os.environ.get("VARIANTS", "sirovo,robusna").split(",")
+# Engleska imena, jer se po njima grana (`== "robust"`) i jer ih nosi kolona
+# `variant`. Default je bio `sirovo,robusna`: za `robusna` se nikad ne ulazi u
+# robusnu granu, pa bi obicno pokretanje tiho merilo sirovo dvaput, pod dva imena.
+VARIJANTE = os.environ.get("VARIANTS", "raw,robust").split(",")
 SEEDOVA = int(os.environ.get("SEEDS", "5"))
 MODELI = models.parse_list(os.environ.get("MODELS", "TabICLv2,TabPFN-V3"))
 N_TRAIN, N_TEST = 2000, 900

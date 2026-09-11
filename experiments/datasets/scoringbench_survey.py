@@ -95,7 +95,11 @@ def obradi(ime, ids):
     po_pragu = [metrics.gpd_mle(z, f) for f in FRACS]
     g10, h10 = po_pragu[1], metrics.hill(z)
     q50, q90, q99 = np.quantile(z, [0.5, 0.9, 0.99])
-    kv = metrics.xi_from_ratio((q99 - q50) / (q90 - q50)) if (q90 - q50) > 1e-12 else np.nan
+    # Rezidualni odnos (Q99-Q50)/(Q90-Q50) trazi rezidualni inverter. `xi_from_ratio`
+    # invertuje sirovi Q99/Q90 i ovde daje drugi broj: citirani CSV je napravljen
+    # ispravnim inverterom, a ova linija je od 28.8. tiho nosila pogresan.
+    kv = (metrics.xi_from_residual_ratio((q99 - q50) / (q90 - q50))
+          if (q90 - q50) > 1e-12 else np.nan)
 
     tri = np.array([g10, h10, kv], dtype=float)
     raspon_tri = float(np.nanmax(tri) - np.nanmin(tri))

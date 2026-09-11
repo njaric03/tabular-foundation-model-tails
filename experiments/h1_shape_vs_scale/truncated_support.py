@@ -109,7 +109,7 @@ def main():
                              reason="")
                 except Exception as e:
                     r = dict(reason=f"{type(e).__name__}: {e}"[:100])
-                r.update(xi=xi, model=ime, seed=seed, seconds=round(time.time() - t1, 1))
+                r.update(n_est=N_EST, xi=xi, model=ime, seed=seed, seconds=round(time.time() - t1, 1))
                 append.write(OUT, r, KOLONE)
                 poruka = r.get("reason") or (f"model/prava {r['ratio_true']:.3f}  "
                                              f"model/odsecena {r['ratio_truncated']:.3f}")

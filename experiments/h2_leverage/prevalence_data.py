@@ -51,7 +51,9 @@ from common import append, datasets, metrics, models, paths, quiet
 quiet.silence()
 
 
-UZORAKA = int(os.environ.get("N_SUBSAMPLES", "40"))
+# 200, jer je citirani fajl meren sa 200 poduzoraka po skupu (99 x 200 = 19.800
+# merenja u nalazima). Default od 40 nije reprodukovao ono sto rad citira.
+UZORAKA = int(os.environ.get("N_SUBSAMPLES", "200"))
 N_FIT = int(os.environ.get("N_FIT", "2000"))
 PRAGOVI = [1.5, 2.0, 4.0, 10.0]
 OUT = os.environ.get("OUTPUT", "prevalence_data.csv")

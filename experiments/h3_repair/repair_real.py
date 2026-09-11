@@ -112,7 +112,7 @@ def main():
                             r = jedan(skup, ime, doza, varijanta, seed, kes)
                         except Exception as e:
                             r = dict(reason=f"{type(e).__name__}: {e}"[:110])
-                        r.update(dataset=skup, model=ime, dose=doza, variant=varijanta,
+                        r.update(n_est=N_EST, dataset=skup, model=ime, dose=doza, variant=varijanta,
                                  seed=seed, seconds=round(time.time() - t1, 1))
                         append.write(OUT, r, KOLONE)
                         poruka = r.get("reason") or (

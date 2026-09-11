@@ -88,18 +88,11 @@ KLJUC = ["dataset", "model", "seed", "n_est"]
 # TabFM je ~1,6 mlrd parametara na CPU-u, oko dva i po minuta po fitu; smanjen profil.
 if MODEL == "TabFM":
     N_FIT, N_VAL, N_TEST = 1000, 500, 600
-
-
-# ------------------------------------------------------------------ modeli
-def napravi_prediktor(Xf, yf, seed):
-    """Vrati funkciju X -> predvidjena uslovna sredina.
-
-    Jedno mesto, `models.predictive_mean`. Model se fituje po pozivu, pa se
-    predikcija racuna odjednom za sve delove koji je traze.
-    """
-    def pred(X):
-        return models.predictive_mean(MODEL, Xf, yf, X, seed=seed, n_est=N_EST)
-    return pred
+    # Jedan clan, kako je TabFM i meren pre prelaska na `common/`: stari
+    # dispecer je imao `n_estimators=1` ukucano. Default N_EST=4 bi ga vrteo
+    # cetiri puta sporije i merio drugu stvar od one koju ovaj profil opisuje.
+    if "N_EST" not in os.environ:
+        N_EST = 1
 
 
 # ------------------------------------------------------------------ metrike
@@ -140,8 +133,12 @@ def _pod(mu, yf):
 def jedan(oznaka, delovi, seed, prava_sredina, t0, rows):
     t1 = time.time()
     (Xf, yf), (Xv, yv), (Xt, yt) = delovi
-    pred = napravi_prediktor(Xf, yf, seed)
-    sirovo_v, sirovo_t = pred(Xv), pred(Xt)
+    # Jedan fit za oba dela. `predictive_mean` fituje pri svakom pozivu, pa su
+    # dva poziva, za val i za test, bila dva fita istog modela na istim podacima:
+    # isti rezultat, dvostruka cena, na TabFM-u oko 20 minuta po celiji.
+    oba = models.predictive_mean(MODEL, Xf, yf, np.vstack([Xv, Xt]), seed=seed,
+                                 n_est=N_EST)
+    sirovo_v, sirovo_t = oba[:len(Xv)], oba[len(Xv):]
     mv, mt = _pod(sirovo_v, yf), _pod(sirovo_t, yf)
     unknown_share = float(np.mean(sirovo_t <= 0))
 
