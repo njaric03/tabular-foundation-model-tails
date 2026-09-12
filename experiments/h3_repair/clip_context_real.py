@@ -188,7 +188,9 @@ def main():
         print(f"resuming, {len(done)} cells already measured", flush=True)
     ids = paths.load_json("sb_openml_ids.json")
     arms = ([("without_max", 0.0), ("raw", 0.0)] + [("clip", c) for c in CLIP_C]
-            + [("log", 0.0), ("tail_log", CC.TAIL_LOG_C), ("evt_trim", 0.0)])
+            + [("log", 0.0), ("tail_log", CC.TAIL_LOG_C), ("evt_trim", 0.0),
+               ("sd_cap", CC.TAU), ("rank_emp", 0.0), ("rank_gpd", 0.0),
+               ("rank_gpd_trim", 0.0), ("rank_exp", 0.0)])
     t0 = time.time()
     for name in DATASETS:
         X, y = datasets.load(name, ids)

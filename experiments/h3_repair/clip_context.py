@@ -156,6 +156,71 @@ every shift above 1, by 9% at a shift of 4 and 38 to 48% at 50. clip_50 does
 cost: +14% at 0.9 on the clean context, better in only 2 of 20 seeds
 (p = 0.0004). So the trade-off is real for a tight cap and not measurable at 200.
 
+THIRD RUN: A CAP THAT IS DERIVED, NOT PICKED
+-------------------------------------------
+`sd_cap` drops C and caps at whatever brings the context's own sd shift to 1.2.
+Predictions, written before that run:
+  P9.  On a context already below 1.2 it clips nothing and costs exactly zero,
+       where clip_200 still clips one to five values on some real tables.
+  P10. Where the leverage is, it lands on a higher cap than C = 200 (284 robust
+       sd against 200 on the worst freMTPL2sev subsample) and clips the same two
+       values, so it should recover resolution and implied xi within noise of
+       clip_200 while distorting less.
+  P11. On the generator at shifts 20 and 50 its implied xi is positive and within
+       noise of clip_200's 0.63 and 0.80.
+
+FOURTH RUN: RANKS IN, EXTREME VALUE THEORY OUT
+---------------------------------------------
+Every arm so far either damages the context (clip, sd_cap, evt_trim) or reshapes
+it and hands the damage to the output (log, tail_log). `rank_emp` and `rank_gpd`
+do neither. The context target becomes its own normal scores, so the mechanism
+is bypassed rather than repaired: a rank cannot inflate an sd. The cost is that
+the inverse map saturates at the largest observed value, and `rank_gpd` pays it
+with a generalised Pareto fitted to the context's own exceedances above its 90th
+percentile, splicing the empirical inverse below and the Pareto above.
+
+Predictions, written before the run:
+  R1. rank_emp is worse than raw on pinball at 0.999 on a clean context, because
+      every upper quantile saturates at the largest observed y.
+  R2. rank_gpd removes that: its pinball at 0.999 on a clean context is within
+      noise of clip_200's, or better.
+  R3. Under shifts of 20 and 50 both rank arms keep borders_in_data near the
+      clean value and the implied xi positive, and they do so by construction,
+      not by tuning. If they do not, the reading of the mechanism is wrong.
+  R4. rank_gpd imposes the marginal tail shape, so its implied xi is pulled
+      towards the average of xi(x) rather than the local one. On the generator
+      that is a bias to see; on real data it should lift Q(0.99) towards the
+      reference.
+  R5. Under a unit error its own GPD fit is contaminated, because the corrupted
+      row is the top exceedance, so its gain at 0.99 is smaller than the cap's
+      and may be negative at 0.999.
+
+FIFTH RUN: WHICH SCALE THE RANKS GO ONTO
+---------------------------------------
+The first rank run answered R1 to R4 and then failed on real tables: at 0.999,
+13.8% of cells were worse than raw by more than 100%, the worst by 86000x, all of
+them TabPFN-V3 on the tables whose marginal shape is near 1 (freMTPL2sev 0.84,
+beMTPL97 0.83, MEPS 0.41, BlogFeedback 0.39). The cause is the composition, not
+the fit: a normal forward map has a tail of exp(-z^2 / 2), so a Pareto inverse
+turns an error in z into exp(xi * z^2 / 2). That is the same failure as tail_log,
+one scale further out.
+
+    rank_gpd_trim  normal scores, but the largest exceedance is dropped before the
+                   GPD is fitted and the shape is capped at 0.95. Tests whether the
+                   blow-ups are the fit.
+    rank_exp       exponential scores, z = -log(1 - p), plus the same guard. The
+                   amplification becomes exp(xi * z), and the largest score is
+                   log(n + 1) = 7.6 rather than 3.3. Tests whether the blow-ups are
+                   the scale.
+
+Predictions:
+  R6. rank_exp keeps rank_gpd's advantage at 0.99 and its worst case at 0.999 is
+      smaller by orders of magnitude.
+  R7. rank_gpd_trim reduces the blow-ups but does not remove them, because the
+      sensitivity is in the composition rather than in the fitted shape. If it
+      does remove them, the diagnosis above is wrong.
+  R8. On the generator both stay within noise of rank_gpd at 0.99.
+
 HOW TO READ IT
 --------------
   borders_in_data up, xi_implied positive     the fix works for the named reason
@@ -175,6 +240,7 @@ import time
 
 import numpy as np
 import pandas as pd
+from scipy.stats import genpareto, norm, rankdata
 
 from common import append, generator, metrics, models, paths, quiet
 
@@ -215,6 +281,37 @@ def pinball(y, q, a):
 # run at the value where hard clipping was seen to cost; a column, not a grid.
 TAIL_LOG_C = 50.0
 
+# The derived cap. Instead of a multiple of the robust sd, the cap is whatever
+# brings the context's own sd shift down to TAU. A multiple does not transfer
+# between tables: on beMTPL97 the largest value sits 79 robust sd above the
+# median, so C = 200 can never bind there, while on BlogFeedback it sits at 213
+# and C = 200 clips a value that is genuine. The sd shift is the quantity part
+# two measured, it is scale free, and TAU = 1.2 is the top of the lowest bin of
+# that design, fixed there before any repair was measured.
+TAU = 1.2
+
+
+def sd_cap(y, tau=TAU, iters=80):
+    """The largest cap whose capped context has an sd shift of at most tau.
+
+    A context already below tau comes back untouched, so the rule costs exactly
+    nothing, by construction rather than by measurement, where there is nothing
+    to repair. Otherwise bisection: a cap at the median is always feasible, since
+    capping ties the top values together and the shift falls to 1, and a cap at
+    the maximum is by definition not.
+    """
+    y = np.asarray(y, dtype=float)
+    if metrics.sd_shift(y) <= tau:
+        return float(y.max()), 0
+    lo, hi = float(np.median(y)), float(y.max())
+    for _ in range(iters):
+        mid = 0.5 * (lo + hi)
+        if metrics.sd_shift(np.minimum(y, mid)) <= tau:
+            lo = mid
+        else:
+            hi = mid
+    return lo, int((y > lo).sum())
+
 
 def evt_trim(y, k_share=0.05, k_min=50, j_max=5, alpha=0.01):
     """Pull down the top values that the tail of the rest cannot have produced.
@@ -239,6 +336,85 @@ def evt_trim(y, k_share=0.05, k_min=50, j_max=5, alpha=0.01):
         return y.copy(), 0
     cap = pos[max(flagged)]              # the largest value not flagged
     return np.minimum(y, cap), int((y > cap).sum())
+
+
+def rank_gpd(y, u_share=0.9, k_min=30, with_tail=True, scores="normal",
+             trim=0, xi_cap=None):
+    """See below; `scores` picks the scale the ranks are mapped onto."""
+    return _rank_map(y, u_share, k_min, with_tail, scores, trim, xi_cap)
+
+
+def _rank_map(y, u_share=0.9, k_min=30, with_tail=True, scores="normal",
+              trim=0, xi_cap=None):
+    """Normal scores into the context, a spliced empirical-GPD map back out.
+
+    The context target is replaced by its own normal scores. The largest row can
+    then not stretch anything, because ranks are bounded: the sd shift of the
+    transformed context is 1 by construction, whatever the original value was.
+    That is where a rank transform normally stops being useful, since its inverse
+    is the empirical quantile function and cannot return a value above the largest
+    one observed, so every upper quantile saturates there. Above the u_share
+    quantile the inverse therefore switches to a generalised Pareto fitted to the
+    context's own exceedances, which makes the map monotone and unbounded. A
+    monotone map carries quantiles exactly, so no bias is introduced by the
+    transform itself; what is imposed is the shape of the marginal tail, since the
+    GPD is fitted on the context's own margin and not per x.
+
+    `with_tail=False` is the same map without that extension, which isolates how
+    much of the result is the ranks and how much is the tail.
+    """
+    y = np.asarray(y, dtype=float)
+    n = len(y)
+    p = rankdata(y, method="average") / (n + 1)     # ties share a rank, and a score
+
+    # Which scale the ranks are mapped onto decides how an error in the model's
+    # own quantile is amplified on the way back. With normal scores the upper tail
+    # of the forward map decays like exp(-z^2 / 2), so composing it with a Pareto
+    # inverse amplifies an error in z like exp(xi * z^2 / 2): a prediction at
+    # z = 4.2 instead of 3.3 comes back three orders of magnitude too high, which
+    # is what the first run of this arm did on MEPS and BlogFeedback (13.8% of
+    # cells worse than +100% at 0.999, the worst by 86000x). Exponential scores
+    # decay like exp(-z), so the amplification is exp(xi * z), and the largest
+    # score is log(n + 1) = 7.6 rather than 3.3. The leverage is still gone either
+    # way, because both scales are bounded by the rank.
+    if scores == "normal":
+        z, to_p = norm.ppf(p), lambda q: norm.cdf(q)
+    elif scores == "exponential":
+        z, to_p = -np.log1p(-p), lambda q: 1.0 - np.exp(-np.maximum(q, 0.0))
+    else:
+        raise ValueError(scores)
+
+    order = np.argsort(p, kind="mergesort")
+    xp, fp = p[order], y[order]                    # the empirical inverse, as points
+    u = float(np.quantile(y, u_share))
+    exc = np.sort(y[y > u]) - u
+    zeta = len(exc) / n
+    xi = scale = np.nan
+    if with_tail and len(exc) >= k_min:
+        try:
+            # `trim` drops that many of the largest exceedances before fitting, so a
+            # contaminated top value does not set the shape it is then judged by;
+            # `xi_cap` bounds the shape, because above 1 the extrapolated quantile
+            # grows faster than any sample can support.
+            fit_on = exc[:-trim] if trim else exc
+            xi, _, scale = genpareto.fit(fit_on, floc=0.0)
+            if xi_cap is not None:
+                xi = min(float(xi), float(xi_cap))
+        except Exception:
+            xi = np.nan
+
+    def back(q):
+        pr = np.clip(to_p(np.asarray(q, dtype=float)), 1e-12, 1 - 1e-12)
+        out = np.interp(pr, xp, fp)
+        if np.isfinite(xi):
+            hi = pr > 1 - zeta
+            if hi.any():
+                r = (1 - pr[hi]) / zeta
+                out[hi] = (u + scale * np.log(1 / r) if abs(xi) < 1e-8
+                           else u + scale / xi * (r ** (-xi) - 1))
+        return out
+
+    return z, back, 0
 
 
 def transform(arm, c, y):
@@ -266,6 +442,17 @@ def transform(arm, c, y):
     if arm == "evt_trim":
         z, n = evt_trim(y)
         return z, same, n
+    if arm == "sd_cap":
+        cap, n = sd_cap(y, c or TAU)
+        return np.minimum(y, cap), same, n
+    if arm == "rank_emp":
+        return rank_gpd(y, with_tail=False)
+    if arm == "rank_gpd":
+        return rank_gpd(y)
+    if arm == "rank_gpd_trim":
+        return rank_gpd(y, trim=1, xi_cap=0.95)
+    if arm == "rank_exp":
+        return rank_gpd(y, scores="exponential", trim=1, xi_cap=0.95)
     raise ValueError(arm)
 
 
@@ -310,7 +497,8 @@ def one(xi, variant, c, target, seed):
     elif variant == "robust":
         q, borders = fit_predict(Xc, (yc - med) / rsd, Xte, seed)
         q, borders = q * rsd + med, borders * rsd + med
-    elif variant in ("clip", "log", "tail_log", "evt_trim"):
+    elif variant in ("clip", "log", "tail_log", "evt_trim", "sd_cap",
+                     "rank_emp", "rank_gpd", "rank_gpd_trim", "rank_exp"):
         y_fit, back, n_clipped = transform(variant, c, yc)
         q, borders = fit_predict(Xc, y_fit, Xte, seed)
         # exp and expm1 of the outer borders overflow to inf; that is where those
@@ -361,6 +549,11 @@ def cells():
                 yield xi, "log", 0.0, target, seed
                 yield xi, "tail_log", TAIL_LOG_C, target, seed
                 yield xi, "evt_trim", 0.0, target, seed
+                yield xi, "sd_cap", TAU, target, seed
+                yield xi, "rank_emp", 0.0, target, seed
+                yield xi, "rank_gpd", 0.0, target, seed
+                yield xi, "rank_gpd_trim", 0.0, target, seed
+                yield xi, "rank_exp", 0.0, target, seed
 
 
 def main():

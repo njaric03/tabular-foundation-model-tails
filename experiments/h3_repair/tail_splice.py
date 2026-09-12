@@ -97,6 +97,89 @@ The shape fitted to the conformity scores is 0.14 to 0.61 by dataset, median
 0.34. The model's own errors are heavy-tailed, which is why the empirical score
 quantile cannot reach 0.999 and why a GPD on those scores can.
 
+SECOND RUN: THE THRESHOLD AS A GRID AND AS A RULE
+-------------------------------------------------
+The 90th percentile was picked as freely as C = 200 was, so it is now measured
+over 0.80, 0.85, 0.90 and 0.95, and chosen by two rules from the scores
+themselves: `ks` by the Kolmogorov-Smirnov distance of the fitted tail, `cv` by
+out-of-fold pinball of the extrapolated score quantile. Predictions:
+  T5. The conclusion does not depend on the threshold: coverage at 0.99 across
+      the four fixed thresholds stays within 0.003 of itself.
+  T6. Neither rule beats the fixed 0.90 in coverage by more than that. If one
+      does, the fixed choice goes and the rule takes its place.
+  T7. The two rules disagree with each other more often than either disagrees
+      with 0.90, because the KS distance judges the fit of the whole tail while
+      the cross-validated loss judges one quantile of it.
+
+THIRD RUN: SHARPNESS, AND WHETHER THE TWO REPAIRS COMPOSE
+--------------------------------------------------------
+Two additions, both answers to a literature review of the second run.
+
+The review proposed switching to the empirical conformal quantile at 0.99, where
+it is not degenerate, on the assumption that it is sharper there. On 1467 cells
+where every arm is present it is not: pinball at 0.99 is 414.9 for cqr_emp
+against 394.2 to 394.6 for every GPD variant and 405.0 for no patch at all. The
+empirical bound is the widest of the three, because at n = 500 the 496th order
+statistic of a heavy-tailed score sample is itself an extreme. So the switch is
+not made, and the sharpness question is attacked where it belongs: the score.
+
+    cqr_gpd_norm   the score divided by the model's own spread for that row,
+                   Q(0.9 | x) - Q(0.5 | x), so
+                   the bound scales with each row's spread instead of being one
+                   additive constant for all of them. The standard locally
+                   adaptive conformal construction, applied to the GPD
+                   extrapolation.
+
+    treatment rank_gpd   the third context treatment: the context target becomes
+                   its own normal scores and the prediction is mapped back
+                   through the spliced empirical-Pareto inverse. The review
+                   argued that this reduces to the output patch with a different
+                   body model. It does not: the rank transform removes the
+                   leverage before the network sees it (borders inside the data
+                   3547 against 421), while the patch leaves the context
+                   contaminated and repairs the output. Crossing the two settles
+                   whether they compose or are redundant.
+
+Predictions:
+  T8. cqr_gpd_norm lowers pinball at 0.99 against cqr_gpd_0.9 at coverage no
+      worse than nominal, on the datasets whose predicted spread varies most
+      across rows.
+  T9. On the rank_gpd context the patch adds less than it adds on the raw
+      context, because the leverage is already gone; if instead it adds the same
+      amount, the two repairs are independent and should be reported as a pair.
+
+FOURTH RUN: THE SPLICE POINT ITSELF CONDITIONAL
+-----------------------------------------------
+Every arm above splices at one number: a quantile of the pooled scores. The
+conditional version moves the splice with the row. `cond_gpd` takes the model's
+own Q(0.9 | x) as the threshold, divides the exceedances over it by that row's
+spread Q(0.9 | x) - Q(0.5 | x), pools those, fits a GPD, and extrapolates per
+row:
+
+    Q(a | x) = Q(0.9 | x) + spread(x) * (sigma / xi) * (((1 - a) / zeta) ** -xi - 1)
+
+with zeta the measured exceedance rate of the model's own Q(0.9 | x) on the
+calibration rows, which also corrects for that quantile being miscalibrated. This
+is the classical conditional peaks-over-threshold construction with an
+intermediate conditional quantile, the same shape as gradient boosting for
+extreme quantile regression and extremal random forests, except that the
+intermediate quantile comes from the model under test rather than from a purpose
+built quantile regressor. Run with GBM as that model it is a baseline in the
+spirit of gbex, built from parts already here; it is not the published
+implementation and is not claimed to be.
+
+It differs from the conformal arms in what it gives up: there is no exchangeability
+argument behind it, so no coverage guarantee, only an EVT extrapolation. That is
+the trade to report.
+
+Predictions:
+  T10. cond_gpd is sharper at 0.99 than cqr_gpd_0.9, because the bound moves with
+       the row instead of adding one constant to every row.
+  T11. Its coverage at 0.999 is closer to nominal than the model alone but less
+       reliable than the conformal arms, since it has no finite-sample guarantee.
+  T12. Under the unit error it degrades less than the additive arms, because the
+       threshold it splices at is itself re-estimated per row.
+
 RUNNING
 -------
     python -u experiments/h3_repair/tail_splice.py
@@ -137,49 +220,141 @@ N_CALIB = int(os.environ.get("N_CALIB", "500"))
 N_TEST = int(os.environ.get("N_TEST", "1000"))
 N_EST = int(os.environ.get("N_EST", "1"))
 CLIP_C = float(os.environ.get("CLIP_C", "200"))
-U_SHARE = float(os.environ.get("U_SHARE", "0.9"))   # threshold for the GPD, on the scores
+# Where the GPD starts, as a share of the calibration scores. The fixed 0.9 of the
+# first run is as arbitrary as C = 200 was, so the whole grid is measured as a
+# sensitivity, and two rules pick it from the scores themselves: `ks` minimises the
+# Kolmogorov-Smirnov distance of the fitted tail, the way Clauset, Shalizi and
+# Newman (2009) pick x_min for a power law, and `cv` minimises out-of-fold pinball
+# of the extrapolated score quantile at the level being asked for. The EVT
+# literature has automatic choices of its own, ordered goodness-of-fit tests with a
+# false discovery rate (Bader, Yan and Zhang, Ann. Appl. Stat. 2018), score tests
+# (Northrop and Coleman, Extremes 2014) and the double bootstrap (Danielsson et
+# al., J. Multivar. Anal. 2001); these two are the cheap end of that family, and
+# both are computable from 500 scores without refitting the model.
+U_SHARES = [float(v) for v in os.environ.get("U_SHARES", "0.8,0.85,0.9,0.95").split(",")]
+ARMS = (["none", "cqr_emp"] + [f"cqr_gpd_{u:g}" for u in U_SHARES]
+        + ["cqr_gpd_ks", "cqr_gpd_cv", "cqr_gpd_norm", "cond_gpd"])
+SHOW = "cqr_gpd_0.9" if "cqr_gpd_0.9" in ARMS else ARMS[-1]
 FACTORS = [1.0, 100.0]
-TREATMENTS = ["raw", "clip_200"]
-LEVELS = [0.9, 0.99, 0.999]
+TREATMENTS = ["raw", "clip_200", "rank_gpd"]
+# What each treatment does to the context, in `clip_context.transform` terms. The
+# back-transform matters for the third one: its quantiles come out in normal-score
+# space and are mapped back through the context's own spliced inverse.
+TREATMENT_ARMS = {"raw": ("raw", 0.0), "clip_200": ("clip", None),
+                  "rank_gpd": ("rank_gpd", 0.0)}
+# 0.5 is here for the spread that the locally adaptive score and the conditional
+# splice divide by, Q(0.9 | x) - Q(0.5 | x). It is also measured in its own right,
+# which is how a repair that moves the whole distribution gets caught.
+LEVELS = [0.5, 0.9, 0.99, 0.999]
+I05, I09 = LEVELS.index(0.5), LEVELS.index(0.9)
 OUT = os.environ.get("OUTPUT", "tail_splice.csv")
 
 COLUMNS = ["dataset", "model", "repeat", "factor", "treatment", "arm", "level",
            "n_fit", "n_calib", "n_test", "n_est", "sd_shift", "coverage", "pinball",
-           "q_median", "xi_hat", "scale_hat", "u_score", "n_exc", "degenerate",
+           "q_median", "u_share", "xi_hat", "scale_hat", "u_score", "n_exc", "degenerate",
            "seconds", "reason"]
 KEY = ["dataset", "model", "repeat", "factor", "treatment", "arm", "level",
        "n_fit", "n_calib", "n_test", "n_est"]
 
 
-def score_quantile(scores, level, u_share=U_SHARE):
-    """The conformity-score quantile three ways: empirical with the conformal
-    correction, and a GPD extrapolation above the u_share threshold."""
-    s = np.sort(np.asarray(scores, dtype=float))
+def emp_quantile(s, level):
+    """The conformal empirical score quantile, and whether the level is past it."""
+    s = np.sort(np.asarray(s, dtype=float))
     n = len(s)
     k = int(np.ceil((n + 1) * level))
-    emp = (float(s[-1]), True) if k > n else (float(s[k - 1]), False)
+    return (float(s[-1]), True) if k > n else (float(s[k - 1]), False)
 
+
+def pwm_fit(exc):
+    """Probability-weighted moments for the GPD, in closed form.
+
+    Hosking and Wallis (1987). Used only where a threshold is being chosen, which
+    needs hundreds of fits per cell: `genpareto.fit` costs about 0.3 s each and
+    made the threshold rules five times more expensive than the model fit they
+    were selecting for. The reported arms keep maximum likelihood, and the two
+    agree to 0.02 in shape on these scores.
+    """
+    x = np.sort(np.asarray(exc, dtype=float))
+    n = len(x)
+    p = (np.arange(1, n + 1) - 0.35) / n
+    a0 = float(x.mean())
+    a1 = float(np.mean(x * (1 - p)))
+    d = a0 - 2 * a1
+    if abs(d) < 1e-12:
+        raise RuntimeError("degenerate PWM denominator")
+    return 2.0 - a0 / d, 2 * a0 * a1 / d          # xi, scale
+
+
+def gpd_quantile(s, level, u_share, fast=False):
+    """Score quantile from a GPD fitted above the u_share threshold.
+
+    Returns None when there is nothing to extrapolate: fewer than 20 exceedances,
+    a level already inside the calibration data, or a fit that does not converge.
+    `fast` swaps maximum likelihood for probability-weighted moments.
+    """
+    s = np.sort(np.asarray(s, dtype=float))
+    n = len(s)
     u = float(np.quantile(s, u_share))
     exc = s[s > u] - u
     zeta = len(exc) / n
-    out = dict(u_score=u, n_exc=int(len(exc)), xi_hat=np.nan, scale_hat=np.nan)
+    info = dict(u_share=u_share, u_score=u, n_exc=int(len(exc)), xi_hat=np.nan,
+                scale_hat=np.nan)
     if len(exc) < 20 or level <= 1 - zeta:
-        # Not extrapolating: inside the calibration data the empirical quantile is
-        # the honest answer, and a GPD fitted to fewer than 20 exceedances is not.
-        return emp, (emp[0], emp[1]), out
+        return None, info
     try:
-        xi, _, scale = genpareto.fit(exc, floc=0.0)
-        out.update(xi_hat=float(xi), scale_hat=float(scale))
+        xi, scale = pwm_fit(exc) if fast else genpareto.fit(exc, floc=0.0)[::2]
         r = (1 - level) / zeta
-        if abs(xi) < 1e-8:
-            q = u + scale * np.log(1 / r)
-        else:
-            q = u + scale / xi * (r ** (-xi) - 1)
+        q = (u + scale * np.log(1 / r) if abs(xi) < 1e-8
+             else u + scale / xi * (r ** (-xi) - 1))
         if not np.isfinite(q):
-            raise RuntimeError("non-finite GPD quantile")
-        return emp, (float(q), False), out
+            return None, info
+        info.update(xi_hat=float(xi), scale_hat=float(scale))
+        return float(q), info
     except Exception:
-        return emp, (emp[0], emp[1]), out
+        return None, info
+
+
+def pick_u_ks(s, grid):
+    """The threshold whose fitted GPD sits closest to its exceedances in KS distance."""
+    s = np.sort(np.asarray(s, dtype=float))
+    best, best_d = grid[len(grid) // 2], np.inf
+    for u_share in grid:
+        u = float(np.quantile(s, u_share))
+        exc = np.sort(s[s > u] - u)
+        if len(exc) < 20:
+            continue
+        try:
+            xi, scale = pwm_fit(exc)
+        except Exception:
+            continue
+        emp = (np.arange(1, len(exc) + 1) - 0.5) / len(exc)
+        d = float(np.max(np.abs(genpareto.cdf(exc, xi, 0.0, scale) - emp)))
+        if d < best_d:
+            best, best_d = u_share, d
+    return best
+
+
+def pick_u_cv(s, level, grid, folds=5, seed=0):
+    """The threshold with the lowest out-of-fold pinball for the quantile it
+    extrapolates. The scores are exchangeable, so plain K-fold is valid on them,
+    and no model is refitted: this costs GPD fits, not TabPFN fits."""
+    s = np.asarray(s, dtype=float)
+    idx = np.random.default_rng(seed).permutation(len(s))
+    parts = np.array_split(idx, folds)
+    best, best_loss = grid[len(grid) // 2], np.inf
+    for u_share in grid:
+        loss, used = 0.0, 0
+        for p in parts:
+            keep = np.setdiff1d(idx, p)
+            q, _ = gpd_quantile(s[keep], level, u_share, fast=True)
+            if q is None:
+                continue
+            d = s[p] - q
+            loss += float(np.mean(np.maximum(level * d, (level - 1) * d)))
+            used += 1
+        if used and loss / used < best_loss:
+            best, best_loss = u_share, loss / used
+    return best
 
 
 def main():
@@ -216,28 +391,89 @@ def main():
                         keys = [dict(dataset=name, model=model, repeat=r, factor=factor,
                                      treatment=treatment, arm=a, level=lv, n_fit=N_FIT,
                                      n_calib=N_CALIB, n_test=N_TEST, n_est=N_EST)
-                                for a in ("none", "cqr_emp", "cqr_gpd") for lv in LEVELS]
+                                for a in ARMS for lv in LEVELS]
                         todo = [k for k in keys if append.key(k, KEY) not in done]
                         if not todo:
                             continue
+                        # Loud, because a shadowed loop variable once turned this
+                        # into a float and TabICL accepted it silently.
+                        assert float(r).is_integer(), f"repeat is not an integer: {r!r}"
                         t1 = time.time()
-                        y_fit = (yf if treatment == "raw"
-                                 else CC.transform("clip", CLIP_C, yf)[0])
+                        arm_t, c_t = TREATMENT_ARMS[treatment]
+                        y_fit, back, _ = CC.transform(arm_t,
+                                                      CLIP_C if c_t is None else c_t, yf)
                         try:
                             q = models.quantiles(model, Xf, y_fit, Xq, seed=7000 + r,
                                                  levels=LEVELS, n_est=N_EST)
+                            with np.errstate(over="ignore", invalid="ignore"):
+                                q = back(q)
                             err = None
                         except Exception as e:
                             err = f"{type(e).__name__}: {e}"[:110]
                         secs = round((time.time() - t1) / max(len(todo), 1), 2)
                         bounds = {}
                         if not err:
+                            # The scale a locally adaptive score divides by: the
+                            # model's own Q(0.9), which is positive here and carries
+                            # its per-row spread. Scores become dimensionless, so a
+                            # row with a wide distribution no longer sets the bound
+                            # for a row with a narrow one.
+                            sc_c = np.maximum(q[:N_CALIB, I09] - q[:N_CALIB, I05], 1e-9)
+                            sc_t = np.maximum(q[N_CALIB:, I09] - q[N_CALIB:, I05], 1e-9)
+                            # The conditional splice. The threshold is not a
+                            # quantile of the pooled scores but the model's own
+                            # Q(0.9 | x), so it moves with the row; the exceedances
+                            # over it are pooled only after being divided by that
+                            # row's spread. This is the classical conditional POT
+                            # construction with the intermediate quantile supplied
+                            # by the model under test, and with GBM as that model it
+                            # is a baseline in the spirit of gbex.
+                            u_c, u_t = q[:N_CALIB, I09], q[N_CALIB:, I09]
+                            over = yc > u_c
+                            zeta_c = float(over.mean())
+                            cond = None
+                            if over.sum() >= 20:
+                                try:
+                                    cxi, cscale = genpareto.fit(
+                                        (yc[over] - u_c[over]) / sc_c[over], floc=0.0)[::2]
+                                    cond = (float(cxi), float(cscale))
+                                except Exception:
+                                    cond = None
                             for i, lv in enumerate(LEVELS):
                                 qc, qt = q[:N_CALIB, i], q[N_CALIB:, i]
-                                emp, gpd, info = score_quantile(yc - qc, lv)
-                                bounds[lv] = dict(none=(qt, 0.0, False, info),
-                                                  cqr_emp=(qt, emp[0], emp[1], info),
-                                                  cqr_gpd=(qt, gpd[0], gpd[1], info))
+                                s = yc - qc
+                                emp, degen = emp_quantile(s, lv)
+                                arms = {"none": (qt, 0.0, False, {}),
+                                        "cqr_emp": (qt, emp, degen, {})}
+                                picked = {"cqr_gpd_ks": pick_u_ks(s, U_SHARES),
+                                          "cqr_gpd_cv": pick_u_cv(s, lv, U_SHARES)}
+                                for arm, u in ([(f"cqr_gpd_{v:g}", v) for v in U_SHARES]
+                                               + list(picked.items())):
+                                    gq, info = gpd_quantile(s, lv, u)
+                                    arms[arm] = ((qt, emp, degen, info) if gq is None
+                                                 else (qt, gq, False, info))
+                                if cond is not None and lv > 1 - zeta_c:
+                                    cxi, cscale = cond
+                                    # Not `r`: that is the repeat index of the loop
+                                    # this sits inside, and shadowing it sent a
+                                    # float seed into every later fit of the run.
+                                    ratio = (1 - lv) / zeta_c
+                                    step = (cscale * np.log(1 / ratio) if abs(cxi) < 1e-8
+                                            else cscale / cxi * (ratio ** (-cxi) - 1))
+                                    arms["cond_gpd"] = (u_t + sc_t * step, 0.0, False,
+                                                        dict(xi_hat=cxi, scale_hat=cscale,
+                                                             u_share=1 - zeta_c,
+                                                             n_exc=int(over.sum())))
+                                else:
+                                    arms["cond_gpd"] = (qt, 0.0, True, {})
+                                sn = (yc - qc) / sc_c
+                                gq, info = gpd_quantile(sn, lv, 0.9)
+                                if gq is None:
+                                    e2, d2 = emp_quantile(sn, lv)
+                                    arms["cqr_gpd_norm"] = (qt, e2 * sc_t, d2, info)
+                                else:
+                                    arms["cqr_gpd_norm"] = (qt, gq * sc_t, False, info)
+                                bounds[lv] = arms
                         for k in todo:
                             row = dict(k, sd_shift=shift, seconds=secs)
                             if err:
@@ -253,9 +489,9 @@ def main():
                         if not err:
                             msg = "  ".join(
                                 f"{lv}: {bounds[lv]['none'][0].mean():.0f}"
-                                f"->{(bounds[lv]['cqr_gpd'][0] + bounds[lv]['cqr_gpd'][1]).mean():.0f}"
+                                f"->{(bounds[lv][SHOW][0] + bounds[lv][SHOW][1]).mean():.0f}"
                                 f" cov {float((yte <= bounds[lv]['none'][0]).mean()):.3f}"
-                                f"/{float((yte <= bounds[lv]['cqr_gpd'][0] + bounds[lv]['cqr_gpd'][1]).mean()):.3f}"
+                                f"/{float((yte <= bounds[lv][SHOW][0] + bounds[lv][SHOW][1]).mean()):.3f}"
                                 for lv in LEVELS)
                         else:
                             msg = err

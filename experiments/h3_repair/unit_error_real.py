@@ -122,7 +122,9 @@ N_TEST = int(os.environ.get("N_TEST", "1000"))
 N_EST = int(os.environ.get("N_EST", "1"))
 FACTORS = [1.0, 100.0]
 ARMS = [("raw", 0.0), ("clip", 50.0), ("clip", 200.0), ("log", 0.0),
-        ("tail_log", CC.TAIL_LOG_C), ("evt_trim", 0.0)]
+        ("tail_log", CC.TAIL_LOG_C), ("evt_trim", 0.0), ("sd_cap", CC.TAU),
+        ("rank_emp", 0.0), ("rank_gpd", 0.0), ("rank_gpd_trim", 0.0),
+        ("rank_exp", 0.0)]
 LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ("50", "90", "99", "999")
 OUT = os.environ.get("OUTPUT", "unit_error_real.csv")
