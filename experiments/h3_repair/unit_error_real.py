@@ -59,6 +59,31 @@ PREDICTIONS, WRITTEN BEFORE THE RUN
 
 Results in `unit_error_real.csv`.
 
+OUTCOME, 12.9.2026
+------------------
+Seven tables, three models, ten subsamples each, 2520 rows, none failed. The unit
+of the counts below is a dataset-model pair, 21 of them.
+
+  U1 measured. A unit error is visible at 4% of rows on freMTPL2sev, 8 to 11% on
+     BlogFeedback, beMTPL97 and MEPS, and 20 to 33% on ausprivauto0405,
+     AutoClaims and norauto. Where it lands it lifts the sd shift to 2.8 to 5.5
+     and sits 4 to 15 times above the second largest value.
+  U2 WRONG. The error costs GBM most, not the foundation models: median pinball
+     at 0.99 rises by 35% on BlogFeedback and 25% on MEPS, against TabICLv2's
+     9 and 14% and TabPFN-V3's 8 and 3%. On freMTPL2sev it costs nothing
+     measurable, because that context's own largest claim already dominates.
+  U3 HELD, and it is the strongest argument for the cap that exists. clip_200
+     beats raw in 17 of 21 units (p = 0.007, median -2.3%), its worst cell is
+     +5.1%, and on a clean context it costs 0.00% at the median and +1.4% at
+     worst. C = 200 was picked after a run, but it behaves as a safe default.
+  U4 FAILED. evt_trim touches the corrupted row in 10% of cells and nothing else
+     in any cell, on any table. Same as on the generator.
+  U5 HALF. log repairs as often (17 of 21, -1.8%) and is not safe: 22 of 210
+     cells overflow, the worst by 2.8e43, because a quantile over-predicted in
+     log space is exponentiated. clip_50 repairs more (-3.7%) and costs more
+     (+64% at worst under the error, +85% on a clean context). tail_log is
+     neither reliable (15 of 21) nor cheap (+63% at worst).
+
 RUNNING
 -------
     python -u experiments/h3_repair/unit_error_real.py
