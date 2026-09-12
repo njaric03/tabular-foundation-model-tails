@@ -195,6 +195,52 @@ Predictions, written before the run:
       row is the top exceedance, so its gain at 0.99 is smaller than the cap's
       and may be negative at 0.999.
 
+OUTCOME OF THE THIRD AND FOURTH RUNS, 12.9.2026
+-----------------------------------------------
+20 seeds each, paired seed by seed against raw unless stated otherwise.
+
+  P9 HELD as a construction claim and needs one caveat as an empirical one. A
+     context below a shift of 1.2 is returned untouched, but a clean heavy-tailed
+     generator context is often not below 1.2: at xi 0.7 and 0.9 sd_cap still
+     clips one or two values with no injected row, which is the same "heavy tails
+     carry their own leverage" the first run saw from the other side. On
+     freMTPL2sev's clean bin it clips 0 where clip_200 clips 3.
+  P10 HELD. It lands on a higher cap (284 robust sd against 200 on the worst
+     freMTPL2sev subsample) and clips 2 values where clip_200 clips 5 at xi 0.9,
+     and it still restores resolution: borders 2546 to 2569 at every shift,
+     against raw's 193 to 554.
+  P11 HELD. Implied xi 0.626 to 0.628 at a true 0.7 and 0.730 to 0.749 at 0.9,
+     flat across shifts. At 0.999 it beats raw in 20/20 seeds at xi 0.7
+     (-48.4%) and 19/20 at 0.9 (-47.7%), which is better than clip_200's -38.5%
+     at 0.9, and on a clean context it costs nothing (13/20, -0.8% and -2.0%).
+     The price is at 0.99, where it is slightly worse than clip_200 (5/20 and
+     3/20 seeds better, p = 0.041 and 0.0026, +0.8% and +1.4%).
+
+  R1 HELD, harder than predicted. rank_emp's pinball at 0.999 at a shift of 50 is
+     +1341% at xi 0.7 and +762% at 0.9, better in 0 of 20 seeds: with no tail
+     extension every upper quantile saturates at the largest observed value, and
+     under leverage that value is the contaminated one.
+  R2 NOT HELD. rank_gpd at 0.999 on a clean context is within noise of raw
+     (+5.1% at 0.7, -5.8% at 0.9) but stays worse than clip_200 (0.350 against
+     0.298 at 0.7). The extension removes the saturation; it does not make the
+     0.999 level competitive with a cap.
+  R3 HELD, and by construction. Both rank arms keep borders between 3558 and
+     3633 at every shift and the implied xi positive throughout (0.612 to 0.659
+     at a true 0.7, 0.792 to 0.849 at 0.9). A rank cannot inflate an sd.
+  R4 WRONG, in the direction worth having. The marginal tail shape does not drag
+     the implied xi towards an average: at a true 0.9 rank_gpd reads 0.849, the
+     closest of every arm measured, against clip_200's 0.804.
+  R5 HELD, and worse than predicted, on real tables rather than here. See
+     `unit_error_real.py`: 13.8% of cells are worse than raw by more than 100% at
+     0.999, the worst by 51889%, all of them TabPFN-V3 on the tables whose
+     marginal shape is near 1.
+
+The finding that was not predicted at all: **rank_gpd is the sharpest arm at
+0.99**, better than clip_200 in 15 to 20 of 20 seeds at every shift and both tail
+indices (p = 0.0000 to 0.041, median -2.1% to -2.7%), including on clean contexts
+where there is nothing to repair. That is not a repair; it is a better
+parametrisation of the target, and it is what the fifth run tries to make safe.
+
 FIFTH RUN: WHICH SCALE THE RANKS GO ONTO
 ---------------------------------------
 The first rank run answered R1 to R4 and then failed on real tables: at 0.999,
@@ -220,6 +266,35 @@ Predictions:
       sensitivity is in the composition rather than in the fitted shape. If it
       does remove them, the diagnosis above is wrong.
   R8. On the generator both stay within noise of rank_gpd at 0.99.
+
+OUTCOME OF THE FIFTH RUN, 12.9.2026
+-----------------------------------
+20 seeds on the generator, and the same two arms on seven real tables through
+`unit_error_real.py`. Both predictions about the cause are half right, and they
+split cleanly along a line I did not anticipate.
+
+  R6 HALF. On the generator the exponential scale does not improve pinball at
+     0.999 against rank_gpd (36 of 80 seeds at xi 0.7, p = 0.43). On the seven
+     real tables under a unit error it does, and where it matters: the share of
+     cells more than 100% worse than raw falls from 16.2% to 5.2%, and the worst
+     cell from +86195% to +84%.
+  R7 HALF, and against the diagnosis. Dropping the largest exceedance and capping
+     the shape at 0.95 does help, significantly: 55 of 80 seeds at 0.999 on the
+     generator (p = 0.001, -15.3%) and 127 of 210 cells under the error
+     (p = 0.003, -6.3%). So the sensitivity is not only in the composition; the
+     fitted shape carries part of it. It does not remove the blow-ups either:
+     11.9% of cells stay above +100%, worst +10191%.
+  R8 HELD. Both stay within noise of rank_gpd at 0.99 (+0.08% to +0.22%).
+
+The split to report: **the trim fixes the centre of the error distribution, the
+scale fixes its tail**. Neither fixes both, and the cap arms have no blow-ups at
+all (0.0% and 0.5% of cells, worst +1%).
+
+What survives as the recommendation is level-dependent, and that is the finding:
+at 0.99 a rank-transformed context is the sharpest thing measured here, on the
+generator at every shift and on real tables under an error; at 0.999 the derived
+cap is the only safe arm. A repair chosen without naming the level is not a
+repair.
 
 HOW TO READ IT
 --------------

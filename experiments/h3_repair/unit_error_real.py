@@ -84,6 +84,34 @@ of the counts below is a dataset-model pair, 21 of them.
      (+64% at worst under the error, +85% on a clean context). tail_log is
      neither reliable (15 of 21) nor cheap (+63% at worst).
 
+SECOND RUN, 12.9.2026: THE RANK ARMS UNDER THE SAME ERROR
+---------------------------------------------------------
+420 cells where every arm is present, 210 of them corrupted. The unit for the
+counts is a dataset-model pair, 21; the blow-up shares are over cells, because
+that is where the risk lives.
+
+| arm | pinball 0.99 | worst 0.99 | cells >100% worse at 0.999 | worst 0.999 |
+|---|---|---|---|---|
+| rank_exp | 19/21 (-4.0%) | +0.3% | 5.2% | +84% |
+| rank_gpd_trim | 19/21 (-3.6%) | +3.0% | 11.9% | +10191% |
+| rank_gpd | 17/21 (-1.9%) | +12.3% | 16.2% | +86195% |
+| sd_cap | 17/21 (-2.3%) | +4.9% | 0.5% | +1% |
+| clip_200 | 16/21 (-1.3%) | +4.0% | 0.0% | +1% |
+
+So a rank-transformed context repairs the level a user reads most, 0.99, better
+than any cap does, and it is the only family that can fail catastrophically two
+levels up. The guards split the failure: the trim moves the median (127 of 210
+cells better than plain rank_gpd, p = 0.003), the exponential scale moves the
+worst case (two orders of magnitude).
+
+Two limits on the rank arms, both from this run:
+  * On a clean real context they buy nothing at 0.99 (11 to 13 of 21 units, median
+    around zero), unlike on the generator where they were sharper everywhere. Their
+    advantage here is conditional on an error being present.
+  * The blow-ups are not only TabPFN. Of the 25 cells where rank_gpd_trim is more
+    than 100% worse at 0.999, 5 are TabICLv2 on beMTPL97 and norauto. An earlier
+    reading of this file's first run said "all TabPFN-V3", and that was wrong.
+
 RUNNING
 -------
     python -u experiments/h3_repair/unit_error_real.py

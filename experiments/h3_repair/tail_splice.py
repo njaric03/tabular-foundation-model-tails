@@ -180,6 +180,49 @@ Predictions:
   T12. Under the unit error it degrades less than the additive arms, because the
        threshold it splices at is itself re-estimated per row.
 
+OUTCOME OF THE SECOND, THIRD AND FOURTH RUNS, 12.9.2026
+-------------------------------------------------------
+50400 rows, none failed. Every comparison is paired on the same cell, and the
+unit is a dataset-model pair, 21 of them. That matters here: a pooled median over
+arms measured on different cell sets suggested a 3% gap between thresholds that
+the paired test says is 0.06%.
+
+  T5 HELD, strongly. At 0.99 the four fixed thresholds differ by at most 0.06% of
+     pinball, paired, and coverage is 0.990 to 0.991 for all of them.
+  T6 HELD. Neither rule beats the fixed 0.90: the KS rule is better in 11 of 21
+     units (p = 1.0, median -0.01%) and the cross-validated rule in 11 of 21
+     (median -0.06%). They cost nothing either, so a rule can replace the hand
+     choice for free, which is the useful form of this result.
+  T7 STRONGER than predicted. The rules disagree about the threshold, often: KS
+     picks 0.80 in 49% of cells and 0.95 in 12%, cross-validation picks 0.90 in
+     35% and 0.80 in 25%. The outcome does not move. The threshold is not a knob
+     worth arguing about at this calibration size.
+  T8 FAILED. Dividing the score by the model's own spread is not sharper: at 0.99
+     it is better in 7 of 21 units on a clean context (median +0.5%, worst +25%),
+     and at 0.90 it is significantly worse (5 of 21, p = 0.027). Locally adaptive
+     scores buy nothing here, and add tail risk.
+  T9 NOT HELD, and that settles an argument. The patch adds about as much on a
+     rank-transformed context as on a raw one (12 of 21 units better at 0.99,
+     median -1.6%, and 12 of 21 at 0.999), so the rank transform is not the patch
+     with a different body model: the two act on different objects and compose.
+     The rank context is also better on its own at 0.99 (15 of 21, -2.8%) and
+     unusable at 0.999 (worst +175232%), which is the instability the fifth run of
+     `clip_context.py` addresses.
+  T10 and T12 FAILED. The conditional splice is worse than the additive patch:
+     at 0.99 it is better in 5 of 21 units on a clean context (p = 0.027, median
+     +14.4%) and at 0.999 under the error in 3 of 21 (p = 0.001, +13.5%), with
+     worst cells of +72800% and +1.7e8%. Splicing per row multiplies a pooled
+     shape by a per-row spread, and where either is large the product is not a
+     quantile any more. Conditionality is not free.
+  T11 HELD for coverage only. cond_gpd covers 0.990 and 0.991 at 0.99 and 0.998
+     to 0.999 at 0.999, as close to nominal as the conformal arms, while being
+     the least sharp of them. Coverage alone does not rank these methods.
+
+So the output side keeps exactly one recommendation, the plain conformal patch
+with a GPD on the scores, and its threshold can be chosen by a rule instead of by
+hand. The two attempts to improve it, locally adaptive scores and a conditional
+splice point, both failed, and both are reported.
+
 RUNNING
 -------
     python -u experiments/h3_repair/tail_splice.py

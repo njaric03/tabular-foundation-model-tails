@@ -89,6 +89,51 @@ raw's -15.4%). tail_log costs TabPFN-V3 a pinball of 854 against 660 at 2 to 4
 sd. clip_200 stays the only arm that helps all three models where the leverage
 is and moves nothing where it is not.
 
+THIRD RUN, 12.9.2026: SIX MODELS, AND THE MECHANISM AS A NATURAL EXPERIMENT
+--------------------------------------------------------------------------
+TabPFN-v2.5, TabPFN-v2.6 and EXAONE-Tabular were added on the same 20 subsamples.
+EXAONE runs in `venv-tabfm`, which is where its package lives; the run in
+`venv-tabfm` is the one `run/run_exaone_a.sh` has always used, and a first attempt
+in `venv-tfm` failed outright with ModuleNotFoundError, 240 rows that were dropped.
+
+Raw `d_q99` against a context without the largest row, median by bin:
+
+| model | 2 to 4 sd | 4 sd and above |
+|---|---|---|
+| TabPFN-v2.5 | -29.7% | **-51.6%** |
+| TabPFN-v2.6 | -54.6% | -48.5% |
+| TabICLv2 | -5.2% | -15.4% |
+| TabPFN-V3 | -6.8% | -7.8% |
+| GBM | +13.3% | -1.7% |
+| EXAONE | +2.8% | +0.9% |
+
+Two things follow, and the second is the stronger.
+
+First, the loss is not one model's quirk: two TabPFN generations lose about half
+of the predicted Q(0.99) on real subsamples whose largest claim shifts the sd, and
+V3 is the least affected of the three. The mechanism weakens across generations
+without being removed.
+
+Second, EXAONE does not lose anything, and its source says why it is the right
+control. `regressor.py:341` centres the target with `selected_y.mean()` and scales
+it with `selected_y.std(correction=1)`: the same non-robust standardisation the
+other packages use. What differs is the head, a bank of predicted quantiles rather
+than a fixed grid of borders in z-space. Under an inflated sd a quantile head
+scales affinely and the relative change cancels; a fixed grid loses resolution
+over the data. So the damage is in the discretisation, not in the standardisation,
+which is what part two argued from the code and can now be read off a comparison
+across packages. TabICLv2 is the case that keeps this honest: it also reports
+quantiles and still loses 15%, so the head type alone is not the whole story and
+its own head has not been read yet.
+
+Repairs scale with the damage, which is the third piece of evidence for the same
+mechanism. Pinball at 0.99 against raw on the ten subsamples at 2 sd and above:
+
+    clip_200   v2.6 10/10 (-17.9%)  v2.5 10/10 (-9.5%)  V3 9/10 (-2.4%)  EXAONE 10/10 (-1.8%)
+    sd_cap     v2.6 10/10 (-15.9%)  v2.5  9/10 (-9.4%)  V3 7/10 (-1.7%)  EXAONE  9/10 (-1.6%)
+    rank_gpd   v2.6  9/10 (-10.8%)  v2.5 10/10 (-11.6%) V3 9/10 (-5.0%)  EXAONE  6/10 (-1.9%)
+    evt_trim   0/10 on every one of the six models: it touches nothing, anywhere.
+
 RUNNING
 -------
     python -u experiments/h3_repair/clip_context_real.py

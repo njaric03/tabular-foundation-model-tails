@@ -34,7 +34,10 @@ from pathlib import Path
 # the three virtualenvs (numpy 1 and 2 are both in use; see
 # metrics.mean_from_quantiles).
 PACKAGES = ["numpy", "pandas", "scipy", "scikit-learn", "torch", "tabpfn",
-            "tabicl", "tabdpt", "tabfm", "exaone-tabular", "xgboost", "catboost"]
+            # The distribution is `exaonetabular`, with no hyphen. It was listed
+            # here as `exaone-tabular`, so `importlib.metadata.version` raised and
+            # every EXAONE row ever measured recorded an empty version.
+            "tabicl", "tabdpt", "tabfm", "exaonetabular", "xgboost", "catboost"]
 
 # Knobs read from the environment by the experiment scripts. Every one of them
 # changes a measurement, and several are not columns in every output.
