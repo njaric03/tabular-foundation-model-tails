@@ -12,8 +12,10 @@ interpolates linearly inside a bar, linear is locally uniform, and a uniform
 tail reads as negative xi. The model has not lost its belief; there are no bars
 left between Q(0.9) and Q(0.99) to express it in.
 
-`q999_in_outer_five` in that same file is 0.0000 at every shift above 4, so the
-half-normal tail and the `icdf` mismatch are real but never reached in practice.
+`q999_in_outer_five` in that same file is 0 at shifts of 20 and 50 and at most
+0.0011 at 10 (the median is 0 at every shift above 4; remeasured 13.9.2026 with
+the border counts reproducing exactly), so the half-normal tail and the `icdf`
+mismatch are real but practically never reached.
 A patch to `icdf` was written and dropped for that reason: it moved nothing.
 
 WHY `robust_scale.py` DID NOT TEST THIS

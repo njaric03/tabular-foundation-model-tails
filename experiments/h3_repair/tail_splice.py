@@ -236,6 +236,26 @@ with a GPD on the scores, and its threshold can be chosen by a rule instead of b
 hand. The two attempts to improve it, locally adaptive scores and a conditional
 splice point, both failed, and both are reported.
 
+FIFTH RUN, 13.9.2026: 5000 TEST ROWS, WHERE 0.999 CAN BE SEEN
+-------------------------------------------------------------
+`DATASETS=freMTPL2sev N_TEST=5000 OUTPUT=tail_splice_n5000.csv`. At 1000 test rows,
+coverage at 0.999 moves in steps of 0.001, so 0.996 and 0.999 are three
+exceedances apart. The unit is the repeat: all test rows of a repeat share one
+calibration sample, and a binomial test over pooled test rows is anti-conservative.
+
+At 0.99 the patch holds. The model alone is below nominal in 10 of 10 repeats for
+GBM and TabPFN-V3 (p = 0.002); with the patch 5, 5 and 7 to 8 of 10, none
+significant. cqr_emp stays inside its Beta(496, 5) band [0.9818, 0.9961].
+
+At 0.999 it does not, for the foundation models. Every model alone is below in 10
+of 10. The patch brings GBM to nominal (0.9992, 0.9995) but leaves TabICLv2 at
+0.9956 to 0.9961 (9 of 10 below under the error, p = 0.021) and TabPFN-V3 at 0.9955
+to 0.9960 (8 of 10): about four times the nominal exceedance rate, and no better
+than the degenerate empirical bound. T2's "16 of 21 at 0.999" was measured on 1000
+test rows and is withdrawn for the foundation models. The likely cause is the
+calibration size: 500 rows give about 50 exceedances, and 0.999 is two orders
+beyond them.
+
 RUNNING
 -------
     python -u experiments/h3_repair/tail_splice.py
