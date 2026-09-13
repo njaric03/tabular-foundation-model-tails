@@ -199,8 +199,21 @@ the paired test says is 0.06%.
      worth arguing about at this calibration size.
   T8 FAILED. Dividing the score by the model's own spread is not sharper: at 0.99
      it is better in 7 of 21 units on a clean context (median +0.5%, worst +25%),
-     and at 0.90 it is significantly worse (5 of 21, p = 0.027). Locally adaptive
-     scores buy nothing here, and add tail risk.
+     and at 0.90 it is significantly worse (5 of 21 under the unit error, two
+     sided p = 0.027; 4 of 21 on a clean context). Locally adaptive scores buy
+     nothing here, and add tail risk.
+     What the 0.90 row actually compares, which the arm names hide. At a
+     threshold of 0.9 the level 0.90 sits inside the calibration data, so
+     `gpd_quantile` returns None for BOTH arms and both fall back -- by design,
+     not by failure: 100% of rows at that level carry no fit. So that line is
+     locally adaptive EMPIRICAL conformal against plain empirical conformal, with
+     no Pareto tail on either side. It is still the textbook test of the locally
+     adaptive score, and the verdict stands; it is simply not a statement about
+     the GPD. Only the 0.99 row, where both arms really fit, is. A re-run cannot
+     move the 0.90 number, and `cqr_gpd_norm` is fixed at a 0.9 threshold, so the
+     locally adaptive score is never measured against a live tail at that level.
+     Doing that needs a `cqr_gpd_norm_0.8` arm, the way cqr_gpd_0.8 and 0.85 do
+     fit at 0.90; it is not measured here.
   T9 NOT HELD, and that settles an argument. The patch adds about as much on a
      rank-transformed context as on a raw one (12 of 21 units better at 0.99,
      median -1.6%, and 12 of 21 at 0.999), so the rank transform is not the patch
@@ -262,7 +275,15 @@ N_FIT = int(os.environ.get("N_FIT", "1500"))
 N_CALIB = int(os.environ.get("N_CALIB", "500"))
 N_TEST = int(os.environ.get("N_TEST", "1000"))
 N_EST = int(os.environ.get("N_EST", "1"))
-CLIP_C = float(os.environ.get("CLIP_C", "200"))
+# One value, not the grid `clip_context.py` reads out of the same variable name.
+# `CLIP_C=20,50,200` is the documented invocation there and used to die here on an
+# opaque `could not convert string to float`, four frames inside an import.
+_clip_c = os.environ.get("CLIP_C", "200")
+if "," in _clip_c:
+    raise SystemExit(
+        f"CLIP_C={_clip_c!r}: this script takes ONE cap, not the grid "
+        f"clip_context.py takes. The clip treatment is a single control here.")
+CLIP_C = float(_clip_c)
 # Where the GPD starts, as a share of the calibration scores. The fixed 0.9 of the
 # first run is as arbitrary as C = 200 was, so the whole grid is measured as a
 # sensitivity, and two rules pick it from the scores themselves: `ks` minimises the
@@ -279,11 +300,18 @@ ARMS = (["none", "cqr_emp"] + [f"cqr_gpd_{u:g}" for u in U_SHARES]
         + ["cqr_gpd_ks", "cqr_gpd_cv", "cqr_gpd_norm", "cond_gpd"])
 SHOW = "cqr_gpd_0.9" if "cqr_gpd_0.9" in ARMS else ARMS[-1]
 FACTORS = [1.0, 100.0]
-TREATMENTS = ["raw", "clip_200", "rank_gpd"]
+# The clip treatment is named after the cap it actually ran at. It was hard-coded
+# `clip_200` while the cap came from CLIP_C, so a run at CLIP_C=50 wrote rows
+# labelled clip_200 -- and since `treatment` is in KEY and `clip_c` was in neither
+# KEY nor COLUMNS, a later resume at a different cap found "already done" and
+# skipped the work. That is rule 2's silent skip. The label carries the value now,
+# so the two cannot come apart, and `clip_c` is written alongside it.
+CLIP_TREATMENT = f"clip_{CLIP_C:g}"
+TREATMENTS = ["raw", CLIP_TREATMENT, "rank_gpd"]
 # What each treatment does to the context, in `clip_context.transform` terms. The
 # back-transform matters for the third one: its quantiles come out in normal-score
 # space and are mapped back through the context's own spliced inverse.
-TREATMENT_ARMS = {"raw": ("raw", 0.0), "clip_200": ("clip", None),
+TREATMENT_ARMS = {"raw": ("raw", 0.0), CLIP_TREATMENT: ("clip", CLIP_C),
                   "rank_gpd": ("rank_gpd", 0.0)}
 # 0.5 is here for the spread that the locally adaptive score and the conditional
 # splice divide by, Q(0.9 | x) - Q(0.5 | x). It is also measured in its own right,
@@ -292,10 +320,10 @@ LEVELS = [0.5, 0.9, 0.99, 0.999]
 I05, I09 = LEVELS.index(0.5), LEVELS.index(0.9)
 OUT = os.environ.get("OUTPUT", "tail_splice.csv")
 
-COLUMNS = ["dataset", "model", "repeat", "factor", "treatment", "arm", "level",
-           "n_fit", "n_calib", "n_test", "n_est", "sd_shift", "coverage", "pinball",
-           "q_median", "u_share", "xi_hat", "scale_hat", "u_score", "n_exc", "degenerate",
-           "seconds", "reason"]
+COLUMNS = ["dataset", "model", "repeat", "factor", "treatment", "clip_c", "arm",
+           "level", "n_fit", "n_calib", "n_test", "n_est", "sd_shift", "coverage",
+           "pinball", "q_median", "u_share", "xi_hat", "scale_hat", "u_score",
+           "n_exc", "degenerate", "seconds", "reason"]
 KEY = ["dataset", "model", "repeat", "factor", "treatment", "arm", "level",
        "n_fit", "n_calib", "n_test", "n_est"]
 
@@ -323,9 +351,17 @@ def pwm_fit(exc):
     a0 = float(x.mean())
     a1 = float(np.mean(x * (1 - p)))
     d = a0 - 2 * a1
-    if abs(d) < 1e-12:
+    # d <= 0, not just |d| ~ 0. A negative denominator gives a NEGATIVE scale, and
+    # `gpd_quantile` then returns u + scale/xi * (r**-xi - 1) < u for r < 1 and
+    # xi > 0 -- a score quantile below its own threshold. That only has to be
+    # finite to pass the check there, so it would be handed to `pick_u_ks` (which
+    # feeds it straight to genpareto.cdf) and `pick_u_cv` as a legitimate fit.
+    if d <= 1e-12:
         raise RuntimeError("degenerate PWM denominator")
-    return 2.0 - a0 / d, 2 * a0 * a1 / d          # xi, scale
+    xi, scale = 2.0 - a0 / d, 2 * a0 * a1 / d
+    if not (scale > 0) or not np.isfinite(xi):
+        raise RuntimeError(f"PWM fit out of range: xi={xi}, scale={scale}")
+    return xi, scale
 
 
 def gpd_quantile(s, level, u_share, fast=False):
@@ -443,8 +479,7 @@ def main():
                         assert float(r).is_integer(), f"repeat is not an integer: {r!r}"
                         t1 = time.time()
                         arm_t, c_t = TREATMENT_ARMS[treatment]
-                        y_fit, back, _ = CC.transform(arm_t,
-                                                      CLIP_C if c_t is None else c_t, yf)
+                        y_fit, back, _ = CC.transform(arm_t, c_t, yf)
                         try:
                             q = models.quantiles(model, Xf, y_fit, Xq, seed=7000 + r,
                                                  levels=LEVELS, n_est=N_EST)
@@ -493,7 +528,16 @@ def main():
                                 for arm, u in ([(f"cqr_gpd_{v:g}", v) for v in U_SHARES]
                                                + list(picked.items())):
                                     gq, info = gpd_quantile(s, lv, u)
-                                    arms[arm] = ((qt, emp, degen, info) if gq is None
+                                    # `True`, not `degen`: a GPD arm that fell back
+                                    # to the empirical quantile did not do what its
+                                    # name says, and that is a degeneracy of its own
+                                    # -- separate from the empirical quantile being
+                                    # out of range, which is what `degen` records.
+                                    # Recording the fallback as False made 12600 rows
+                                    # of the last run byte-identical copies of
+                                    # cqr_emp under seven arm names, all of them
+                                    # flagged as genuine fits.
+                                    arms[arm] = ((qt, emp, True, info) if gq is None
                                                  else (qt, gq, False, info))
                                 if cond is not None and lv > 1 - zeta_c:
                                     cxi, cscale = cond
@@ -512,13 +556,14 @@ def main():
                                 sn = (yc - qc) / sc_c
                                 gq, info = gpd_quantile(sn, lv, 0.9)
                                 if gq is None:
-                                    e2, d2 = emp_quantile(sn, lv)
-                                    arms["cqr_gpd_norm"] = (qt, e2 * sc_t, d2, info)
+                                    e2, _ = emp_quantile(sn, lv)   # fallback: degenerate
+                                    arms["cqr_gpd_norm"] = (qt, e2 * sc_t, True, info)
                                 else:
                                     arms["cqr_gpd_norm"] = (qt, gq * sc_t, False, info)
                                 bounds[lv] = arms
                         for k in todo:
-                            row = dict(k, sd_shift=shift, seconds=secs)
+                            row = dict(k, sd_shift=shift, seconds=secs,
+                                       clip_c=c_t if arm_t == "clip" else 0.0)
                             if err:
                                 row["reason"] = err
                             else:
@@ -551,8 +596,26 @@ def report(t0=None):
     d = d[d.reason.isna() | (d.reason.astype(str).str.strip() == "")]
     if d.empty:
         return
+
+    # A degenerate row is the arm's fallback, not the arm: cqr_emp past the reach
+    # of 500 calibration scores, a cqr_gpd_* whose GPD declined to fit, cond_gpd
+    # below its own conditional threshold. Those rows are the BARE MODEL wearing
+    # the arm's name, and pooling them into the arm's median compares a method
+    # against a mixture of itself and no method at all. The share is not small:
+    # in the run of 12.9.2026 cond_gpd was degenerate in 1260 of 1260 cells at
+    # level 0.5 and 331 of 1260 at 0.9. Printed first, so that a table below with
+    # a thin denominator is visible as such, then excluded from every median.
+    deg = d.assign(degenerate=d.degenerate.fillna(False).astype(bool))
+    share = deg.pivot_table(index=["level", "arm"], values="degenerate",
+                            aggfunc="mean").round(3)
+    share = share[share.degenerate > 0]
+    print("\n=== degenerate share (arm fell back to the bare model or to cqr_emp) ===")
+    print(share.to_string() if len(share) else "  none")
+    d = deg[~deg.degenerate]
+    if d.empty:
+        return
     for col in ("coverage", "pinball"):
-        print(f"\n=== {col}, median over datasets and repeats ===")
+        print(f"\n=== {col}, median over datasets and repeats, degenerate rows dropped ===")
         print(d.pivot_table(index=["level", "factor", "treatment"], columns=["model", "arm"],
                             values=col, aggfunc="median").round(4).to_string())
     print("\n=== coverage by dataset, level 0.99, raw context ===")

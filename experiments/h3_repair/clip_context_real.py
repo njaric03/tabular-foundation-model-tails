@@ -118,13 +118,19 @@ Second, EXAONE does not lose anything, and its source says why it is the right
 control. `regressor.py:341` centres the target with `selected_y.mean()` and scales
 it with `selected_y.std(correction=1)`: the same non-robust standardisation the
 other packages use. What differs is the head, a bank of predicted quantiles rather
-than a fixed grid of borders in z-space. Under an inflated sd a quantile head
-scales affinely and the relative change cancels; a fixed grid loses resolution
-over the data. So the damage is in the discretisation, not in the standardisation,
-which is what part two argued from the code and can now be read off a comparison
-across packages. TabICLv2 is the case that keeps this honest: it also reports
-quantiles and still loses 15%, so the head type alone is not the whole story and
-its own head has not been read yet.
+than a fixed grid of borders in z-space.
+
+TabICLv2's head was read on 13.9.2026 and it splits that conclusion in three.
+`_sklearn/regressor.py:412` fits a plain StandardScaler on the target, the network
+predicts 999 quantile values in that scaled space, and line 769 inverts the scaler
+affinely: no grid anywhere, and still a 15% loss. So non-robust standardisation
+alone costs part of the tail, because an inflated sd squashes the body towards zero
+and the network conditions on a nearly degenerate context; the fixed grid then
+multiplies that loss to 48 to 52%; and a quantile head can avoid it entirely, as
+EXAONE does, for a reason the head type does not explain, since EXAONE and TabICLv2
+standardise identically and both predict quantile values. The earlier claim here,
+that the damage is in the discretisation and not the standardisation, is withdrawn
+as too strong.
 
 Repairs scale with the damage, which is the third piece of evidence for the same
 mechanism. Pinball at 0.99 against raw on the ten subsamples at 2 sd and above:
@@ -239,6 +245,12 @@ def main():
     t0 = time.time()
     for name in DATASETS:
         X, y = datasets.load(name, ids)
+        if models.CATEGORICAL:
+            # The columns prepare() ordinal-coded, handed on so the model can treat
+            # them as categories. Recorded as the CATEGORICAL knob in provenance.
+            models.CATEGORICAL_INDICES = datasets.LAST.get("categorical", [])
+            print(f"  [categorical] {len(models.CATEGORICAL_INDICES)} of {X.shape[1]} "
+                  f"columns passed as categories", flush=True)
         ok = np.isfinite(y) & (y > 0)            # the wide sweep's filter, same order
         X, y = X[ok], y[ok]
         found = subsamples(y, np.random.default_rng(31337))

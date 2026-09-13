@@ -232,8 +232,11 @@ OUTCOME OF THE THIRD AND FOURTH RUNS, 12.9.2026
      closest of every arm measured, against clip_200's 0.804.
   R5 HELD, and worse than predicted, on real tables rather than here. See
      `unit_error_real.py`: 13.8% of cells are worse than raw by more than 100% at
-     0.999, the worst by 51889%, all of them TabPFN-V3 on the tables whose
-     marginal shape is near 1.
+     0.999, the worst by 86000x, all of them TabPFN-V3 on the tables whose
+     marginal shape is near 1. (Recomputed from `unit_error_real.csv`, rank_gpd
+     against raw on pb999 paired by dataset-model-repeat-factor: 13.810% of 420
+     cells, worst +8619507%. An earlier draft of this block read "the worst by
+     51889%", which no slice of the file reproduces.)
 
 The finding that was not predicted at all: **rank_gpd is the sharpest arm at
 0.99**, better than clip_200 in 15 to 20 of 20 seeds at every shift and both tail
@@ -289,6 +292,16 @@ split cleanly along a line I did not anticipate.
 The split to report: **the trim fixes the centre of the error distribution, the
 scale fixes its tail**. Neither fixes both, and the cap arms have no blow-ups at
 all (0.0% and 0.5% of cells, worst +1%).
+
+WHICH PANEL THE ABOVE IS MEASURED ON. R6 to R8 stand on two complete files:
+`clip_context.csv` and `unit_error_real.csv` both carry all 160 and all 420 cells
+for every arm, rank_gpd_trim and rank_exp included, so every paired figure quoted
+here compares arms on the same cells. `clip_context_real.csv` is NOT complete:
+those two arms have 80 of the 120 cells the other nine arms have, because the run
+is still going. Nothing above is quoted from it, and nothing should be until it
+finishes -- a median over arms measured on different cell sets is the error
+`tail_splice.py` records under the second run, where a 3% gap between thresholds
+turned out to be 0.06% once the comparison was paired.
 
 What survives as the recommendation is level-dependent, and that is the finding:
 at 0.99 a rank-transformed context is the sharpest thing measured here, on the
@@ -413,14 +426,29 @@ def evt_trim(y, k_share=0.05, k_min=50, j_max=5, alpha=0.01):
     return np.minimum(y, cap), int((y > cap).sum())
 
 
-def rank_gpd(y, u_share=0.9, k_min=30, with_tail=True, scores="normal",
-             trim=0, xi_cap=None):
+# The rank arms' own knobs, declared here rather than spelled out at four call
+# sites. They are NOT in KEY: the variant name is, and each name pins its own
+# (trim, xi_cap, scores), so the arms cannot collide with each other. What is not
+# distinguished is the same arm measured at a different RANK_U_SHARE or
+# RANK_K_MIN, so changing either needs a new OUTPUT rather than a resume over
+# `clip_context.csv` -- rule 2's silent-skip, which the key alone cannot catch
+# here. RANK_U_SHARE = 0.9 is the same free choice `tail_splice.py` turned into a
+# measured grid once it decided a fixed 0.9 was as arbitrary as C = 200; it is
+# still fixed here and has not been measured as a sensitivity.
+RANK_U_SHARE = 0.9
+RANK_K_MIN = 30
+RANK_TRIM = 1                                  # rank_gpd_trim, rank_exp
+RANK_XI_CAP = 0.95                             # rank_gpd_trim, rank_exp
+
+
+def rank_gpd(y, u_share=RANK_U_SHARE, k_min=RANK_K_MIN, with_tail=True,
+             scores="normal", trim=0, xi_cap=None):
     """See below; `scores` picks the scale the ranks are mapped onto."""
     return _rank_map(y, u_share, k_min, with_tail, scores, trim, xi_cap)
 
 
-def _rank_map(y, u_share=0.9, k_min=30, with_tail=True, scores="normal",
-              trim=0, xi_cap=None):
+def _rank_map(y, u_share=RANK_U_SHARE, k_min=RANK_K_MIN, with_tail=True,
+              scores="normal", trim=0, xi_cap=None):
     """Normal scores into the context, a spliced empirical-GPD map back out.
 
     The context target is replaced by its own normal scores. The largest row can
@@ -430,10 +458,21 @@ def _rank_map(y, u_share=0.9, k_min=30, with_tail=True, scores="normal",
     is the empirical quantile function and cannot return a value above the largest
     one observed, so every upper quantile saturates there. Above the u_share
     quantile the inverse therefore switches to a generalised Pareto fitted to the
-    context's own exceedances, which makes the map monotone and unbounded. A
-    monotone map carries quantiles exactly, so no bias is introduced by the
-    transform itself; what is imposed is the shape of the marginal tail, since the
-    GPD is fitted on the context's own margin and not per x.
+    context's own exceedances, which makes the map unbounded. Below u the map is
+    the empirical inverse and carries quantiles exactly; above it the shape of the
+    marginal tail is imposed, since the GPD is fitted on the context's own margin
+    and not per x, so the top u_share of the range comes back smoothed rather than
+    exactly (up to 66% relative at the far end on a Pareto sample). That is the
+    price of the extension, not an accident of it.
+
+    The two branches are spliced at the probability where the EMPIRICAL inverse
+    returns u, not at `1 - len(exc)/n`. Those are not the same number: with the
+    exceedance count as the rate, the empirical branch ends one order statistic
+    ABOVE u while the Pareto branch starts AT u, so the map stepped DOWN at the
+    seam -- by 1.5x the local order-statistic gap on a Pareto(xi=0.9) context.
+    A non-monotone inverse is not merely inelegant here: `one()` feeds
+    `back(borders)` to `np.searchsorted`, which is undefined on an unsorted array,
+    so `same_bar_90_99` was being read off a garbage bin index for every rank arm.
 
     `with_tail=False` is the same map without that extension, which isolates how
     much of the result is the ranks and how much is the tail.
@@ -463,7 +502,11 @@ def _rank_map(y, u_share=0.9, k_min=30, with_tail=True, scores="normal",
     xp, fp = p[order], y[order]                    # the empirical inverse, as points
     u = float(np.quantile(y, u_share))
     exc = np.sort(y[y > u]) - u
-    zeta = len(exc) / n
+    # The tail probability the Pareto branch is given, taken as the point where the
+    # empirical branch itself reaches u rather than as len(exc) / n. Both estimate
+    # P(Y > u); only this one makes the two branches meet, because it is defined by
+    # the map that hands over. See the docstring on the seam.
+    zeta = max(1.0 - float(np.interp(u, fp, xp)), 1e-12)
     xi = scale = np.nan
     if with_tail and len(exc) >= k_min:
         try:
@@ -489,7 +532,11 @@ def _rank_map(y, u_share=0.9, k_min=30, with_tail=True, scores="normal",
                            else u + scale / xi * (r ** (-xi) - 1))
         return out
 
-    return z, back, 0
+    # Every value is rewritten, not none of them. `transform` promises "how many
+    # context values the arm changed", and reporting 0 made a rank arm's n_clipped
+    # indistinguishable from raw's -- in the column the first three runs used to
+    # argue that sd_cap costs nothing where there is nothing to repair.
+    return z, back, n
 
 
 def transform(arm, c, y):
@@ -518,16 +565,19 @@ def transform(arm, c, y):
         z, n = evt_trim(y)
         return z, same, n
     if arm == "sd_cap":
-        cap, n = sd_cap(y, c or TAU)
+        # `c is None`, not `c or TAU`: tau = 0.0 is a real request (it caps at the
+        # median) and `or` silently turned it into TAU, so the arm ran at a
+        # different setting than the clip_c column recorded.
+        cap, n = sd_cap(y, TAU if c is None else c)
         return np.minimum(y, cap), same, n
     if arm == "rank_emp":
         return rank_gpd(y, with_tail=False)
     if arm == "rank_gpd":
         return rank_gpd(y)
     if arm == "rank_gpd_trim":
-        return rank_gpd(y, trim=1, xi_cap=0.95)
+        return rank_gpd(y, trim=RANK_TRIM, xi_cap=RANK_XI_CAP)
     if arm == "rank_exp":
-        return rank_gpd(y, scores="exponential", trim=1, xi_cap=0.95)
+        return rank_gpd(y, scores="exponential", trim=RANK_TRIM, xi_cap=RANK_XI_CAP)
     raise ValueError(arm)
 
 

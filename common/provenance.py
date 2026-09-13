@@ -34,10 +34,18 @@ from pathlib import Path
 # the three virtualenvs (numpy 1 and 2 are both in use; see
 # metrics.mean_from_quantiles).
 PACKAGES = ["numpy", "pandas", "scipy", "scikit-learn", "torch", "tabpfn",
-            # The distribution is `exaonetabular`, with no hyphen. It was listed
-            # here as `exaone-tabular`, so `importlib.metadata.version` raised and
-            # every EXAONE row ever measured recorded an empty version.
-            "tabicl", "tabdpt", "tabfm", "exaonetabular", "xgboost", "catboost"]
+            "tabicl", "tabdpt", "tabfm", "exaone-tabular", "xgboost", "catboost"]
+
+# Where a name in PACKAGES is not the name the distribution is installed under.
+# EXAONE ships as `exaonetabular`, with no hyphen, so `importlib.metadata.version`
+# raised on the spelling above and every EXAONE row ever measured recorded an
+# empty version. The lookup is redirected here rather than by editing PACKAGES,
+# because PACKAGES also names the COLUMN (`v_exaone_tabular`): renaming the entry
+# renames the column, and then `_widen` sees a column that has disappeared, gives
+# up, and the next knob added to ENV_KNOBS appends a wider row under the narrower
+# header -- the shift `_widen` exists to prevent. The column name is part of the
+# file format; the distribution name is not.
+DISTRIBUTIONS = {"exaone-tabular": "exaonetabular"}
 
 # Knobs read from the environment by the experiment scripts. Every one of them
 # changes a measurement, and several are not columns in every output.
@@ -63,7 +71,7 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              # float32 is used, PER_LEVEL whether the quantile bank is read in
              # one pass or one per level. (`N` in that adapter's __main__ demo is
              # left out: it writes no CSV.)
-             "DTYPE", "PER_LEVEL", "SELECTED",
+             "DTYPE", "PER_LEVEL", "SELECTED", "CATEGORICAL",
              # Not read by any script here: TabPFN's own package setting, whose
              # `env_prefix="TABPFN_"` picks the generation. `mean_correction.py`
              # builds TabPFNRegressor itself, without `model_path`, so this is
@@ -83,7 +91,7 @@ def _version(pkg: str) -> str:
     """Installed version without importing the package."""
     try:
         from importlib.metadata import version
-        return version(pkg)
+        return version(DISTRIBUTIONS.get(pkg, pkg))
     except Exception:
         return ""
 
@@ -117,8 +125,11 @@ def row(output: str) -> dict:
     return r
 
 
-def _widen(path: Path) -> None:
+def _widen(path: Path) -> bool:
     """Give an existing file the columns COLUMNS has gained since it was written.
+
+    Returns whether the header on disk now matches COLUMNS, so the caller can
+    refuse to append when it does not.
 
     `DictWriter` writes the header only when it creates the file, so adding a
     knob to ENV_KNOBS would append wider rows under a narrower header and shift
@@ -127,20 +138,28 @@ def _widen(path: Path) -> None:
     the record of what produced a measurement, so a silent shift there is worse
     than in a result file. Old rows get blanks, which is the truth: the knob was
     not recorded when they were written.
+
+    Printing and carrying on was not enough. A column that disappears from
+    COLUMNS -- a package renamed in PACKAGES, say -- lands in `dropped` forever,
+    so every later call takes the give-up branch, and the FIRST knob added after
+    that appends a wider row under the narrower header anyway. The refusal has to
+    stop the write, not just describe it.
     """
     if not path.exists() or path.stat().st_size == 0:
-        return
+        return True
     with open(path, encoding="utf-8", newline="") as fh:
         old = next(csv.reader(fh), None)
     if old is None or old == COLUMNS:
-        return
+        return True
     added = [c for c in COLUMNS if c not in old]
     dropped = [c for c in old if c not in COLUMNS]
     if dropped or not added:
         # A column disappeared, or the order changed. Not something to guess at.
-        print(f"[provenance] header differs and cannot be widened; "
-              f"missing from COLUMNS: {dropped}", flush=True)
-        return
+        print(f"[provenance] header differs and cannot be widened, so this row is "
+              f"NOT recorded; missing from COLUMNS: {dropped}. Restore the column "
+              f"name, or move the file aside and let a new one be written.",
+              flush=True)
+        return False
     import pandas as pd
     d = pd.read_csv(path)
     for c in added:
@@ -148,6 +167,7 @@ def _widen(path: Path) -> None:
     d[COLUMNS].to_csv(path, index=False)
     print(f"[provenance] added columns {added}, {len(d)} existing rows blank there",
           flush=True)
+    return True
 
 
 def record(output: str) -> None:
@@ -160,7 +180,8 @@ def record(output: str) -> None:
     path = paths.result("provenance.csv")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        _widen(path)
+        if not _widen(path):
+            return
         new = not path.exists() or path.stat().st_size == 0
         with open(path, "a", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(fh, fieldnames=COLUMNS, extrasaction="ignore")

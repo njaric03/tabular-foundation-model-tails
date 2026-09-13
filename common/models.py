@@ -34,6 +34,7 @@ RULES BUILT IN
 """
 from __future__ import annotations
 
+import os
 import numpy as np
 
 # Names as they appear in the existing CSV files. Synonyms are mapped so older
@@ -96,6 +97,17 @@ def describe(name: str, seed: int, n_est: int, **extra) -> dict:
 
 # ------------------------------------------------------------------- quantiles
 
+# `datasets.prepare` hands every model integer codes for categorical columns, and
+# TabPFN and TabICL have their own handling that is bypassed by that. This is the
+# switch for measuring what it costs: CATEGORICAL=native makes `quantiles` pass the
+# column indices on, and the experiment sets them from `datasets.LAST`. TabPFN
+# accepts `categorical_features_indices`; TabICL 2.1.1 has no such parameter, so the
+# comparison is only possible for the TabPFN family and that is a limit of the test,
+# not a choice.
+CATEGORICAL = os.environ.get("CATEGORICAL", "") == "native"
+CATEGORICAL_INDICES: list = []
+
+
 def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np.ndarray:
     """(n_test, len(levels)) predicted quantiles on the original target scale.
 
@@ -131,6 +143,8 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
                   ignore_pretraining_limits=True)
         if name in TABPFN_PATHS:
             kw["model_path"] = TABPFN_PATHS[name]
+        if CATEGORICAL and CATEGORICAL_INDICES:
+            kw["categorical_features_indices"] = list(CATEGORICAL_INDICES)
         m = TabPFNRegressor(**kw)
         m.fit(Xtr, ytr)
         return np.stack([np.asarray(a, dtype=float) for a in
