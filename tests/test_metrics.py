@@ -1,24 +1,17 @@
 # -*- coding: utf-8 -*-
-"""Property tests for the estimators in `common/metrics.py`.
+"""Property tests of `common/metrics.py`.
 
-Why these exist. Three numerical bugs are on record in this repository, all in
-this module or its 19 former copies, and all found by reading rather than by
-running:
-
-  * the Hill estimator used the smallest INCLUDED order statistic as its
-    threshold, biasing xi low by about xi/k;
-  * `gpd_quantile` divided by zero at xi = 0 in half the copies, and the
-    RuntimeWarning went into the repo-wide `filterwarnings("ignore")`;
-  * `int(0.999 * 100) == 99`, so a column for 0.99 was overwritten by 0.999.
-
-Every one of them is caught by a test that takes a second to run.
+Three numerical bugs are on record in these estimators, all found by reading: a Hill
+threshold that biased xi low by about xi/k, a division by zero at xi = 0 hidden by a
+blanket warning filter, and `int(0.999 * 100) == 99` overwriting the 0.99 column.
 """
+import warnings
+
 import numpy as np
 import pytest
 from scipy.stats import genpareto
 
 from common import metrics
-
 
 # ------------------------------------------------------------ GPD quantiles
 
@@ -37,20 +30,9 @@ def test_gpd_quantile_is_the_gumbel_limit_at_zero():
 
 def test_gpd_quantile_raises_no_numeric_warning_at_zero():
     """The exact bug the blanket warning filter used to hide."""
-    with np.errstate(all="raise"), pytest.warns(None) if False else _no_warnings():
-        metrics.gpd_quantile(np.array([0.5, 0.99]), np.array([0.0, 0.0]))
-
-
-class _no_warnings:
-    def __enter__(self):
-        import warnings
-        self.ctx = warnings.catch_warnings()
-        self.ctx.__enter__()
+    with np.errstate(all="raise"), warnings.catch_warnings():
         warnings.simplefilter("error")
-        return self
-
-    def __exit__(self, *a):
-        return self.ctx.__exit__(*a)
+        metrics.gpd_quantile(np.array([0.5, 0.99]), np.array([0.0, 0.0]))
 
 
 # ------------------------------------------------------------- the inversions
@@ -171,12 +153,22 @@ def test_mean_from_quantiles_recovers_the_mean_of_a_uniform():
 
 # -------------------------------------------------------------- guards
 
-def test_share_tracked_refuses_a_reference_gradient_that_is_too_small():
-    assert np.isnan(metrics.share_tracked(0.0, 1.0, 0.0, 0.01))
-    assert metrics.share_tracked(0.0, 0.5, 0.0, 1.0) == pytest.approx(0.5)
+@pytest.mark.parametrize("xi", [0.3, 0.7])
+def test_implied_xi_recovers_the_index_from_exact_quantiles(xi):
+    q = metrics.gpd_quantile(np.array([0.5, 0.9, 0.99]), np.full(3, xi))
+    rows = np.tile(q, (20, 1)) * np.linspace(1, 3, 20)[:, None]
+    assert metrics.implied_xi(rows[:, 2], rows[:, 1]) == pytest.approx(xi, abs=1e-6)
+    assert metrics.implied_xi(rows[:, 2], rows[:, 1], rows[:, 0]) == pytest.approx(xi, abs=1e-6)
 
 
-def test_rel_change_skips_zero_denominators_instead_of_returning_inf():
-    before = np.array([0.0, 1.0, 2.0])
-    after = np.array([5.0, 2.0, 4.0])
-    assert metrics.rel_change(before, after) == pytest.approx(1.0)
+def test_implied_xi_is_nan_when_no_row_has_a_denominator():
+    z = np.zeros(5)
+    assert np.isnan(metrics.implied_xi(z, z))
+    assert np.isnan(metrics.implied_xi(z, z, z))
+
+
+def test_rel_change_by_level_skips_zero_references():
+    ref = np.array([[0.0, 1.0], [1.0, -2.0], [2.0, 4.0]])
+    new = np.array([[5.0, 2.0], [2.0, -1.0], [4.0, 8.0]])
+    assert metrics.rel_change_by_level(ref, new) == pytest.approx([1.0, 1.0])
+    assert metrics.rel_change_by_level(ref, new, positive=True)[1] == pytest.approx(1.0)

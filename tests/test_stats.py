@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
-"""The clustered test in `common/stats.py`.
-
-The point of the module is that a nested design must not be counted as if it
-were flat, so the tests are about exactly that: the same effect, told once per
-free unit, must give a weaker p-value than the same effect told three times per
-free unit.
-"""
+"""The clustered test in `common/stats.py`: a nested design must not count as a flat one,
+so repeating an effect within a free unit must not strengthen the cluster-level p-value."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -62,8 +57,10 @@ def test_ties_are_dropped_from_the_sign_test():
 
 
 def test_empty_input_does_not_raise():
+    from common import tables
     d = frame().iloc[0:0]
     assert stats.paired_by_cluster(d, "scale_share", "shape_share")["n"] == 0
+    assert np.isnan(tables.paired_rank_test(d)["share"])
 
 
 def test_tables_paired_rank_test_reports_both_levels():

@@ -1,16 +1,12 @@
 # -*- coding: utf-8 -*-
-"""The resume and header guards in `common/append.py`.
-
-Every one of these corresponds to a failure that cost measurements: shifted
-columns when a script gained a parameter, a resume key missing a knob so a
-re-run silently did nothing, and two processes writing one output.
-"""
+"""The resume and header guards of `common/append.py`, each after a failure that cost
+measurements: shifted columns, a key missing a knob, two writers on one file."""
 import sys
 
 import pandas as pd
 import pytest
 
-from common import append
+from common import append, files
 
 
 @pytest.fixture()
@@ -65,19 +61,29 @@ def test_done_refuses_a_key_column_that_is_empty_in_every_row(out):
 
 
 def test_a_second_writer_waits_rather_than_interleaving(out, monkeypatch):
-    monkeypatch.setattr(append, "WAIT_S", 0)
-    p = append._path(out)
-    lock = append._Lock(p)
-    lock.__enter__()
-    try:
+    monkeypatch.setattr(files, "WAIT_S", 0)
+    with files.FileLock(append._path(out)):
         with pytest.raises(TimeoutError):
             append.write(out, dict(a=1), ["a"])
-    finally:
-        lock.__exit__()
+
+
+def test_an_empty_key_cell_matches_on_resume(out):
+    """None is written as an empty cell and read back as NaN, which equals nothing.
+    Without normalising both to None, the cell is measured again on every run."""
+    cols = ["model", "seed", "dose"]
+    append.write(out, dict(model="GBM", seed=1, dose=None), cols)
+    append.write(out, dict(model="GBM", seed=2, dose=3), cols)
+    assert append.key(dict(model="GBM", seed=1, dose=None), cols) in append.done(out, cols)
+
+
+def test_widening_copies_values_as_text(out):
+    """A pandas round trip turned an all-digit git sha into an int and dropped its zero."""
+    append.write(out, dict(sha="0123456", v="1.10"), ["sha", "v"])
+    append.write(out, dict(sha="0000001", v="2", c=1), ["sha", "v", "c"])
+    assert "0123456,1.10," in append._path(out).read_text(encoding="utf-8")
 
 
 def test_provenance_is_recorded_for_the_output(out, tmp_path):
-    append._provenance_seen = set()
     from common import provenance
     provenance._recorded.clear()
     append.write(out, dict(a=1), ["a"])

@@ -1,6 +1,6 @@
 # Predictions written before each run, and what happened
 
-Extracted verbatim from the module docstrings of the scripts below at commit `fa31358`,
+Extracted verbatim from the module docstrings of the scripts below at commit `578a2f3`,
 before a refactor shortened those docstrings. Nothing here was edited: the text is what
 sat at the top of each script, predictions first and outcomes appended after each run.
 The git history of each script shows when a prediction block was committed relative to
@@ -9,6 +9,9 @@ the result rows it describes.
 These are predictions written into the code before running, not a formal
 preregistration in a public registry. Where a prediction was drafted after a smoke test,
 or a threshold was picked after a run, the block says so itself.
+
+Outcomes of runs after the refactor is merged are appended below the last section, in
+the same form.
 
 ## Contents
 
@@ -922,6 +925,28 @@ Two limits on the rank arms, both from this run:
   * The blow-ups are not only TabPFN. Of the 25 cells where rank_gpd_trim is more
     than 100% worse at 0.999, 5 are TabICLv2 on beMTPL97 and norauto. An earlier
     reading of this file's first run said "all TabPFN-V3", and that was wrong.
+
+THIRD RUN, 14.9.2026: TABPFN V2.5 AND V2.6
+-----------------------------------------
+3080 rows, seven tables, ten repeats, none failed. The unit is a dataset-model pair,
+14 of them.
+
+The error costs the two older generations little accuracy: median pinball at 0.99
+moves by -6% to +16% by table (BlogFeedback +15.7% and MEPS +8.5% on v2.6, at most
++5.9% on v2.5). That fits the split seen on freMTPL2sev, where grid-headed models
+mis-report the upper quantile far more than they lose in pinball.
+
+    clip_200       11/14 (p = 0.057, median -4.0%, worst +2.7%)
+    sd_cap         11/14 (p = 0.057, median -4.0%, worst +6.4%)
+    clip_50        10/14 (median -1.9%, worst +9.5%)
+    rank_exp        8/14 (p = 0.79, median -1.3%, worst +8.3%)
+    rank_gpd_trim   8/14 (median -2.0%, worst +60.8%)
+    log             6/14 (median +5.3%, worst +3.96e6%)
+    evt_trim        3/14 (touches almost nothing)
+
+The caps carry over to the older generations. The rank transform, the best arm at
+0.99 on TabPFN-V3, TabICLv2 and GBM (19 of 21, median -5.9%), does not, so the
+level-dependent recommendation also depends on the model.
 
 RUNNING
 -------

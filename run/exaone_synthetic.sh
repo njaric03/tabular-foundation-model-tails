@@ -1,5 +1,6 @@
 #!/bin/sh
-# Stream B: 20 seedova oblik -> 20 seedova skala -> sredina -> intervencija na xi=0,3 i 0,7.
+# EXAONE on the generator: shape and scale over 20 seeds at n_est=4, the mean's response in
+# TabFM's profile, and the influence of one row.
 set -x
 export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6
 PY=venv-tabfm/Scripts/python.exe

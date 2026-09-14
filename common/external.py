@@ -1,38 +1,24 @@
 # -*- coding: utf-8 -*-
-"""Heavy-tailed datasets that are not on OpenML, fetched once and cached.
+"""Heavy-tailed tables that are not on OpenML, fetched once and cached.
 
-WHY
----
-The real-data evidence for parts two and three rests on one table,
-freMTPL2sev. The OpenML pool cannot supply more: of 103 surveyed datasets only
-two carry both a leverage of 2 sd and a tail index above 0.5, because benchmark
-tables are curated. Heavy tails with covariates live in insurance severity,
-health expenditure and online popularity, so the candidates come from there.
+The OpenML pool supplies one table with both leverage and a heavy tail, freMTPL2sev:
+benchmark tables are curated. Heavy tails with covariates live in insurance severity,
+health expenditure and online popularity, so the candidates come from there. Each entry
+fixes the target and drops the columns that are outcomes of the same event (claim counts,
+claim indicators, totals), all named before any table was loaded.
+`experiments/h2_leverage/external_selection.py` decides which enter the pool.
 
-THE CANDIDATES, NAMED BEFORE ANY OF THEM WAS LOADED
----------------------------------------------------
-Each entry fixes the target and the columns that are dropped because they are
-outcomes of the same event as the target (claim counts, claim indicators, the
-total of which the target is an average, utilisation). Nothing here was chosen
-after looking at a target's distribution; the gate that decides which of them
-enter the pool is `experiments/h2_leverage/external_selection.py`.
+`dataCar` is left out because it is the same portfolio as `ausprivauto0405`, and
+`AutoBi` because 1340 rows do not fit a 2000 + 1000 split.
 
-`dataCar` from insuranceData is left out on purpose: it is the same Australian
-2004-05 portfolio as `ausprivauto0405`, and the two would count one target
-twice. `AutoBi` is too small (1340 rows) for a 2000 + 1000 split.
-
-HOW IT RUNS
------------
-Converting an `.rda` needs `pyreadr`, which is not in the pinned model
-environments and should not be. So there are two steps:
+Converting an `.rda` needs `pyreadr`, which the model environments do not carry:
 
     venv-data/Scripts/python -m common.external      # fetch and convert, once
-    (any venv) datasets.load("beMTPL97")               # reads the converted csv.gz
+    datasets.load("beMTPL97")                        # any venv, reads the csv.gz
 
-The raw files live in `.cache/external/raw/`, the converted tables in
-`.cache/external/`, both outside git. The sha256 of every raw file is recorded
-in `data/external_sources.json` on the first fetch and checked on every later
-one, the same guard `datasets.check_fingerprint` gives the OpenML tables.
+Raw files go to `.cache/external/raw/` and converted tables to `.cache/external/`, both
+outside git. The sha256 of every raw file is recorded in `data/external_sources.json`
+on the first fetch and checked on every later one.
 """
 from __future__ import annotations
 
@@ -43,10 +29,9 @@ import tarfile
 import urllib.request
 import zipfile
 
-import numpy as np
 import pandas as pd
 
-from common import paths
+from common import files, paths
 
 CAS = "https://github.com/dutangc/CASdatasets/raw/master/data/"
 
@@ -109,19 +94,21 @@ def table_path(name):
 def _check_sha(name, blob: bytes) -> None:
     sha = hashlib.sha256(blob).hexdigest()
     path = paths.data(SOURCES)
-    known = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     url = REGISTRY[name]["url"]
-    if url not in known:
-        known[url] = sha
-        path.write_text(json.dumps(known, indent=1, sort_keys=True), encoding="utf-8")
-        print(f"  [external] sha256 recorded for {url.rsplit('/', 1)[-1]}: {sha[:16]}")
-    elif known[url] != sha:
+    with files.FileLock(path):
+        known = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        if url not in known:
+            known[url] = sha
+            path.write_text(json.dumps(known, indent=1, sort_keys=True), encoding="utf-8")
+            print(f"  [external] sha256 recorded for {url.rsplit('/', 1)[-1]}: {sha[:16]}")
+            return
+    if known[url] != sha:
         raise RuntimeError(f"{url}: the file is not the one recorded before "
                            f"({known[url][:16]} then, {sha[:16]} now)")
 
 
 def fetch(name) -> bytes:
-    """The raw file, downloaded on first use and checked against its hash."""
+    """The raw file, downloaded on first use and checked against its recorded hash."""
     raw = _raw_path(name)
     if not raw.exists():
         raw.parent.mkdir(parents=True, exist_ok=True)
@@ -137,7 +124,8 @@ def _read(name, blob) -> pd.DataFrame:
     kind = spec["kind"]
     if kind in ("rda", "rda-in-tar"):
         import tempfile
-        import pyreadr   # venv-data only
+
+        import pyreadr  # venv-data only
         if kind == "rda-in-tar":
             with tarfile.open(fileobj=io.BytesIO(blob)) as t:
                 blob = t.extractfile(spec["member"]).read()
@@ -157,15 +145,13 @@ def _read(name, blob) -> pd.DataFrame:
 
 
 def convert(name) -> None:
-    """Raw file to `<name>.csv.gz`, target in the column `__target__`."""
+    """Raw file to `<name>.csv.gz`, with the target in the column `__target__`."""
     spec = REGISTRY[name]
     df = _read(name, fetch(name))
     target = df.columns[spec["target"]] if isinstance(spec["target"], int) else spec["target"]
     y = pd.to_numeric(df.pop(target), errors="coerce")
     df = df.drop(columns=[c for c in spec.get("drop", []) if c in df.columns])
-    # Dates and other objects that are not categories would be ordinal-coded by
-    # `datasets.prepare` into something meaningless; none of the kept columns
-    # should be one, and a loud failure is better than a silent code.
+    # A date would be ordinal-coded into nonsense by `datasets.prepare`; fail instead.
     for c in df.columns:
         if str(df[c].dtype).startswith("datetime"):
             raise RuntimeError(f"{name}: column {c} is a date; add it to `drop`")

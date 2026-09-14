@@ -1,24 +1,9 @@
 # -*- coding: utf-8 -*-
-"""What produced a row: package versions, commit, interpreter, env knobs.
+"""What produced a result row: package versions, commit, interpreter and env knobs.
 
-The gap this closes. `findings/NALAZI.md` section 2.1 is a claim about specific
-package versions -- TabPFN 8.4.0, TabICL 2.1.1, TabDPT 1.2.0, TabFM 1.0.1,
-EXAONE-Tabular 1.0.0 -- and the whole of H2 is a measured consequence of what
-those versions do to the target. Until now no result row said which version, or
-even which of the three virtualenvs, produced it. Six months later, at the
-defence, that is not reconstructible.
-
-Why a sidecar file and not columns. Adding provenance columns to every result
-CSV would change every header, and `append.write` refuses to append to a file
-whose header moved -- correctly, that guard exists because shifted columns cost
-measurements once already. So provenance goes to one shared log,
-`results/provenance.csv`, joined to a result by its file name and the time the
-rows were written.
-
-Nothing calls this by hand: `common/append.py` records once per process the
-first time it writes to an output. A knob that is not recorded is a knob that
-cannot be reconstructed (rule 2 of RULES.md), and a package version is a knob
-the environment sets rather than the script.
+One row per (process, output) goes to `results/provenance.csv`, joined to a result by
+file name and time. `append.write` calls `record` on its first write, so no script has
+to remember it. A sidecar file keeps every result header unchanged.
 """
 from __future__ import annotations
 
@@ -28,36 +13,22 @@ import platform
 import subprocess
 import sys
 import time
+from importlib.metadata import version
 from pathlib import Path
 
-# Model packages, plus the numerical stack whose major version differs between
-# the three virtualenvs (numpy 1 and 2 are both in use; see
-# metrics.mean_from_quantiles).
+from common import files, paths
+
+# Model packages plus the numerical stack, whose major versions differ between venvs.
 PACKAGES = ["numpy", "pandas", "scipy", "scikit-learn", "torch", "tabpfn",
             "tabicl", "tabdpt", "tabfm", "exaone-tabular", "xgboost", "catboost"]
 
-# Where a name in PACKAGES is not the name the distribution is installed under.
-# EXAONE ships as `exaonetabular`, with no hyphen, so `importlib.metadata.version`
-# raised on the spelling above and every EXAONE row ever measured recorded an
-# empty version. The lookup is redirected here rather than by editing PACKAGES,
-# because PACKAGES also names the COLUMN (`v_exaone_tabular`): renaming the entry
-# renames the column, and then `_widen` sees a column that has disappeared, gives
-# up, and the next knob added to ENV_KNOBS appends a wider row under the narrower
-# header -- the shift `_widen` exists to prevent. The column name is part of the
-# file format; the distribution name is not.
+# Distribution names that differ from the PACKAGES spelling. PACKAGES also names the
+# column (`v_exaone_tabular`), and renaming a column would break the header, so the
+# lookup is redirected here instead.
 DISTRIBUTIONS = {"exaone-tabular": "exaonetabular"}
 
-# Knobs read from the environment by the experiment scripts. Every one of them
-# changes a measurement, and several are not columns in every output.
-#
-# The second row is what the list was missing. `MAX_ATTEMPTS` is the worst of
-# them: it is how many draws `prevalence_models.py` rejects while hunting the
-# high leverage bins, so it sets the treatment size in the second part, and it
-# reaches neither a column nor this list. `PARTS`, `N_BOOT`, `N_PERM`, `N_GRID`,
-# `N_FIT` and `N_TEST` are the same kind of gap. The rest do land in a column of
-# their own output, and are recorded here as well because rule 2 asks that a
-# knob be reconstructable from the row, not from the reader's memory of which
-# script wrote it.
+# Every environment variable that changes a measurement. The order is the column order
+# of the file on disk: append new names at the end.
 ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              "SD_SHIFTS", "DATASETS", "POSITION", "VARIANTS", "LEVELS",
              "MEMBERS", "N_GROUPS", "N_TRAIN", "OUTPUT", "TFM_STRICT",
@@ -65,19 +36,15 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              "N_PER_BIN", "K_SHARE", "LOG_SCALE", "MAX_ATTEMPTS", "MASS",
              "N_BOOT", "N_FIT", "N_GRID", "N_PERM", "N_PER_GROUP", "N_TEST",
              "OUTPUT1", "OUTPUT2", "N_REPEATS", "TRANSFORMS", "N_SUBSAMPLES",
-             # Read in `common/`, not in a script, which is why the first sweep
-             # over `experiments/` missed them. Both change what EXAONE returns:
-             # DTYPE decides whether the shipped float16 or the CPU default
-             # float32 is used, PER_LEVEL whether the quantile bank is read in
-             # one pass or one per level. (`N` in that adapter's __main__ demo is
-             # left out: it writes no CSV.)
+             # read in common/ rather than in a script
              "DTYPE", "PER_LEVEL", "SELECTED", "CATEGORICAL",
-             # Not read by any script here: TabPFN's own package setting, whose
-             # `env_prefix="TABPFN_"` picks the generation. `mean_correction.py`
-             # builds TabPFNRegressor itself, without `model_path`, so this is
-             # what chose the checkpoint for the `TabPFN-V2` rows, and nothing
-             # recorded it. `run/run_mean_correction.sh` still sets it.
-             "TABPFN_MODEL_VERSION"]
+             # TabPFN's own setting, which picks the checkpoint when no model_path is given
+             "TABPFN_MODEL_VERSION",
+             "CLIP_C", "U_SHARES", "REPEATS", "N_CALIB",
+             # TabPFN's CPU output depends on the thread count bit for bit: the same
+             # generator cells give an implied xi of 0.6516 at 6 threads and 0.7003 at 3.
+             # An unset value means the library default, which depends on the machine.
+             "OMP_NUM_THREADS", "MKL_NUM_THREADS"]
 
 COLUMNS = (["utc", "output", "script", "git_sha", "git_dirty", "python",
             "platform", "venv"]
@@ -88,9 +55,8 @@ _recorded: set[str] = set()
 
 
 def _version(pkg: str) -> str:
-    """Installed version without importing the package."""
+    """Installed version without importing the package, or '' when it is absent."""
     try:
-        from importlib.metadata import version
         return version(DISTRIBUTIONS.get(pkg, pkg))
     except Exception:
         return ""
@@ -109,7 +75,7 @@ def _git() -> tuple[str, str]:
 
 
 def row(output: str) -> dict:
-    """The provenance record for the current process, as a dict."""
+    """The provenance record of the current process."""
     sha, dirty = _git()
     r = dict(utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              output=str(output),
@@ -126,68 +92,47 @@ def row(output: str) -> dict:
 
 
 def _widen(path: Path) -> bool:
-    """Give an existing file the columns COLUMNS has gained since it was written.
+    """Bring the header on disk up to COLUMNS. Returns False when that is impossible.
 
-    Returns whether the header on disk now matches COLUMNS, so the caller can
-    refuse to append when it does not.
-
-    `DictWriter` writes the header only when it creates the file, so adding a
-    knob to ENV_KNOBS would append wider rows under a narrower header and shift
-    every value after the first new column. `append._reconcile` guards its own
-    outputs against exactly that; provenance had no such guard, and its rows are
-    the record of what produced a measurement, so a silent shift there is worse
-    than in a result file. Old rows get blanks, which is the truth: the knob was
-    not recorded when they were written.
-
-    Printing and carrying on was not enough. A column that disappears from
-    COLUMNS -- a package renamed in PACKAGES, say -- lands in `dropped` forever,
-    so every later call takes the give-up branch, and the FIRST knob added after
-    that appends a wider row under the narrower header anyway. The refusal has to
-    stop the write, not just describe it.
+    Only added columns can be reconciled, and old rows get blanks there. A column that
+    disappeared from COLUMNS is refused, because appending anyway would shift every
+    value after it.
     """
-    if not path.exists() or path.stat().st_size == 0:
-        return True
-    with open(path, encoding="utf-8", newline="") as fh:
-        old = next(csv.reader(fh), None)
+    old = files.csv_header(path)
     if old is None or old == COLUMNS:
         return True
-    added = [c for c in COLUMNS if c not in old]
     dropped = [c for c in old if c not in COLUMNS]
-    if dropped or not added:
-        # A column disappeared, or the order changed. Not something to guess at.
-        print(f"[provenance] header differs and cannot be widened, so this row is "
-              f"NOT recorded; missing from COLUMNS: {dropped}. Restore the column "
-              f"name, or move the file aside and let a new one be written.",
-              flush=True)
+    if dropped:
+        print(f"[provenance] header lost columns {dropped}, so this row is NOT recorded. "
+              f"Restore the names in COLUMNS, or move the file aside.", flush=True)
         return False
-    import pandas as pd
-    d = pd.read_csv(path)
-    for c in added:
-        d[c] = ""
-    d[COLUMNS].to_csv(path, index=False)
-    print(f"[provenance] added columns {added}, {len(d)} existing rows blank there",
+    n = files.rewrite_csv(path, COLUMNS)
+    added = [c for c in COLUMNS if c not in old]
+    print(f"[provenance] header now matches COLUMNS (added {added}), {n} rows kept",
           flush=True)
     return True
 
 
 def record(output: str) -> None:
-    """Append one provenance row, at most once per output per process."""
-    key = str(output)
-    if key in _recorded:
+    """Append one provenance row, at most once per output per process. Never raises."""
+    if str(output) in _recorded:
         return
-    _recorded.add(key)
-    from common import paths
+    _recorded.add(str(output))
     path = paths.result("provenance.csv")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        if not _widen(path):
-            return
-        new = not path.exists() or path.stat().st_size == 0
-        with open(path, "a", newline="", encoding="utf-8") as fh:
-            w = csv.DictWriter(fh, fieldnames=COLUMNS, extrasaction="ignore")
-            if new:
-                w.writeheader()
-            w.writerow(row(output))
+        r = row(output)
+        # Every running measurement shares this file, so the header check and the
+        # append happen under one lock.
+        with files.FileLock(path):
+            if not _widen(path):
+                return
+            new = files.csv_header(path) is None
+            with open(path, "a", newline="", encoding="utf-8") as fh:
+                w = csv.DictWriter(fh, fieldnames=COLUMNS, extrasaction="ignore")
+                if new:
+                    w.writeheader()
+                w.writerow(r)
     except Exception as e:
         # Provenance must never take a measurement down with it.
         print(f"[provenance] not recorded: {type(e).__name__}: {e}", flush=True)

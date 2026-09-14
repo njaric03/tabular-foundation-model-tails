@@ -1,106 +1,47 @@
 # -*- coding: utf-8 -*-
-"""Safe row-by-row append to a result CSV.
-
-Long measurements are resumable: they append one row per (model, seed, ...) cell
-and skip cells already present. Hand-rolled `to_csv(mode="a")` had three holes,
-each of which cost measurements in this project:
-
-1. SHIFTED COLUMNS. `header=not exists` writes no header when the file exists,
-   without checking that the column list still matches. When a script gained a
-   parameter, the file stayed on the old columns while the script started
-   sending more fields.
-2. TWO PROCESSES RACING. Two streams writing one output interleave rows and
-   formats.
-3. SILENT SKIPPING. When the resume key is typed out by hand, a newly added
-   knob that is not in the key makes a re-run with a different value find
-   "already done" and do nothing, without a message.
+"""Row-by-row append to a result CSV, resumable and guarded.
 
     from common import append
 
-    COLUMNS = ["xi", "model", "dose", "seed", "position", "n_train", "n_est", ...]
-    KEY     = ["xi", "model", "dose", "seed", "position", "n_train", "n_est"]
+    COLUMNS = ["xi", "model", "seed", "n_est", "xi_implied", "reason"]
+    KEY = ["xi", "model", "seed", "n_est"]
 
     done = append.done(OUTPUT, KEY)
-    ...
-    if append.key(row, KEY) in done:
-        continue
-    append.write(OUTPUT, row, COLUMNS)
+    if append.key(row, KEY) not in done:
+        append.write(OUTPUT, row, COLUMNS)
 
-`done` and `write` share the key list, so a parameter that reaches the CSV but
-not the key can no longer pass unnoticed: `done` raises if a key column is
-missing from the file.
+Each guard here was added after its absence cost a measurement:
+
+* the header on disk must match the columns sent. A pure superset widens the file,
+  anything else raises `Shifted`;
+* rows are written under a file lock, so two processes cannot interleave them;
+* `done` raises when a key column is missing, or empty in every row, since a re-run
+  with another value would then skip or duplicate the work without a word.
 """
 from __future__ import annotations
 
-import csv
-import os
-import time
-from pathlib import Path
-
 import pandas as pd
 
-from common import paths, provenance
-
-# How long to wait for someone else's lock before giving up.
-WAIT_S = 120
+from common import files, paths, provenance
 
 
 class Shifted(Exception):
-    """The header on disk does not match the columns the script is sending."""
+    """The header on disk does not match the columns the script sends."""
 
 
-def _path(p) -> Path:
-    return Path(p) if len(Path(p).parts) > 1 and Path(p).is_absolute() else paths.result(p)
+def _path(output):
+    return paths.result(output)
 
 
-class _Lock:
-    """File lock. `O_EXCL` is atomic on both Windows and POSIX."""
+def _reconcile(p, columns: list[str]) -> None:
+    """Check the header and widen the file when the new columns are a superset.
 
-    def __init__(self, target: Path):
-        self.path = target.with_suffix(target.suffix + ".lock")
-
-    def __enter__(self):
-        deadline = time.time() + WAIT_S
-        while True:
-            try:
-                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.write(fd, str(os.getpid()).encode())
-                os.close(fd)
-                return self
-            except FileExistsError:
-                if time.time() > deadline:
-                    raise TimeoutError(
-                        f"lock {self.path.name} held by someone else for {WAIT_S}s. "
-                        f"Most likely a second process writing the same OUTPUT; each "
-                        f"stream needs its own. If a process died, delete the lock file.")
-                time.sleep(0.1)
-
-    def __exit__(self, *_):
-        try:
-            self.path.unlink()
-        except FileNotFoundError:
-            pass
-        return False
-
-
-def _header(p: Path) -> list[str] | None:
-    if not p.exists() or p.stat().st_size == 0:
-        return None
-    with open(p, encoding="utf-8", newline="") as f:
-        return next(csv.reader(f), None)
-
-
-def _reconcile(p: Path, columns: list[str]) -> None:
-    """Check the header; widen the file when the new columns are a pure superset.
-
-    Widening is safe: old rows get blanks in the new columns, which is the truth
-    (the parameter was not recorded then). Any other difference is an error, as a
-    renamed, dropped or reordered column cannot be reconciled automatically.
+    Old rows get blanks in the new columns, which is true: the parameter was not
+    recorded then. A renamed or dropped column cannot be reconciled and raises.
     """
-    old = _header(p)
+    old = files.csv_header(p)
     if old is None or old == list(columns):
         return
-
     missing = [c for c in old if c not in columns]
     if missing:
         raise Shifted(
@@ -108,64 +49,61 @@ def _reconcile(p: Path, columns: list[str]) -> None:
             f"  on disk: {old}\n"
             f"  script : {list(columns)}\n"
             f"Appending would shift the columns. Restore them, or write a new OUTPUT.")
-
-    d = pd.read_csv(p)
-    for c in columns:
-        if c not in d.columns:
-            d[c] = pd.NA
-    d[list(columns)].to_csv(p, index=False)
+    n = files.rewrite_csv(p, columns)
     added = [c for c in columns if c not in old]
-    print(f"  [append] {p.name}: added columns {added}, {len(d)} existing rows "
-          f"filled with blanks", flush=True)
+    if added:
+        print(f"  [append] {p.name}: added columns {added}, {n} existing rows left blank",
+              flush=True)
 
 
 def write(output, row: dict, columns: list[str]) -> None:
-    """Append one row, under a lock, after reconciling the header.
-
-    The first write to an output also records the package versions, the commit
-    and the environment knobs of this process in `results/provenance.csv`. It
-    happens here rather than in each script because a step that has to be
-    remembered is a step that gets forgotten: `models.describe` was written for
-    exactly this purpose and never called from anywhere.
-    """
+    """Append one row under a lock. The first write of a process also records provenance."""
     p = _path(output)
     p.parent.mkdir(parents=True, exist_ok=True)
     provenance.record(p.name)
-    with _Lock(p):
+    with files.FileLock(p):
         _reconcile(p, columns)
-        empty = not p.exists() or p.stat().st_size == 0
         pd.DataFrame([row], columns=list(columns)).to_csv(
-            p, mode="a", index=False, header=empty)
+            p, mode="a", index=False, header=files.csv_header(p) is None)
+
+
+def replace(output, frame: pd.DataFrame) -> None:
+    """Write a whole result file at once, for scripts that recompute everything in
+    minutes. Records provenance like `write`."""
+    p = _path(output)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    provenance.record(p.name)
+    with files.FileLock(p):
+        frame.to_csv(p, index=False)
 
 
 def key(row: dict, columns: list[str]) -> tuple:
-    """Resume key from a row. Numbers are normalised so 1 and 1.0 match."""
+    """Resume key of a row. 1 and 1.0 match, and so do None and an empty cell."""
     return tuple(_norm(row.get(c)) for c in columns)
 
 
 def _norm(v):
-    if isinstance(v, bool) or v is None:
-        return v
+    if v is None or v is pd.NA or isinstance(v, bool):
+        return None if v is pd.NA else v
     try:
         f = float(v)
     except (TypeError, ValueError):
         return str(v)
-    return round(f, 9)
+    # An empty cell reads back as NaN, and NaN equals nothing, not even itself.
+    return None if f != f else round(f, 9)
 
 
 def done(output, columns: list[str]) -> set[tuple]:
     """Keys already present in the file.
 
-    Raises when a key column is absent, or present but empty in every row: both
-    mean earlier rows were written without the parameter, so old and new rows
-    cannot be told apart. A column of NaN is the worse of the two, because NaN
-    does not even equal itself, so every lookup misses and a re-run silently
-    duplicates the whole file instead of resuming. Failing is better.
+    Raises when a key column is absent, or present but empty in every row. Either
+    way the old rows were written without the parameter, so a re-run cannot tell
+    them apart from new ones.
     """
     p = _path(output)
-    if not p.exists() or p.stat().st_size == 0:
+    if files.csv_header(p) is None:
         return set()
-    d = pd.read_csv(p)
+    d = pd.read_csv(p, low_memory=False)
     missing = [c for c in columns if c not in d.columns]
     if missing:
         raise Shifted(
@@ -176,8 +114,7 @@ def done(output, columns: list[str]) -> set[tuple]:
     if empty:
         raise Shifted(
             f"{p.name}: key columns {empty} exist but are empty in every row, so the "
-            f"script keys on a parameter it never writes. Every lookup would miss and "
-            f"a re-run would duplicate the file instead of resuming.\n"
+            f"script keys on a parameter it never writes.\n"
             f"Write the column, then backfill the existing rows with the value they "
             f"were measured at.")
     return {key(r, columns) for r in d[list(columns)].to_dict("records")}

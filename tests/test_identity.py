@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 """Two identities the result files depend on: the dataset and the model.
 
-Both were wrong in the repository at the same time, and both are the same
-mistake: a label was treated as the thing it names. `218_house_8L` and
-`house_16H` are two OpenML names for one target vector, so a sign test over
-names counted nine free units where there are eight. `XGBoost` and `XGB` are two
-spellings of one model, so a `groupby("model")` split one control in two. Rule 6
-covers the first at the seed level; these tests carry it to the level above.
+Both went wrong the same way, by treating a label as the thing it names:
+`218_house_8L` and `house_16H` are one target vector (rule 6), and `XGBoost` and `XGB`
+are one model (rule 7).
 """
 import glob
 import os
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -66,6 +64,19 @@ def test_parse_list_refuses_an_unknown_name():
         models.parse_list("GBM,NoSuchModel")
 
 
+def test_tabdpt_quantiles_refuse_an_ensemble_they_would_not_measure():
+    """The bin head is read from one member; n_est=4 would be recorded but not run."""
+    X = np.zeros((10, 2))
+    with pytest.raises(ValueError):
+        models.quantiles("TabDPT", X, np.ones(10), X, seed=0, levels=[0.5], n_est=4)
+
+
+def test_the_rank_test_clusters_by_target_vector():
+    d = pd.DataFrame([dict(dataset=n, scale_share=1.0, shape_share=0.5)
+                      for n in ["218_house_8L", "house_16H", "diamonds"]])
+    assert tables.paired_rank_test(d)["clusters"] == 2
+
+
 @pytest.mark.parametrize("path", RESULTS, ids=lambda p: os.path.basename(p))
 def test_result_model_names_are_canonical_after_repair(path):
     """Every `model` value must be a supported name once the synonym map has
@@ -78,9 +89,7 @@ def test_result_model_names_are_canonical_after_repair(path):
     assert not unknown, f"unresolvable model names: {sorted(unknown)}"
 
 
-# `TabPFN-V2` appears once, in `mean_correction.csv`, written before
-# `results/provenance.csv` existed. Package 8.4.0 ships v2.5 and v2.6 and the
-# row does not say which was loaded, so mapping it to either would assert a
-# checkpoint nobody can verify. It stays listed here, and unresolved, until the
-# run is repeated. See `findings/NALAZI.md` section 9.
+# `TabPFN-V2` appears in `mean_correction.csv`, written before provenance was recorded.
+# Package 8.4.0 ships v2.5 and v2.6 and the rows do not say which was loaded, so the name
+# stays unresolved until the run is repeated.
 KNOWN_UNRESOLVED = {"TabPFN-V2"}

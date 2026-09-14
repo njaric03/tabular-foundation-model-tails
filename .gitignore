@@ -1,55 +1,36 @@
-# ============================================================
-#  Virtuelna okruzenja i kes
-# ============================================================
-# TabDPT i TabFM traze svoja okruzenja, sa torch-om unutra
+# Virtualenvs and caches. TabDPT and TabFM need environments of their own.
 venv-*/
 __pycache__/
 *.pyc
 .cache/
 scikit_learn_data/
 
-# ============================================================
-#  Model weights -- never in the repo
-# ============================================================
-# TabFM je 6,6 GB, skida se sa run/download_tabfm.sh
+# Model weights are never in the repository; TabFM's 6.6 GB come from run/download_tabfm.sh.
 *.safetensors
 *.ckpt
 *.pt
 *.bin
 
-# ============================================================
-#  Logovi pokretanja
-# ============================================================
-# Rezultat merenja je CSV; .log je samo trag konzole i regenerise se.
-# Ako neki log JESTE dokaz (npr. pad koji se navodi u nalazu), izuzmi ga
-# eksplicitno sa `git add -f` i dodaj `!ime.log` red ispod.
+# Console logs. A measurement is its CSV; a log that is itself evidence is added with
+# `git add -f` and a `!name.log` line below.
 *.log
 
-# ============================================================
-#  Rezultati koji se NE cuvaju
-# ============================================================
-# Pravilo: u repou stoje samo CSV-ovi koje citira NALAZI.md ili neki nalaz-*.md.
-# Sve ostalo je radni izlaz -- ide u archive/ i ostaje lokalno.
+# Only CSVs that a finding cites or a script reads are kept (rule 3); the rest is local.
 archive/
 
-# Kontaminirani izlaz iz trke dva procesa nad istim CSV-om
+# Output of two processes racing on one CSV, and superseded versions of a result.
 *.KONTAMINIRANO.csv
-
-# Zamenjene verzije rezultata; istorija je u gitu, ne treba i u radnom stablu
 *.v1.csv
 *.stara.csv
 
-# ============================================================
-#  Radne sitnice
-# ============================================================
+# Working files, including the locks and temporary files of common/files.py.
 *.tmp
 *.bak
+*.lock
 .DS_Store
 Thumbs.db
 
-# ============================================================
-#  Notebook checkpoints
-# ============================================================
+# Notebook checkpoints and build output
 .ipynb_checkpoints/
 *.egg-info/
 build/

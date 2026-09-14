@@ -1,73 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Adapter for EXAONE-Tabular: reading quantiles out of its 999-quantile head.
+"""EXAONE-Tabular adapter: quantiles from its 999-level head, and a loader that works.
 
-WHY
----
-EXAONE-Tabular (LG AI Research, August 2026) was, on 17 August 2026, SECOND on
-the TabArena leaderboard (Elo 1755 overall, 1883 on regression), at about 21.1M
-parameters. There is no published paper, only a model card and the code. Its
-`regressor.py:341-349` does the same thing as the other four packages:
+Two patches, each active for one call only:
 
-    center_tensor = selected_y.mean()
-    scale_tensor  = selected_y.std(correction=1)
-    transformed   = (selected_y - center_tensor) / (scale_tensor + 1e-8)
+1. `predict` returns a trimmed mean and discards the quantile bank inside
+   `_collapse_members`. `quantiles` swaps that method for one returning the chosen
+   levels, so de-normalisation and member weighting stay the model's own.
+2. `from_pretrained` fails on torch 2.13 with "checkpoint quantile levels do not match
+   the model": 240 of the 999 stored levels differ from `torch.linspace` by one ULP,
+   and `checkpoint.py` compares them with the bitwise `torch.equal`. `_lenient_equal`
+   accepts a difference up to 1e-6 at the same shape and dtype while loading.
 
-A non-robust standardisation of the target, while the features go through a
-QuantileTransformer, a rank transform that is immune to outliers by
-construction. The model card says as much in words: "Targets are standardized
-against the fitted support set".
-
-This file exposes the quantiles so the model can be measured with the same
-instrument as TabICLv2, TabPFN and TabDPT.
-
-TWO PROBLEMS SOLVED HERE
-------------------------
-1. `predict()` returns a point only, the mean trimmed over the central 99.8% of
-   the quantile function. The bank of 999 levels is thrown away in
-   `_collapse_members`. The fix is to replace `_collapse_members` for the
-   duration of the call so that it returns the selected level instead. The rest
-   of the path (`* scale + center`, the ensemble member weights) is untouched,
-   so the output is de-normalised exactly the way the model does it.
-
-2. `from_pretrained()` FAILS on torch 2.13:
-
-       ValueError: checkpoint quantile levels do not match the model
-
-   The cause is not a mismatched model but float32 rounding: the checkpoint
-   carries `quantile_levels`, and the head builds them with
-   `torch.linspace(1/1000, 999/1000, 999)`. 240 of the 999 levels differ by
-   **one ULP** (max |difference| = 5.96e-08), and `checkpoint.py:295` compares
-   with `torch.equal`, which is bitwise exact. The fix replaces `torch.equal`
-   for the duration of the load with a version that, when the exact comparison
-   fails, allows a difference of up to 1e-6 at the same shape. Nothing else
-   changes.
-
-LEVELS
-------
-The checkpoint carries tau_i = (i+1)/1000 for i = 0..998, verified by reading the
-safetensors file. So Q(0.5) -> 499, Q(0.9) -> 899, Q(0.99) -> 989,
-Q(0.999) -> 998.
-
-USAGE
------
-    from common.adapters import exaone
+The head predicts tau_i = (i + 1) / 1000 for i = 0..998, so Q(0.99) is index 989. Like
+the other packages, `regressor.py:341` standardises the target by its plain mean and sd
+while the features go through a QuantileTransformer.
 
     m = exaone.create(seed=0)
     m.fit(Xtr, ytr)
     Q = exaone.quantiles(m, Xte, [0.5, 0.9, 0.99])   # (n_test, 3)
 """
+from __future__ import annotations
+
 import contextlib
 import os
 
 import numpy as np
 import torch
 
+from common import env
 
 QUANT_COUNT = 999
 
 
 def level_index(tau: float) -> int:
-    """tau_i = (i+1)/1000 -> index into the bank of 999 quantiles."""
+    """Index of tau in the bank tau_i = (i + 1) / 1000."""
     i = int(round(tau * (QUANT_COUNT + 1))) - 1
     if not 0 <= i < QUANT_COUNT:
         raise ValueError(f"tau={tau} outside the grid of {QUANT_COUNT} levels")
@@ -76,12 +42,7 @@ def level_index(tau: float) -> int:
 
 @contextlib.contextmanager
 def _lenient_equal(atol: float = 1e-6):
-    """`torch.equal` with a one ULP tolerance, for the duration of the load only.
-
-    See the module docstring: without this `from_pretrained` fails on torch 2.13.
-    The exact comparison is still tried first; the tolerance is used only when
-    that fails, and only for tensors of the same shape and dtype.
-    """
+    """`torch.equal` with a one-ULP tolerance, for the duration of the load only."""
     original = torch.equal
 
     def lenient(a, b):
@@ -89,7 +50,7 @@ def _lenient_equal(atol: float = 1e-6):
             return True
         if not (isinstance(a, torch.Tensor) and isinstance(b, torch.Tensor)):
             return False
-        if a.shape != b.shape or a.dtype != b.dtype:
+        if a.shape != b.shape or a.dtype != b.dtype or a.dtype == torch.bool:
             return False
         return bool((a - b).abs().max() <= atol)
 
@@ -104,53 +65,34 @@ def create(seed: int = 0, n_est: int | None = None, device: str = "cpu",
            dtype: str | None = None):
     """A loaded EXAONETabularRegressor.
 
-    The seed does not enter the weights, the model is pre-trained; it fixes the
-    permutations of the ensemble members, the same role `random_state` has in the
-    other packages.
-
-    DTYPE. The manifest pins `compute_dtype="float16"`, because the model is
-    written for CUDA ("a CUDA GPU is strongly recommended -- the model uses fused
-    attention kernels and half precision"). On CPU torch has no fast fp16 kernels
-    and emulates them, so inference is an order of magnitude slower. The default
-    on CPU is therefore **float32**: that is more precise rather than less, but
-    it IS a departure from the shipped configuration and has to be written down
-    as such in the thesis. To measure in the shipped configuration:
-    `DTYPE=float16`.
-
-    N_EST. The manifest pins `ensemble_count=8`. The other measurements in this
-    repository use 1 or 4 (`findings/h1/vincentization.md`), so the knob is
-    exposed for comparability.
+    The seed fixes the permutations of the ensemble members. The manifest pins
+    `compute_dtype="float16"` for CUDA; torch emulates fp16 on CPU an order of magnitude
+    slower, so the CPU default here is float32, a documented departure from the shipped
+    configuration (DTYPE=float16 restores it). The manifest's `ensemble_count=8` is
+    overridden by `n_est` so EXAONE is comparable with the 1 and 4 used elsewhere.
     """
     from exaonetabular import EXAONETabularRegressor
     if dtype is None:
-        dtype = os.environ.get("DTYPE") or ("float32" if str(device) == "cpu" else None)
+        dtype = env.text("DTYPE", "float32" if str(device) == "cpu" else "") or None
     with _lenient_equal():
         return EXAONETabularRegressor.from_pretrained(
             device=device, seed=seed, ensemble_count=n_est, compute_dtype=dtype)
 
 
 def quantiles(model, X, taus):
-    """(n_test, len(taus)) predicted quantiles, on the original target scale.
+    """(n_test, len(taus)) predicted quantiles on the original target scale.
 
-    Works by having `_collapse_members` return the selected levels instead of the
-    trimmed mean, for the duration of the call. The bank is sorted before it is
-    indexed, which is what the model does in its own `trimmed` branch, as a guard
-    against crossing quantiles. The rest of the `predict` path (`* scale +
-    center`, joining the members) is untouched.
-
-    FAST PATH. When the member weights are `None`, and they are below about
-    12,000 context rows, since NNLS asks for 2,000 held-out rows, `predict` joins
-    the members with `.mean(dim=0)`, which also works on a tensor of shape
-    (members, rows, K). All levels then come out of ONE pass. With fitted weights
-    the blend does not broadcast over a third axis, so it falls back to one pass
-    per level.
+    The bank is sorted before indexing, as the model's own trimmed path does. Without
+    fitted member weights, which NNLS only fits above about 12,000 context rows, members
+    are joined by `.mean(dim=0)`, which works on (members, rows, K) and gives every level
+    in one pass. With weights the blend does not broadcast, so each level takes a pass.
+    PER_LEVEL=1 forces the slow path.
     """
     import exaonetabular.regressor as R
 
     X = np.asarray(X, dtype=np.float64)
     idx = [level_index(t) for t in taus]
-    fast = (model._state().get("member_weights") is None
-            and not os.environ.get("PER_LEVEL"))
+    fast = model._state().get("member_weights") is None and not env.flag("PER_LEVEL")
     original = R.EXAONETabularRegressor._collapse_members
 
     def make_collapse(pick):
@@ -195,8 +137,7 @@ if __name__ == "__main__":
     m.fit(X, y)
     Q = quantiles(m, Xte, [0.5, 0.9, 0.99, 0.999])
     point = m.predict(Xte)
-    print("monotone Q50<=Q90<=Q99<=Q999:",
-          bool(np.all(np.diff(Q, axis=1) >= -1e-9)))
+    print("monotone Q50<=Q90<=Q99<=Q999:", bool(np.all(np.diff(Q, axis=1) >= -1e-9)))
     print("medians:", np.round(np.median(Q, axis=0), 3),
           " point:", round(float(np.median(point)), 3))
     print("empirical y:", np.round(np.quantile(y, [0.5, 0.9, 0.99, 0.999]), 3))

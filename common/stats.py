@@ -1,30 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Tests that respect how the measurements are nested.
+"""Paired tests that count each free unit once.
 
-THE PROBLEM THIS FIXES
-
-`dissociation_real.csv` holds 59 usable comparisons: 9 datasets x 3 models x 3
-seeds. A paired Wilcoxon over those 59 rows assumes 59 independent pairs, and
-they are not. Three seeds on the same dataset with the same model are three
-looks at nearly the same quantity, and three models on one dataset share the
-dataset. The unit that varies freely is the dataset, of which there are nine.
-
-The consequence is only about precision, not about direction: the row-level
-p = 3.4e-11 is an overstatement of evidence that is already visible by eye, and
-at the dataset level the same claim stands at p = 0.002. The honest number is
-the second one, and it is the one a committee will ask for.
-
-The same applies to the synthetic families: 60 runs are 4 families x 5 seeds x 3
-models, where the free unit is (family, seed) -- 20 of them, not 60.
-
-WHAT IS REPORTED
-
-`paired_by_cluster` returns both, side by side, so the text can quote the
-conservative number and still show the row-level one:
-
-    naive_p     paired Wilcoxon over all rows, pseudoreplicated
-    cluster_p   exact sign test over cluster medians, one-sided
-    clusters    how many free units the second number rests on
+The rows of a result file are nested: seeds within models within datasets. A Wilcoxon
+over all rows treats them as independent and overstates the evidence (p = 3.4e-11 on
+the real-data dissociation). `paired_by_cluster` reduces each cluster to one median
+difference and runs an exact sign test on those; `paired_by_target` clusters by target
+vector, since two dataset names can serve one target (rule 6). Both p-values come back,
+and the text quotes `cluster_p`.
 """
 from __future__ import annotations
 
@@ -36,15 +18,15 @@ def paired_by_cluster(d: pd.DataFrame, a: str, b: str, cluster="dataset",
                       target: float = 1.0) -> dict:
     """Is `a` closer to `target` than `b`, counted once per cluster?
 
-    Rows are reduced to one median difference per cluster, and the sign test
-    runs on those. `cluster` may be a column name or a list of them.
+    `cluster` is a column name or a list of them. Clusters whose median difference is
+    exactly zero drop out of the sign test.
     """
     from scipy.stats import binomtest, wilcoxon
 
     keys = [cluster] if isinstance(cluster, str) else list(cluster)
     d = d.dropna(subset=[a, b]).copy()
     if d.empty:
-        return dict(n=0, clusters=0, wins=0, cluster_wins=0,
+        return dict(n=0, wins=0, share=np.nan, clusters=0, cluster_wins=0,
                     naive_p=np.nan, cluster_p=np.nan)
 
     d["_da"] = (d[a] - target).abs()
@@ -66,24 +48,18 @@ def paired_by_cluster(d: pd.DataFrame, a: str, b: str, cluster="dataset",
 
 
 def describe(res: dict, unit="datasets") -> str:
-    """One line for a findings document."""
+    """One line with both levels of the test."""
     return (f"{res['wins']}/{res['n']} rows (naive p = {res['naive_p']:.2g}, "
             f"pseudoreplicated); {res['cluster_wins']}/{res['clusters']} {unit} "
             f"(sign test p = {res['cluster_p']:.2g})")
 
 
 def add_target_group(d: pd.DataFrame, column="dataset") -> pd.DataFrame:
-    """Add a `target_group` column: the identity of the target, not its name.
+    """A copy with a `target_group` column: the target vector's hash, or the name when
+    no fingerprint is recorded."""
+    from common import datasets
 
-    Rule 6 was written about seeds, and the same error is available one level
-    up. `218_house_8L` and `house_16H` are two OpenML names for one target
-    vector under two feature sets, so a sign test over dataset names counts
-    nine free units where there are eight. The direction of every conclusion
-    survives it; the p-value moves from 0.002 to 0.0039.
-    """
-    from common import datasets as _datasets
-
-    groups = _datasets.target_groups()
+    groups = datasets.target_groups()
     out = d.copy()
     out["target_group"] = out[column].map(lambda n: groups.get(n, n))
     return out
@@ -91,6 +67,6 @@ def add_target_group(d: pd.DataFrame, column="dataset") -> pd.DataFrame:
 
 def paired_by_target(d: pd.DataFrame, a: str, b: str, column="dataset",
                      target: float = 1.0) -> dict:
-    """`paired_by_cluster` with the target vector, not the name, as the unit."""
+    """`paired_by_cluster` with the target vector, not the dataset name, as the unit."""
     return paired_by_cluster(add_target_group(d, column), a, b,
                              cluster="target_group", target=target)

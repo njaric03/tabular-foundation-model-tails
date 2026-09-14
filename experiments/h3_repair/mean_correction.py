@@ -1,231 +1,113 @@
 # -*- coding: utf-8 -*-
+"""Post-hoc correction of the conditional mean, across the model family.
+
+The deficit in the mean is large and stable where the 0.999 quantile is not: TabPFN-V3
+returns 0.304 of the true conditional mean at xi = 0.9 (sd 0.012 over five seeds)
+against an attainable 0.549, and the gamma deviance reproduces across runs with r = 0.91.
+The correction needs only a point prediction, so it applies to mean-only models too.
+
+    y_corrected = c * y_predicted
+
+`c` is chosen on a held-out validation split. Minimising the gamma deviance gives
+c = mean(y / yhat) in closed form; `c_ratio` = mean(y) / mean(yhat) weights by size and is
+robust to tiny predictions. An isotonic map yhat -> y is measured as the richer variant.
+The mean is the model's own (`models.predictive_mean`), not the median.
+
+    MODEL=TabICLv2 python -u experiments/h3_repair/mean_correction.py
+    MODEL=TabFM venv-tabfm/Scripts/python -u experiments/h3_repair/mean_correction.py
 """
-Post-hoc korekcija uslovne sredine, preko cele familije modela.
-
-ZASTO OVO A NE KALEMLJENJE REPA
--------------------------------
-Kalem repa je ciljao kvantil 0,999, koji se na test skupovima reda 10^3 ne moze
-pouzdano izmeriti, izmereno je da se efekat ne reprodukuje (r = 0,04 izmedju dva
-nezavisna eksperimenta), dok se iste mere na nivou 0,99 reprodukuju sa r = 0,80.
-
-Deficit sredine je suprotan slucaj: velik, stabilan i merljiv. TabPFN-V3 pri xi = 0,9
-vraca 0,304 prave uslovne sredine sa rasipanjem od 0,012 po pet seedova, uz granicu
-dostiznosti od 0,549. Gama devijansa, metrika koja to hvata, reprodukuje se sa r = 0,91.
-
-Uz to, metod trazi SAMO tackovnu prognozu, pa vazi i za modele bez uslovne raspodele
-(TabFM, Mitra, LimiX), za razliku od kalemljenja repa.
-
-METOD
------
-    y_ispravljeno = c * y_predvidjeno
-
-`c` se bira na izdvojenom `val` delu tako da minimizuje gama devijansu. Izvod po c daje
-zatvoreno resenje:
-
-    d/dc [ 2*mean( y/(c*yhat) - 1 - log(y/(c*yhat)) ) ] = 0   =>   c* = mean(y/yhat)
-
-Dakle jedan broj, bez optimizacije i bez pretpostavke o obliku repa.
-
-Uz to se meri i bogatija varijanta: izotona regresija yhat -> y naucena na `val`, za
-slucaj da deficit nije isti po celom opsegu predikcije.
-
-MODELI, PODACI I UPIS IDU KROZ `common/`
----------------------------------------
-Ovaj fajl je do sada gradio modele sam, ucitavao skupove sam i pisao CSV sam.
-Bio je jedini takav: `common/models.py` je nastao 31.8., tri dana posle njega, i
-tada nije prevucen.
-
-Prelazak nije bio mehanicki, jer `models.mean` za TabICL i TabPFN vraca MEDIJANU,
-uz obrazlozenje da je to najblizi tackovni sazetak bez dodatnih pretpostavki. Tu
-je predmet merenja SREDINA, pa je u `common/models.py` dodat `predictive_mean`,
-koji od modela trazi `output_type="mean"`. `mean` ostaje netaknut, jer ga citaju
-`truncated_support`, `repair_mean` i `credibility`.
-
-Uz to: `datasets.load(..., positive_only=True)` umesto lokalne kopije ucitavanja,
-pa svaki skup prolazi kroz proveru otiska; i `append.write` umesto rucnog
-prepisivanja celog CSV-a, pa se dobija zakljucavanje, provenance red i zastita od
-pomeranja kolona. `n_est` je sada knob, kolona i deo kljuca, kako trazi pravilo 2.
-
-POKRETANJE
-----------
-    MODEL=TabICLv2   python mean_correction.py
-    MODEL=TabPFN-V3  python mean_correction.py
-    MODEL=TabPFN-v2.5 python mean_correction.py       # generacija ide kroz TABPFN_PATHS
-    MODEL=GBM        python mean_correction.py
-    MODEL=TabDPT     venv-tabdpt/Scripts/python mean_correction.py
-    MODEL=TabFM      venv-tabfm/Scripts/python mean_correction.py
-
-Rezultati se dopisuju u `mean_correction.csv`.
-"""
-import os
-import time
 import numpy as np
-import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 from sklearn.model_selection import train_test_split
 
-from common import append, datasets, generator, models, paths, quiet
+from common import datasets, env, generator, metrics, models, quiet, runner
 
 quiet.silence()
 
-N_TRAIN, N_TEST = 2000, 900
-
-MODEL = models.parse_list(os.environ.get("MODEL", "TabICLv2"))[0]
-N_EST = int(os.environ.get("N_EST", "4"))
-# W je u `common/generator.py`; ovde je stajala kopija formule.
-XI_SINT = [0.0, 0.3, 0.5, 0.7, 0.9]
+MODEL = env.models("TabICLv2", name="MODEL")[0]
+# TabFM takes about two and a half minutes per fit on CPU, so it runs a smaller profile
+# with one member, as it was measured before.
+TABFM = MODEL == "TabFM"
+N_EST = env.integer("N_EST", 1 if TABFM else 4)
+N_FIT, N_VAL, N_TEST = (1000, 500, 600) if TABFM else (2000, 800, 1500)
+XI_SYNTHETIC = [0.0, 0.3, 0.5, 0.7, 0.9]
 SEEDS = [0, 1, 2]
-N_FIT, N_VAL, N_TEST = 2000, 800, 1500
-OUT = os.environ.get("OUTPUT", "mean_correction.csv")
+OUTPUT = env.text("OUTPUT", "mean_correction.csv")
 
 VARIANTS = ["raw", "constant", "mean_ratio", "isotonic"]
-KOLONE = (["dataset", "model", "seed", "n_est", "c_val", "c_test",
-           "c_ratio", "unknown_share"]
-          + [f"{p}_{v}" for p in ("gdev", "rmse", "ratio") for v in VARIANTS]
-          + ["seconds", "reason"])
-KLJUC = ["dataset", "model", "seed", "n_est"]
-
-# TabFM je ~1,6 mlrd parametara na CPU-u, oko dva i po minuta po fitu; smanjen profil.
-if MODEL == "TabFM":
-    N_FIT, N_VAL, N_TEST = 1000, 500, 600
-    # Jedan clan, kako je TabFM i meren pre prelaska na `common/`: stari
-    # dispecer je imao `n_estimators=1` ukucano. Default N_EST=4 bi ga vrteo
-    # cetiri puta sporije i merio drugu stvar od one koju ovaj profil opisuje.
-    if "N_EST" not in os.environ:
-        N_EST = 1
+COLUMNS = (["dataset", "model", "seed", "n_est", "c_val", "c_test", "c_ratio", "unknown_share"]
+           + [f"{p}_{v}" for p in ("gdev", "rmse", "ratio") for v in VARIANTS]
+           + ["seconds", "reason"])
+KEY = ["dataset", "model", "seed", "n_est"]
 
 
-# ------------------------------------------------------------------ metrike
-def gama_dev(mu, y):
-    mu = np.maximum(np.asarray(mu, dtype=float), 1e-9)
-    y = np.maximum(np.asarray(y, dtype=float), 1e-9)
-    return float(2.0 * np.mean((y - mu) / mu - np.log(y / mu)))
-
-
-def rmse(mu, y):
-    return float(np.sqrt(np.mean((np.asarray(mu) - np.asarray(y)) ** 2)))
-
-
-# ------------------------------------------------------------------ podaci
-def sint(xi, n, rng):
-    """Isti generator koji dobijaju modeli, plus prava uslovna sredina s/(1-xi)."""
-    p = generator.gpd(n, rng, xi=xi)
-    return p.X, p.y, generator.true_mean(p)
-
-
-def ucitaj(ime):
-    """Kroz `common.datasets`, pa svaki skup prolazi i kroz proveru otiska."""
-    return datasets.load(ime, positive_only=True)
-
-
-# ------------------------------------------------------------------- jedinica
-def _pod(mu, yf):
-    """Podigni predikciju na smislen pozitivan pod.
-
-    ZASTO: odsecanje na 1e-9 je vec jednom razvalilo merenje. Modeli daju nepozitivne
-    predikcije i na strogo pozitivnom targetu; deljenje takvom vrednoscu pravi odnos
-    y/yhat reda 1e9, koji sam odredi faktor `c`. Pod se vezuje za skalu targeta, ne za
-    masinsku epsilon vrednost.
-    """
+def floor(mu, yf):
+    """A positive floor tied to the target's scale. A floor at 1e-9 once let one tiny
+    prediction make y / yhat about 1e9 and set `c` on its own."""
     return np.maximum(np.asarray(mu, dtype=float), 1e-3 * float(np.median(yf)))
 
 
-def jedan(oznaka, delovi, seed, prava_sredina, t0, rows):
-    t1 = time.time()
-    (Xf, yf), (Xv, yv), (Xt, yt) = delovi
-    # Jedan fit za oba dela. `predictive_mean` fituje pri svakom pozivu, pa su
-    # dva poziva, za val i za test, bila dva fita istog modela na istim podacima:
-    # isti rezultat, dvostruka cena, na TabFM-u oko 20 minuta po celiji.
-    oba = models.predictive_mean(MODEL, Xf, yf, np.vstack([Xv, Xt]), seed=seed,
-                                 n_est=N_EST)
-    sirovo_v, sirovo_t = oba[:len(Xv)], oba[len(Xv):]
-    mv, mt = _pod(sirovo_v, yf), _pod(sirovo_t, yf)
-    unknown_share = float(np.mean(sirovo_t <= 0))
+def measure(cell):
+    (Xf, yf), (Xv, yv), (Xt, yt) = cell["_parts"]
+    true_mean = cell["_true_mean"]
+    # One fit for both the validation and the test rows.
+    both = models.predictive_mean(MODEL, Xf, yf, np.vstack([Xv, Xt]), seed=cell["seed"],
+                                  n_est=cell["n_est"])
+    raw_v, raw_t = both[:len(Xv)], both[len(Xv):]
+    mv, mt = floor(raw_v, yf), floor(raw_t, yf)
 
-    # --- korekcija naucena SAMO na val delu; degenerisane tacke se izbacuju
-    ok = sirovo_v > 0
-    sel0 = ok if ok.sum() >= 50 else np.ones(len(mv), dtype=bool)
-    # Dva kandidata za faktor. `c_dev` minimizuje gama devijansu u zatvorenom obliku,
-    # ali tezi tacke sa MALOM predikcijom (deli se sa yhat), pa ga sitne predikcije
-    # razvale, GBM ih daje do 8,6%. `c_ratio` tezi po velicini i na to je otporan.
-    # Koji je bolji nije ocigledno, pa se mere oba.
-    c = float(np.mean(yv[sel0] / mv[sel0]))                       # c_dev
-    c_ratio = float(np.mean(yv[sel0]) / np.mean(mv[sel0]))
-    # sel0 vazi i za izotonu
-    iso = IsotonicRegression(increasing=True, out_of_bounds="clip").fit(mv[sel0], yv[sel0])
+    sel = raw_v > 0
+    if sel.sum() < 50:
+        sel = np.ones(len(mv), dtype=bool)
+    c = float(np.mean(yv[sel] / mv[sel]))
+    c_ratio = float(np.mean(yv[sel]) / np.mean(mv[sel]))
+    iso = IsotonicRegression(increasing=True, out_of_bounds="clip").fit(mv[sel], yv[sel])
+    variants = {"raw": mt, "constant": c * mt, "mean_ratio": c_ratio * mt,
+                "isotonic": np.maximum(iso.predict(mt), 1e-9)}
 
-    # Kljucevi su engleski jer od njih nastaju imena kolona: `gdev_constant`,
-    # `rmse_mean_ratio`, `ratio_isotonic`. Migracija je prevela CSV i citanja
-    # ispod, a ovaj recnik nije, pa je `r["gdev_constant"]` dizao KeyError na
-    # prvom redu i skripta nije mogla da izmeri nista.
-    var = {"raw": mt, "constant": c * mt, "mean_ratio": c_ratio * mt,
-           "isotonic": np.maximum(iso.predict(mt), 1e-9)}
-
-    r = dict(dataset=oznaka, model=MODEL, seed=seed, n_est=N_EST, c_val=c,
-             c_test=float(np.mean(yt / mt)),          # koliko bi bio idealan faktor
-             c_ratio=c_ratio, unknown_share=unknown_share, reason="")
-    for ime, mu in var.items():
-        r[f"gdev_{ime}"] = gama_dev(mu, yt)
-        r[f"rmse_{ime}"] = rmse(mu, yt)
-        if prava_sredina is not None and np.all(np.isfinite(prava_sredina)):
-            r[f"ratio_{ime}"] = float(mu.mean() / prava_sredina.mean())
-    r["seconds"] = round(time.time() - t1, 1)
-    rows.append(r)
-    d1 = 100 * (r["gdev_constant"] - r["gdev_raw"]) / r["gdev_raw"]
-    d3 = 100 * (r["gdev_mean_ratio"] - r["gdev_raw"]) / r["gdev_raw"]
-    d2 = 100 * (r["gdev_isotonic"] - r["gdev_raw"]) / r["gdev_raw"]
-    up = f" nepoz={unknown_share:.1%}" if unknown_share > 0 else ""
-    print(f"  {oznaka:22s} s={seed}  c={c:5.2f} (idealno {r['c_test']:5.2f}){up}  "
-          f"gdev: c_dev {d1:+6.1f}%  c_ratio {d3:+6.1f}%  izo {d2:+6.1f}%  "
-          f"[{r['seconds']}s]",
-          flush=True)
-    append.write(OUT, r, KOLONE)
+    r = dict(c_val=c, c_test=float(np.mean(yt / mt)), c_ratio=c_ratio,
+             unknown_share=float(np.mean(raw_t <= 0)))
+    for name, mu in variants.items():
+        r[f"gdev_{name}"] = metrics.gamma_deviance(mu, yt)
+        r[f"rmse_{name}"] = float(np.sqrt(np.mean((mu - yt) ** 2)))
+        if true_mean is not None and np.all(np.isfinite(true_mean)):
+            r[f"ratio_{name}"] = float(mu.mean() / true_mean.mean())
+    return r
 
 
-def gotovo():
-    return append.done(OUT, KLJUC)
+def cells():
+    for xi in XI_SYNTHETIC:
+        for seed in SEEDS:
+            rng = np.random.default_rng(3000 + seed * 100 + int(xi * 10))
+            fit, val, test = (generator.gpd(n, rng, xi=xi) for n in (N_FIT, N_VAL, N_TEST))
+            yield dict(dataset=f"sint xi={xi}", model=MODEL, seed=seed, n_est=N_EST,
+                       _parts=((fit.X, fit.y), (val.X, val.y), (test.X, test.y)),
+                       _true_mean=generator.true_mean(test))
+    for name in datasets.selected_names():
+        try:
+            X, y = datasets.load(name, positive_only=True)
+        except Exception as e:
+            print(f"  {name}: skipped, {runner.reason(e)}", flush=True)
+            continue
+        for seed in SEEDS:
+            Xr, Xt, yr, yt = train_test_split(X, y, test_size=min(N_TEST, int(0.25 * len(y))),
+                                              random_state=seed)
+            Xf, Xv, yf, yv = train_test_split(Xr, yr, train_size=min(N_FIT, int(0.6 * len(yr))),
+                                              test_size=min(N_VAL, int(0.25 * len(yr))),
+                                              random_state=seed)
+            yield dict(dataset=name, model=MODEL, seed=seed, n_est=N_EST,
+                       _parts=((Xf, yf), (Xv, yv), (Xt, yt)), _true_mean=None)
 
 
 def main():
     print(f"MODEL={MODEL} N_EST={N_EST}", flush=True)
-    rows, t0, g = [], time.time(), gotovo()
-
-    print("=== SINTETICKI ===", flush=True)
-    for xi in XI_SINT:
-        for seed in SEEDS:
-            k = dict(dataset=f"sint xi={xi}", model=MODEL, seed=seed,
-                     n_est=N_EST)
-            if append.key(k, KLJUC) in g:
-                continue
-            rng = np.random.default_rng(3000 + seed * 100 + int(xi * 10))
-            Xf, yf, _ = sint(xi, N_FIT, rng)
-            Xv, yv, _ = sint(xi, N_VAL, rng)
-            Xt, yt, st = sint(xi, N_TEST, rng)
-            jedan(f"sint xi={xi}", ((Xf, yf), (Xv, yv), (Xt, yt)), seed, st, t0, rows)
-
-    print("\n=== STVARNI ===", flush=True)
-    for ime in [l.strip() for l in open(paths.data("selected_datasets.txt"), encoding="utf-8") if l.strip()]:
-        try:
-            X, y = ucitaj(ime)
-        except Exception as e:
-            print(f"  {ime}: preskacem ({type(e).__name__})", flush=True)
-            continue
-        for seed in SEEDS:
-            k = dict(dataset=ime, model=MODEL, seed=seed, n_est=N_EST)
-            if append.key(k, KLJUC) in g:
-                continue
-            n = len(y)
-            Xr, Xt, yr, yt = train_test_split(X, y, test_size=min(N_TEST, int(0.25 * n)),
-                                              random_state=seed)
-            Xf, Xv, yf, yv = train_test_split(
-                Xr, yr, train_size=min(N_FIT, int(0.6 * len(yr))),
-                test_size=min(N_VAL, int(0.25 * len(yr))), random_state=seed)
-            try:
-                jedan(ime, ((Xf, yf), (Xv, yv), (Xt, yt)), seed, None, t0, rows)
-            except Exception as e:
-                print(f"  {ime} s={seed}: pao ({type(e).__name__})", flush=True)
-
-    print(f"\nukupno {time.time()-t0:.0f}s -> {OUT}", flush=True)
+    seconds = runner.run(
+        OUTPUT, COLUMNS, KEY, cells(), measure,
+        show=lambda r: f"c {r['c_val']:5.2f} (ideal {r['c_test']:5.2f})  gdev: constant "
+                       f"{100 * (r['gdev_constant'] / r['gdev_raw'] - 1):+6.1f}%  mean ratio "
+                       f"{100 * (r['gdev_mean_ratio'] / r['gdev_raw'] - 1):+6.1f}%  isotonic "
+                       f"{100 * (r['gdev_isotonic'] / r['gdev_raw'] - 1):+6.1f}%")
+    print(f"\ntotal {seconds:.0f}s -> {OUTPUT}")
 
 
 if __name__ == "__main__":

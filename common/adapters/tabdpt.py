@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
-"""TabDPT adapter: quantiles pulled out of the internal bin head.
+"""TabDPT adapter: quantiles recovered from the internal bin head.
 
-TabDPT publishes only a point prediction, but internally it holds a
-distribution over 2048 bins fixed on [-10, 10] in z-space. The quantiles are
-recovered by intercepting the method that collapses those logits to an
-expectation, keeping the logits, and letting the original run.
-
-The bin edges live in normalised space and the package does not expose the
-affine map back. It is reconstructed from the model own mean: the intercepted
-expectation and the returned prediction differ by exactly that affine map, so
-one least-squares fit on (expectation, prediction) recovers it.
+TabDPT publishes a point prediction, but internally holds a distribution over 2048 bins
+fixed on [-10, 10] in normalised space. The method that collapses those logits to an
+expectation is intercepted for one call, so the logits are kept and the original still
+runs. The package does not expose the affine map back to target units, but the
+intercepted expectation and the returned prediction differ by exactly that map, so one
+least-squares fit on the pairs recovers it.
 """
 from __future__ import annotations
 
@@ -17,16 +14,12 @@ import numpy as np
 
 
 def quantiles(Xtr, ytr, Xte, seed, levels):
-    """(n_test, len(levels)) quantiles on the original target scale."""
+    """(n_test, len(levels)) quantiles on the original target scale, from one member."""
     import torch
     from tabdpt import TabDPTRegressor
 
-    Xtr = np.asarray(Xtr, float)
-    ytr = np.asarray(ytr, float)
-    Xte = np.asarray(Xte, float)
-
     m = TabDPTRegressor(device="cpu")
-    m.fit(Xtr, ytr)
+    m.fit(np.asarray(Xtr, float), np.asarray(ytr, float))
 
     captured = []
     original = type(m)._expectation_from_regression_logits
@@ -37,7 +30,8 @@ def quantiles(Xtr, ytr, Xte, seed, levels):
 
     type(m)._expectation_from_regression_logits = intercept
     try:
-        raw = np.asarray(m.predict(Xte, n_ensembles=1, seed=seed), dtype=float)
+        raw = np.asarray(m.predict(np.asarray(Xte, float), n_ensembles=1, seed=seed),
+                         dtype=float)
     finally:
         type(m)._expectation_from_regression_logits = original
 
@@ -51,34 +45,27 @@ def quantiles(Xtr, ytr, Xte, seed, levels):
     centres = 0.5 * (edges[:-1] + edges[1:])
     w = torch.softmax(logits, dim=-1)
 
-    # Affine map raw = a * y_norm + b, reconstructed from the model own mean.
+    # raw = a * y_norm + b, fitted on the model's own expectation.
     y_hat = (w * centres).sum(dim=-1).numpy()
-    A = np.c_[y_hat, np.ones(len(y_hat))]
-    a, b = np.linalg.lstsq(A, raw, rcond=None)[0]
+    a, b = np.linalg.lstsq(np.c_[y_hat, np.ones(len(y_hat))], raw, rcond=None)[0]
 
     cdf = torch.cumsum(w, dim=-1).numpy()
-    q = np.empty((len(raw), len(levels)))
     ev = edges.numpy()
+    rows = np.arange(len(raw))
+    q = np.empty((len(raw), len(levels)))
     for j, alpha in enumerate(levels):
         idx = np.clip(np.sum(cdf < alpha, axis=1), 0, len(centres) - 1)
-        c_lo = np.where(idx > 0, cdf[np.arange(len(idx)), idx - 1], 0.0)
-        c_hi = cdf[np.arange(len(idx)), idx]
+        c_lo = np.where(idx > 0, cdf[rows, idx - 1], 0.0)
+        c_hi = cdf[rows, idx]
         share = np.clip((alpha - c_lo) / np.maximum(c_hi - c_lo, 1e-12), 0.0, 1.0)
         q[:, j] = ev[idx] + share * (ev[idx + 1] - ev[idx])
     return q * a + b
 
 
 def mean(Xtr, ytr, Xte, seed, n_est=1):
-    """(n_test,) point prediction, the published output.
-
-    `seed` and `n_est` reach `predict`, which they did not before: its defaults
-    are `n_ensembles=8, seed=None`, so this function ignored both arguments and
-    TabDPT was the one model in the repository running unseeded. That is rule 4
-    of RULES.md, every model gets the seed, no exceptions. `quantiles` above
-    always passed it; only this path did not.
-    """
+    """(n_test,) the published point prediction, seeded, with `n_est` members."""
     from tabdpt import TabDPTRegressor
     m = TabDPTRegressor(device="cpu")
     m.fit(np.asarray(Xtr, float), np.asarray(ytr, float))
-    return np.asarray(m.predict(np.asarray(Xte, float),
-                                n_ensembles=n_est, seed=seed), dtype=float)
+    return np.asarray(m.predict(np.asarray(Xte, float), n_ensembles=n_est, seed=seed),
+                      dtype=float)

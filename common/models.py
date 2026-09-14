@@ -1,52 +1,28 @@
 # -*- coding: utf-8 -*-
-"""One place where a model is constructed. Replaces 20 hand-copied dispatchers.
+"""The one place a model is built and asked for quantiles or a mean.
 
-The repo held 20 functions doing the same thing under 13 different names, about
-1068 lines, instantiating a regressor in 65 places across 31 files. That is what
-made the seeding bug of 25 August possible: one script passed random_state=0 to
-TabPFN while giving the other models the seed, so two measurements being
-compared were not seeded alike, and there was no single place where that could
-be seen. It hit 278 TabPFN rows across 9 CSV files.
+    Q = models.quantiles("TabPFN-V3", Xtr, ytr, Xte, seed=7000, levels=[0.5, 0.9, 0.99])
+    m = models.mean("TabDPT", Xtr, ytr, Xte, seed=7000)
 
-RULES BUILT IN
-  - EVERY model gets random_state=seed. No exceptions and no silent zero.
-  - describe() returns the run parameters as a dict, so they enter the CSV as
-    columns. Rule 2 of RULES.md: a knob that is not a column cannot be
-    reconstructed afterwards. What the environment sets rather than the script --
-    package versions, the commit, the virtualenv -- goes to
-    `results/provenance.csv`, written by `common/append.py` itself.
-  - HYPERPARAMETERS OF THE CONTROLS ARE FIXED, NOT TUNED. The tree models run at
-    the settings below on every dataset, while the foundation models run at their
-    library defaults. For the robustness claim that is irrelevant: the controls
-    are there to show that a model which does not standardise the target does not
-    react, and no tuning changes that. For the H1 table, where GBM captures more
-    of the shape gradient than the foundation models do, it is a limitation worth
-    stating rather than defending.
-  - An unknown model name fails immediately instead of silently falling through
-    to the GBM branch, which is what most of the copies did.
-
-    from common import models
-
-    Q = models.quantiles("TabPFN-V3", Xtr, ytr, Xte, seed=7000,
-                         levels=[0.5, 0.9, 0.99], n_est=4)   # (n_test, 3)
-    m = models.mean("TabDPT", Xtr, ytr, Xte, seed=7000, n_est=1)   # (n_test,)
-    row.update(models.describe("TabPFN-V3", seed=7000, n_est=4))
+Every model gets `random_state=seed` (rule 4). An unknown name raises instead of
+falling through to a default model. The tree controls run at fixed settings on every
+dataset while the foundation models run at their defaults; for the robustness claim
+that is irrelevant, for the H1 table it is a limitation to state.
 """
 from __future__ import annotations
 
-import os
 import numpy as np
 
-# Names as they appear in the existing CSV files. Synonyms are mapped so older
-# MODELS= invocations keep working.
+from common import env
+
+# Other spellings that older MODELS= invocations used.
 SYNONYMS = {
     "TabPFNv3": "TabPFN-V3", "TabPFN-v3": "TabPFN-V3",
     "TabPFNv2": "TabPFN-v2.5", "TabICL": "TabICLv2",
     "GradientBoosting": "GBM", "XGBoost": "XGB", "CatBoost": "CB",
 }
 
-# TabPFN generations are selected through model_path; package 8.4.0 ships
-# v2.5, v2.6 and v3.
+# TabPFN generations other than V3, selected through `model_path`; 8.4.0 ships them.
 TABPFN_PATHS = {
     "TabPFN-v2.5": "tabpfn-v2.5-regressor-v2.5_real.ckpt",
     "TabPFN-v2.6": "tabpfn-v2.6-regressor-v2.6_default.ckpt",
@@ -55,66 +31,52 @@ TABPFN_PATHS = {
 SUPPORTED = ["GBM", "XGB", "CB", "TabICLv2", "TabPFN-V3", "TabPFN-v2.5",
              "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM"]
 
-# Models with no conditional distribution at all. They can only be measured on
-# the mean, which is a property of the model, not a gap in the measurements.
-MEAN_ONLY = ["TabFM"]
+# CATEGORICAL=native passes the columns `datasets.prepare` coded from categories to
+# TabPFN as `categorical_features_indices`; the script sets CATEGORICAL_INDICES from
+# `datasets.LAST`. TabICL 2.1.1 has no such parameter.
+CATEGORICAL = env.text("CATEGORICAL", "") == "native"
+CATEGORICAL_INDICES: list = []
 
 
 def parse_list(value: str) -> list[str]:
-    """Split a `MODELS=` value and canonicalise every name in it.
-
-    Scripts used to write the caller's spelling straight into the `model`
-    column, so `MODELS=XGBoost` and `MODELS=XGB` produced two labels for one
-    model and `prevalence_models.csv` disagrees with `coverage.csv` to this
-    day. Parsing through here means the CSV carries the canonical name whatever
-    the caller typed.
-    """
+    """Split a `MODELS=` value and return every name under its canonical spelling (rule 7)."""
     return [normalise(x.strip()) for x in value.split(",") if x.strip()]
 
 
 def normalise(name: str) -> str:
     name = SYNONYMS.get(name, name)
     if name not in SUPPORTED:
-        raise ValueError(
-            f"unknown model {name!r}. Supported: {', '.join(SUPPORTED)}.\n"
-            f"Unknown names used to fall through to the GBM branch silently, so a "
-            f"run looked successful while measuring the wrong model.")
+        raise ValueError(f"unknown model {name!r}. Supported: {', '.join(SUPPORTED)}.")
     return name
 
 
-def describe(name: str, seed: int, n_est: int, **extra) -> dict:
-    """Run parameters as CSV columns. See rule 2 in RULES.md.
+def tabpfn_regressor(name: str, seed: int, n_est: int):
+    """An unfitted TabPFNRegressor of generation `name`, seeded, with this repo's settings."""
+    from tabpfn import TabPFNRegressor
+    kw = dict(n_estimators=n_est, device="cpu", random_state=seed,
+              ignore_pretraining_limits=True)
+    if name in TABPFN_PATHS:
+        kw["model_path"] = TABPFN_PATHS[name]
+    if CATEGORICAL and CATEGORICAL_INDICES:
+        kw["categorical_features_indices"] = list(CATEGORICAL_INDICES)
+    return TabPFNRegressor(**kw)
 
-    Kept because it names the minimum every row must carry, but nothing calls it:
-    the scripts build their own row dicts, which is why it was written and then
-    forgotten. What cannot be forgotten now is the environment: `common/append.py`
-    records package versions, the commit and the environment knobs into
-    `results/provenance.csv` on the first write of every process, without any
-    script having to remember to ask.
-    """
-    return dict(model=normalise(name), seed=seed, n_est=n_est, **extra)
+
+def tabicl_regressor(seed: int, n_est: int):
+    """An unfitted TabICLRegressor, seeded."""
+    from tabicl import TabICLRegressor
+    return TabICLRegressor(n_estimators=n_est, device="cpu", random_state=seed)
 
 
-# ------------------------------------------------------------------- quantiles
-
-# `datasets.prepare` hands every model integer codes for categorical columns, and
-# TabPFN and TabICL have their own handling that is bypassed by that. This is the
-# switch for measuring what it costs: CATEGORICAL=native makes `quantiles` pass the
-# column indices on, and the experiment sets them from `datasets.LAST`. TabPFN
-# accepts `categorical_features_indices`; TabICL 2.1.1 has no such parameter, so the
-# comparison is only possible for the TabPFN family and that is a limit of the test,
-# not a choice.
-CATEGORICAL = os.environ.get("CATEGORICAL", "") == "native"
-CATEGORICAL_INDICES: list = []
+def tabpfn_quantiles(m, X, levels) -> np.ndarray:
+    """(n, len(levels)) from a fitted TabPFNRegressor, which returns one array per level."""
+    return np.stack([np.asarray(a, dtype=float) for a in
+                     m.predict(X, output_type="quantiles", quantiles=list(levels))],
+                    axis=1)
 
 
 def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np.ndarray:
-    """(n_test, len(levels)) predicted quantiles on the original target scale.
-
-    seed goes into random_state of EVERY model. If some model ever has to be
-    seeded differently, that must be explicit and argued here, not a forgotten
-    zero in one of twenty copies.
-    """
+    """(n_test, len(levels)) predicted quantiles on the original target scale."""
     name = normalise(name)
     levels = list(levels)
     Xtr, Xte = np.asarray(Xtr, float), np.asarray(Xte, float)
@@ -127,32 +89,25 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
         return np.asarray(exaone.quantiles(m, Xte, levels), dtype=float)
 
     if name == "TabDPT":
+        # The bin head is read from one forward pass. Accepting n_est > 1 would put
+        # that value in the CSV while a single member was measured.
+        if n_est != 1:
+            raise ValueError(f"TabDPT quantiles are read from one member; n_est={n_est}")
         from common.adapters import tabdpt
         return tabdpt.quantiles(Xtr, ytr, Xte, seed, levels)
 
     if name == "TabICLv2":
-        from tabicl import TabICLRegressor
-        m = TabICLRegressor(n_estimators=n_est, device="cpu", random_state=seed)
+        m = tabicl_regressor(seed, n_est)
         m.fit(Xtr, ytr)
         return np.asarray(m.predict(Xte, output_type="quantiles", alphas=levels),
                           dtype=float)
 
     if name.startswith("TabPFN"):
-        from tabpfn import TabPFNRegressor
-        kw = dict(n_estimators=n_est, device="cpu", random_state=seed,
-                  ignore_pretraining_limits=True)
-        if name in TABPFN_PATHS:
-            kw["model_path"] = TABPFN_PATHS[name]
-        if CATEGORICAL and CATEGORICAL_INDICES:
-            kw["categorical_features_indices"] = list(CATEGORICAL_INDICES)
-        m = TabPFNRegressor(**kw)
+        m = tabpfn_regressor(name, seed, n_est)
         m.fit(Xtr, ytr)
-        return np.stack([np.asarray(a, dtype=float) for a in
-                         m.predict(Xte, output_type="quantiles", quantiles=levels)],
-                        axis=1)
+        return tabpfn_quantiles(m, Xte, levels)
 
     if name == "XGB":
-        # The serious tree baseline; sklearn GBM is the pedagogical one.
         import xgboost as xgb
         m = xgb.XGBRegressor(objective="reg:quantileerror",
                              quantile_alpha=np.array(levels),
@@ -163,8 +118,7 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
         return q if q.ndim == 2 else q.reshape(len(Xte), -1)
 
     if name == "CB":
-        # Best tree model in regression on TabArena, so the fair contrast for
-        # the foundation models. MultiQuantile fits all levels in one model.
+        # MultiQuantile fits every level in one model.
         from catboost import CatBoostRegressor
         alphas = ",".join(str(a) for a in levels)
         m = CatBoostRegressor(loss_function=f"MultiQuantile:alpha={alphas}",
@@ -175,12 +129,8 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
         return q if q.ndim == 2 else q.reshape(len(Xte), -1)
 
     if name == "GBM":
-        # GBM is NOT deterministic in random_state despite subsample=1.0 and
-        # max_features=None: the sklearn splitter uses it to order features and
-        # break ties. Measured on identical data, the median relative prediction
-        # difference is 9.6%. At the reported sample sizes the effect is noise
-        # (28% vs 29% shape share, sd 0.25 over 6 seeds), but it is still seeded
-        # properly here so the control arm follows the same rule as the rest.
+        # random_state matters even with subsample=1.0: the splitter uses it to order
+        # features and break ties.
         from sklearn.ensemble import GradientBoostingRegressor
         return np.column_stack([
             GradientBoostingRegressor(loss="quantile", alpha=a, n_estimators=200,
@@ -188,14 +138,11 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
             .fit(Xtr, ytr).predict(Xte)
             for a in levels])
 
-    raise NotImplementedError(
-        f"{name} has no quantile head in this module; use mean() instead.")
+    raise NotImplementedError(f"{name} has no quantile head; use mean() instead.")
 
-
-# ------------------------------------------------------------------------ mean
 
 def mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.ndarray:
-    """(n_test,) point prediction. Also for models with no quantile head."""
+    """(n_test,) point prediction. For models with a quantile head, the median."""
     name = normalise(name)
     Xtr, Xte = np.asarray(Xtr, float), np.asarray(Xte, float)
     ytr = np.asarray(ytr, float)
@@ -235,49 +182,25 @@ def mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.ndarray:
         m.fit(Xtr, ytr)
         return np.asarray(m.predict(Xte), dtype=float)
 
-    # The rest have a quantile head; the median is the closest point summary
-    # without extra assumptions.
     return quantiles(name, Xtr, ytr, Xte, seed, [0.5], n_est)[:, 0]
 
 
 def predictive_mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.ndarray:
-    """(n_test,) the model's OWN mean, asked for wherever it publishes one.
+    """(n_test,) the model's own mean, where it publishes one.
 
-    Not the same thing as `mean` above. That one falls back to the median for a
-    model with a quantile head, reasoning that the median is the closest point
-    summary without extra assumptions, and it is the right default when a point
-    prediction is merely needed. It is the wrong one when the mean itself is the
-    quantity under study: `experiments/h3_repair/mean_correction.py` measures a
-    deficit in the conditional mean, and a median would answer a different
-    question.
-
-    So TabICL and TabPFN are asked for `output_type="mean"` here, which is what
-    they compute from their own head, rather than being read at 0.5. Everything
-    else already returns a mean and is dispatched exactly as in `mean`.
-
-    Keeping the two apart is deliberate. Changing `mean` to return the true mean
-    would silently move `truncated_support`, `repair_mean` and `credibility`,
-    which ask for a point prediction and get the median today.
+    Unlike `mean`, TabICL and TabPFN are asked for `output_type="mean"` instead of the
+    median. `mean` keeps the median because truncated_support, repair_mean and
+    credibility were measured with it.
     """
     name = normalise(name)
     Xtr, Xte = np.asarray(Xtr, float), np.asarray(Xte, float)
     ytr = np.asarray(ytr, float)
 
     if name == "TabICLv2":
-        from tabicl import TabICLRegressor
-        m = TabICLRegressor(n_estimators=n_est, device="cpu", random_state=seed)
-        m.fit(Xtr, ytr)
-        return np.asarray(m.predict(Xte, output_type="mean"), dtype=float)
-
-    if name.startswith("TabPFN"):
-        from tabpfn import TabPFNRegressor
-        kw = dict(n_estimators=n_est, device="cpu", random_state=seed,
-                  ignore_pretraining_limits=True)
-        if name in TABPFN_PATHS:
-            kw["model_path"] = TABPFN_PATHS[name]
-        m = TabPFNRegressor(**kw)
-        m.fit(Xtr, ytr)
-        return np.asarray(m.predict(Xte, output_type="mean"), dtype=float)
-
-    # TabFM, TabDPT, EXAONE and the tree controls publish a mean already.
-    return mean(name, Xtr, ytr, Xte, seed, n_est)
+        m = tabicl_regressor(seed, n_est)
+    elif name.startswith("TabPFN"):
+        m = tabpfn_regressor(name, seed, n_est)
+    else:
+        return mean(name, Xtr, ytr, Xte, seed, n_est)
+    m.fit(Xtr, ytr)
+    return np.asarray(m.predict(Xte, output_type="mean"), dtype=float)

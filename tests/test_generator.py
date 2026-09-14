@@ -1,16 +1,9 @@
 # -*- coding: utf-8 -*-
-"""The generator, and the parity that lets the controls be compared at all.
+"""The generator, and its parity with the formula every published run used.
 
-`oracle_xi_of_x.py` is the control that decides whether H1 is a statement about
-the models or about the data: it re-measures the same quantity with an
-extreme-value oracle on the same amount of data. That comparison is only valid
-while the oracle draws from exactly the same generator as the models are given.
-Until now the oracle carried its own copy of the constants and the formula, as
-did four other scripts, and nothing checked that the copies had not drifted.
-
-The reference below is the historical inline formula, written out once here.
-If `common/generator.py` ever stops reproducing it bit for bit, that is a change
-to every published number and this test says so.
+The oracle control of H1 is valid only while it draws from exactly the generator the
+models are given. The reference below is the historical inline formula; if
+`common/generator.py` stops reproducing it, every published number changes.
 """
 import numpy as np
 import pytest

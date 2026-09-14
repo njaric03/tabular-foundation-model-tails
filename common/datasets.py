@@ -1,44 +1,41 @@
 # -*- coding: utf-8 -*-
-"""Loading the real tabular datasets, in one place.
-
-Four variants of this loader existed across the scripts, differing in how they
-handle a non-numeric target, categorical columns and non-positive y. The
-canonical one is the ScoringBench survey loader, kept here.
-
-freMTPL2sev is special: severity comes in one table and the covariates in
-another, so the two have to be joined on the policy id and the claims summed
-per policy. Three scripts carried a copy of that join.
+"""Real tabular datasets: loading, preparation and fingerprints.
 
     from common import datasets
 
     X, y = datasets.load("diamonds")
-    names = datasets.scoringbench_names()
+    X, y = datasets.load("freMTPL2sev", positive_only=True)
+
+`load` reads the external tables converted by `common/external.py`, tries OpenML by
+name and by id, and falls back to PMLB. What it did is left in `LAST`: the source,
+whether the dataset's own target was used, which columns were categorical, and a
+fingerprint checked against `data/dataset_fingerprints.json`.
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
-import os
 import re
 
 import numpy as np
 import pandas as pd
 from sklearn.datasets import fetch_openml
 
-from common import paths
+from common import env, files, paths
 
-# Names that live under a different name, or only under an id, on OpenML.
+# Names that resolve on OpenML only under an id.
 ALIASES = {"Ele2": 42362}
 
-# What the last call to `load` actually loaded. Reset on every call.
-#
-# Two fields here are not decoration. `target_source` says whether the dataset's
-# own target was used or the fallback below picked the last numeric column,
-# which is a silent choice that feeds the survey of 99 datasets and therefore
-# the base rate of leverage quoted in the findings. `n_categorical` says how
-# many columns were ordinal-coded from categories; the foundation models are
-# never told which those are, and freMTPL2sev, which carries the whole real-data
-# leverage result, has several.
+# The ten tables of the real-data dissociation (H1). `218_house_8L` and `house_16H`
+# serve one target vector under two feature sets.
+DISSOCIATION = ["OnlineNewsPopularity", "diamonds", "particulate-matter-ukair-2017",
+                "Buzzinsocialmedia_Twitter", "CPS1988", "218_house_8L",
+                "superconduct", "houses", "Allstate_Claims_Severity", "house_16H"]
+
+# What the last `load` did, reset on every call. `target_source` says whether the
+# dataset's own target was used or the last numeric column; `categorical` lists the
+# columns coded from categories, which reach the models as plain numbers.
 LAST: dict = {}
 
 FINGERPRINTS = "dataset_fingerprints.json"
@@ -53,24 +50,29 @@ def scoringbench_names() -> list[str]:
 
 
 def openml_ids() -> dict:
-    """Name to OpenML id, for the datasets whose name does not resolve."""
+    """OpenML ids of the ScoringBench names that do not resolve by name."""
     return paths.load_json("sb_openml_ids.json")
 
 
 def selected_names() -> list[str]:
-    """The hand-picked heavy-tailed datasets that pass the identification test."""
+    """Heavy-tailed tables that passed `experiments/datasets/dataset_selection.py`."""
     return paths.lines("selected_datasets.txt")
 
 
+def external_names() -> list[str]:
+    """External tables that passed `experiments/h2_leverage/external_selection.py`."""
+    return paths.lines("external_selected.txt")
+
+
 def _load_pmlb(name):
-    """PMLB datasets, named like 215_2dplanes, are not on OpenML under that name."""
+    """PMLB tables, named like 215_2dplanes, which OpenML does not carry under that name."""
     df = pd.read_csv(PMLB_URL.format(name=name), sep="\t", compression="gzip")
     y = pd.to_numeric(df.pop("target"), errors="coerce").to_numpy(dtype=float)
     return df, y
 
 
 def _load_fremtpl2():
-    """Claim severity joined to its covariates, summed per policy."""
+    """Claim severity summed per policy and joined to the policy covariates."""
     sev = fetch_openml("freMTPL2sev", as_frame=True, parser="auto").data
     freq = fetch_openml("freMTPL2freq", as_frame=True, parser="auto").data
     sev = sev.groupby("IDpol", as_index=False).ClaimAmount.sum()
@@ -80,18 +82,11 @@ def _load_fremtpl2():
 
 
 def prepare(X, y):
-    """Categories to codes, missing values filled, invalid targets dropped.
+    """Categories to integer codes, missing values filled, non-finite targets dropped.
 
-    Two properties of this step are limitations rather than choices, and both
-    are recorded in `LAST` so they can be quoted instead of discovered:
-
-    * categorical columns become integer codes and are then handed to every
-      model as plain numbers. TabPFN and TabICL have their own categorical
-      handling, and it is bypassed here. Changing that changes every real-data
-      number, so it is recorded and left for a re-run, not switched silently.
-    * the median that fills missing values is computed on the whole table,
-      before any split. The leakage is small -- a median over thousands of rows
-      barely moves when a few thousand are held out -- but it is leakage.
+    Two limitations, recorded rather than hidden: categorical columns reach the models
+    as plain codes unless CATEGORICAL=native passes their indices on, and the median
+    that fills missing values is taken over the whole table, before any split.
     """
     y = np.asarray(y, dtype=float)
     if not np.isfinite(y).any():
@@ -108,13 +103,10 @@ def prepare(X, y):
 
 
 def fingerprint(X, y) -> dict:
-    """Shape and a hash of the target, enough to notice that a source moved.
+    """Shape and a hash of the target: enough to notice that a source changed.
 
-    `fetch_openml` is called by name, without a version, so the table it returns
-    is whatever OpenML serves that day. Nothing in a result CSV would show that
-    a dataset changed underneath a measurement. This is the cheapest guard: the
-    first load records the fingerprint in `data/dataset_fingerprints.json`, and
-    every later load compares against it.
+    `fetch_openml` is called without a version, so the table is whatever OpenML
+    serves that day.
     """
     y = np.asarray(y, dtype=float)
     return dict(n_rows=int(len(y)), n_cols=int(np.shape(X)[1]),
@@ -123,49 +115,39 @@ def fingerprint(X, y) -> dict:
 
 
 def check_fingerprint(name: str, X, y) -> None:
-    """Compare with the recorded fingerprint, or record it the first time.
+    """Record the fingerprint on the first load, compare with it on every later one.
 
-    A mismatch prints loudly and, under TFM_STRICT=1, raises: a measurement
-    started against a table that is not the one earlier rows were measured on is
-    a run that should not quietly continue.
+    A mismatch prints a warning, and raises under TFM_STRICT=1.
     """
     got = fingerprint(X, y)
     LAST["fingerprint"] = got
-    try:
-        path = paths.data(FINGERPRINTS)
-    except Exception:
-        path = paths.path(FINGERPRINTS, "data")
-    known = {}
-    if path.exists():
-        known = json.loads(path.read_text(encoding="utf-8"))
-
-    if name not in known:
-        known[name] = got
-        path.write_text(json.dumps(known, indent=1, sort_keys=True), encoding="utf-8")
-        print(f"  [datasets] fingerprint recorded for {name}: "
-              f"{got['n_rows']} x {got['n_cols']}, y {got['y_sha1']}", flush=True)
-        return
+    path = paths.data(FINGERPRINTS)
+    # Locked: two processes recording new datasets at once would each write the file
+    # back without the other's entry.
+    with files.FileLock(path):
+        known = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        if name not in known:
+            known[name] = got
+            path.write_text(json.dumps(known, indent=1, sort_keys=True), encoding="utf-8")
+            print(f"  [datasets] fingerprint recorded for {name}: "
+                  f"{got['n_rows']} x {got['n_cols']}, y {got['y_sha1']}", flush=True)
+            return
 
     if known[name] != got:
         message = (f"{name}: the table is not the one that was measured before.\n"
                    f"  recorded: {known[name]}\n"
                    f"  now     : {got}\n"
                    f"Results measured before and after this change are not comparable.")
-        if os.environ.get("TFM_STRICT", "") not in ("", "0", "false"):
+        if env.flag("TFM_STRICT"):
             raise RuntimeError(message)
         print("  [datasets] WARNING " + message, flush=True)
 
 
 def load(name, ids=None, positive_only=False):
-    """Load a dataset by name. Tries OpenML by name, then by id, then PMLB.
+    """Load a dataset by name.
 
-    positive_only drops non-positive targets, which the tail estimators need but
-    which changes n, so it is off by default and requested explicitly.
-
-    What was loaded, and how, is left in `LAST`: the source, whether the
-    dataset's own target was used or the fallback picked a column, how many
-    columns were categorical, and a fingerprint of the table. See `LAST` above
-    for why each of those matters to a published number.
+    `positive_only` drops non-positive targets, which the tail estimators need but which
+    changes n, so it is asked for explicitly.
     """
     LAST.clear()
     LAST.update(name=name, source="", target_source="default",
@@ -177,6 +159,13 @@ def load(name, ids=None, positive_only=False):
         LAST["dropped_non_positive"] = int((~keep).sum())
         X, y = X[keep], y[keep]
     return X, y
+
+
+@functools.lru_cache(maxsize=1)
+def load_cached(name, positive_only=False):
+    """`load`, remembering the last table, for loops that visit one dataset at a time.
+    The arrays are shared between calls, so callers must not modify them in place."""
+    return load(name, positive_only=positive_only)
 
 
 def _load(name, ids=None):
@@ -195,11 +184,8 @@ def _load(name, ids=None):
         LAST["source"] = "pmlb"
         return prepare(*_load_pmlb(name))
 
-    # Every candidate's failure is kept. Keeping only the last one reports the
-    # error of the as_frame=False fallback, which for a table with string columns
-    # is always "try as_frame=True" and hides why the as_frame=True attempt, made
-    # first, actually failed. That cost one dataset a silent drop from the wide
-    # leverage sweep.
+    # Every candidate's failure is kept. The as_frame=False fallback always fails with
+    # the same hint, so keeping only the last error hid why the first attempt failed.
     failures, d = [], None
     candidates = [{"name": name}]
     if name in ALIASES:
@@ -234,14 +220,9 @@ def _load(name, ids=None):
     y = pd.to_numeric(pd.Series(np.asarray(d.target).ravel()),
                       errors="coerce").to_numpy(dtype=float)
     if not np.isfinite(y).any():
-        # The default target is not numeric, e.g. a date or a category. Take the
-        # last numeric column instead: ScoringBench runs regression, so a numeric
-        # target has to exist somewhere in the frame.
-        #
-        # This is a silent choice of what is being predicted, and it reaches a
-        # headline number: the survey of 99 datasets, from which the base rate of
-        # leverage comes, runs over whatever this picked. `LAST["target_source"]`
-        # records it so the survey can report how many datasets went this way.
+        # The default target is not numeric, so take the last numeric column. That is a
+        # choice of what is predicted, and it feeds the survey behind the base rate of
+        # leverage, hence the record in LAST.
         num = X.select_dtypes(include=[np.number]).columns
         if len(num) == 0:
             raise RuntimeError("no numeric column")
@@ -251,22 +232,12 @@ def _load(name, ids=None):
 
 
 def target_groups() -> dict:
-    """Dataset name to the identity of its target vector.
+    """Dataset name to the hash of its target vector.
 
-    Two OpenML names can serve the same target under different feature sets.
-    `218_house_8L` and `house_16H` are the pair in this repository: 22.784 rows,
-    the same `y_sha1`, 8 columns against 16. A per-dataset sign test that counts
-    both is counting one free unit twice, which is rule 6 one level up from the
-    seed level where it was first caught.
-
-    The grouping key is the recorded target hash, so a name with no fingerprint
-    yet maps to itself and forms its own group. That keeps the function usable
-    on result frames written before the fingerprints existed.
+    Two names can serve one target under different feature sets (`218_house_8L` and
+    `house_16H`), and a sign test over names would count that unit twice (rule 6).
     """
-    try:
-        path = paths.data(FINGERPRINTS)
-    except Exception:
-        path = paths.path(FINGERPRINTS, "data")
+    path = paths.data(FINGERPRINTS)
     if not path.exists():
         return {}
     known = json.loads(path.read_text(encoding="utf-8"))
@@ -274,13 +245,12 @@ def target_groups() -> dict:
 
 
 def target_group(name: str) -> str:
-    """The target identity of one dataset, or its own name when unknown."""
+    """The target hash of one dataset, or its name when no fingerprint is recorded."""
     return target_groups().get(name, name)
 
 
 def duplicate_targets() -> dict:
-    """Target hash to the dataset names that share it, for hashes shared by more
-    than one name. Empty when every recorded dataset has its own target."""
+    """Target hash to the names that share it, for hashes shared by more than one name."""
     out: dict = {}
     for name, key in target_groups().items():
         out.setdefault(key, []).append(name)

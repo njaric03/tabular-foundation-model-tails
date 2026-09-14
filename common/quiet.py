@@ -1,41 +1,25 @@
 # -*- coding: utf-8 -*-
-"""One narrow warning filter, replacing `filterwarnings("ignore")` in 31 files.
+"""A narrow warning filter for every script.
 
-The blanket ignore was in every script, and it is on record as having hidden a
-real bug for months: `gpd_quantile` divided by zero at xi = 0 in half the copies
-and the RuntimeWarning that was the only sign of it went to /dev/null
-(`common/metrics.py`, `common/generator.py`).
-
-The distinction that matters is who raised the warning:
-
-  * UserWarning, FutureWarning, DeprecationWarning come from the model packages
-    and from sklearn, thousands of times per run, and say nothing about the
-    measurement. Silenced.
-  * RuntimeWarning is numeric: overflow, divide-by-zero, invalid value in a
-    reduction. That is the class that hides a wrong number. Shown once per
-    location, so it stays visible without flooding the log.
-
-    from common import quiet
-    quiet.silence()
-
-With TFM_STRICT=1 a RuntimeWarning becomes an exception, which is how a script
-should be run once after any change to an estimator.
+Package warnings (UserWarning, FutureWarning, DeprecationWarning and the like) are
+silenced. RuntimeWarning, the class that signals a wrong number, stays visible once per
+location and becomes an error under TFM_STRICT=1. A blanket `filterwarnings("ignore")`
+once hid a divide-by-zero in the tail-index inversion for months.
 """
 from __future__ import annotations
 
-import os
 import warnings
 
-# Everything here is package noise, not a statement about the measurement.
+from common import env
+
 NOISE = (UserWarning, FutureWarning, DeprecationWarning,
          PendingDeprecationWarning, ImportWarning, ResourceWarning)
 
 
 def silence(strict: bool | None = None) -> None:
-    """Silence package noise, keep numeric warnings visible."""
+    """Silence package noise and keep numeric warnings visible."""
     if strict is None:
-        strict = os.environ.get("TFM_STRICT", "") not in ("", "0", "false")
+        strict = env.flag("TFM_STRICT")
     for category in NOISE:
         warnings.filterwarnings("ignore", category=category)
-    # The numeric class. "once" per location: visible, not a flood.
     warnings.filterwarnings("error" if strict else "once", category=RuntimeWarning)

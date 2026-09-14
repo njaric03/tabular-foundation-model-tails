@@ -1,13 +1,6 @@
-# The estimators have tests because three numerical bugs in them are on record,
-# and all three were found by reading rather than by running. Nothing ran them
-# automatically until now: the resume key in the leverage sweep was broken for
-# weeks and only surfaced when a run happened to be repeated.
-#
-# The model packages are deliberately absent here. TabPFN, TabICL, TabDPT, TabFM
-# and EXAONE need mutually incompatible torch versions and a licence login, so
-# they live in per-experiment virtualenvs. What is tested is `common/`: the
-# estimators, the generator, the append guards and the clustered tests, which
-# need nothing but numpy, scipy, pandas and scikit-learn.
+# Lint, the tests of common/, and an import of every experiment script. The model packages
+# are not installed: they need incompatible torch versions and a licence login, so the
+# scripts that import them are skipped.
 name: tests
 
 on:
@@ -29,9 +22,11 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          # matplotlib is not a runtime dependency, but one test imports every
-          # script under experiments/ and one of those draws figures.
-          python -m pip install -e . pytest matplotlib
+          # matplotlib because the import test loads plot_dissociation.py
+          python -m pip install -e ".[dev]" matplotlib
+
+      - name: Lint
+        run: ruff check .
 
       - name: Run tests
         run: python -m pytest tests -q
