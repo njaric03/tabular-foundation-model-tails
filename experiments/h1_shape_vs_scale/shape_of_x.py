@@ -19,7 +19,11 @@ from common import append, env, generator, gradients, metrics, models, paths, qu
 
 quiet.silence()
 
-N_TRAIN, N_TEST = 2000, 900
+# N_TRAIN became a knob for nanoTabPFN, which takes at most 896 context rows. Files written
+# before it have no n_train column and hold 2000; the resume refuses them, so a run with
+# another value needs a new OUTPUT.
+N_TRAIN = env.integer("N_TRAIN", 2000)
+N_TEST = 900
 LEVELS = gradients.LEVELS
 # The ensemble size moves TabPFN's shape share from 19% at 4 members to 42% at 1.
 N_EST = env.integer("N_EST", 4)
@@ -27,8 +31,9 @@ SEEDS = env.seeds(env.integer("SEEDS", 20))
 MODELS = env.models("GBM,TabICLv2,TabPFN-V3")
 OUTPUT = env.text("OUTPUT", "shape_of_x_20.csv")
 
-COLUMNS = ["model", "seed", "tercile", "n_est", "xi_true", "ratio_model", "xi_implied"]
-KEY = ["model", "seed", "tercile", "n_est"]
+COLUMNS = ["model", "seed", "tercile", "n_est", "n_train", "xi_true", "ratio_model",
+           "xi_implied"]
+KEY = ["model", "seed", "tercile", "n_est", "n_train"]
 
 
 def main():
@@ -42,7 +47,8 @@ def main():
         test = generator.gpd(N_TEST, rng, xi=generator.XI_OF_X)
         tercile, _ = gradients.generator_terciles(test.X)
         for name in MODELS:
-            rows = [dict(model=name, seed=seed, tercile=t + 1, n_est=N_EST) for t in range(3)]
+            rows = [dict(model=name, seed=seed, tercile=t + 1, n_est=N_EST, n_train=N_TRAIN)
+                    for t in range(3)]
             if all(append.key(r, KEY) in done for r in rows):
                 continue
             q = models.quantiles(name, train.X, train.y, test.X, seed=seed,

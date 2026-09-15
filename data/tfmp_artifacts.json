@@ -62,6 +62,8 @@
     "amp": "fp16",
     "sdpa": 1,
     "grad_ckpt": 1,
+    "target_clip": 10000,
+    "target_clip_why": "decided 2026-09-15 after the first A0B1 run: on shard 2026 the robust scale is below 0.01 sd in 2.68% of contexts, encoded targets reach 2.2e9, fp16 gives NaN. Share of contexts the cap touches (first 5000 tables): A0B0 0%, A0B1 0.70%, A1B0 0%, A1B1 2.60%; a cap at 100 would have touched 47.7% of A1B1 contexts and acted as a context repair",
     "a1": {"p_tail": 0.5, "p_contam": 0.3, "xi_range": [0.0, 1.0], "w_sd": 2.0, "shift_range": [4.0, 50.0], "shift_draw": "log-uniform"},
     "why_steps_not_hours": "every arm gets the same optimiser steps and the same tables in the same order; wall time is recorded per run"
   },
@@ -74,5 +76,21 @@
     "checks": "every shard: all y finite, no constant table, 1024 rows, padding columns zero; the first tables of the four shards differ",
     "arm_A0_as_generated": "seed 2026, all 14000 tables: max z beyond 4.05 in 3.16% (5: 1.44%, 10: 0.31%, largest 22.6), as often on the lower side (431 tables); sd shift of the whole table median 1.0052, 99.9% 1.132, largest 1.413; sd shift of the context 4 or more in 2 tables, 20 or more in none, largest 10.1"
   },
-  "arms": {}
+  "arms": {
+    "nanoTabPFN-A0B0-s1": {
+      "checkpoint": ".cache/tfmp/checkpoints/nanoTabPFN-A0B0-s1.pth",
+      "bytes": 17965406,
+      "sha256": "030c1c0a110740055abba3f83dd274faf799c738614e388017f684bd0b1be1ca",
+      "finished": "2026-09-15 14:44",
+      "seconds": 11302,
+      "tables_per_s": 4.955,
+      "peak_mb": 2477,
+      "last_logged_loss": 1.13012,
+      "edges": [-13.1, 21.8],
+      "target_clip": "none: trained before the cap. Of its 56000 tables, 3 exceed 100 encoded units and 1 exceeds 10000 (48170.8), so the cap would have changed one table. Kept by decision of 2026-09-15; the adapter reads it with the cap"
+    },
+    "failed": {
+      "nanoTabPFN-A0B1-s1 without target_clip": "2026-09-15 14:45 to 14:52, stopped at step 150 of 7000: edges [-6.25e6, 2.21e9], loss NaN at steps 50 and 150. Log in .cache/tfmp/failed/"
+    }
+  }
 }

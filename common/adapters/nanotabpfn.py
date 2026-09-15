@@ -9,6 +9,7 @@ and saved as one file each under `.cache/tfmp/checkpoints/`:
     architecture, model        as TFM-Playground's `train.py` writes them
     bucket_edges               the borders in encoded space
     encoding                   "meansd" or "robust"
+    target_clip                the cap on the encoded target, TARGET_CLIP
     max_context, max_features  the largest context and feature count seen in pre-training
 
 Keeping the edges and the encoding in the checkpoint means a model cannot be read with the
@@ -39,6 +40,11 @@ CHECKPOINTS = paths.ROOT / ".cache" / "tfmp" / "checkpoints"
 ENCODINGS = ("meansd", "robust")
 # The constant TFM-Playground adds to the sd; the robust scale gets the same floor.
 EPS = 1e-8
+# The encoded target is capped here in training, in the edges and at inference. On TabICL's
+# prior the robust scale is below a hundredth of the sd in 2.7% of contexts, the encoded
+# values reach 1e9, and fp16 turns them into NaN. The cap touches 0.7% of contexts under
+# A0B1, 2.6% under A1B1 and one table of 56000 under A0B0.
+TARGET_CLIP = 1e4
 TEST_CHUNK = 512
 
 _loaded: dict = {}
@@ -57,6 +63,11 @@ def encode_stats(y, encoding: str) -> tuple[float, float]:
         q75, q25 = np.percentile(y, [75, 25])
         return float(np.median(y)), float((q75 - q25) / 1.349) + EPS
     raise ValueError(f"unknown encoding {encoding!r}; expected one of {ENCODINGS}")
+
+
+def encode(y, centre: float, scale: float, clip: float = TARGET_CLIP) -> np.ndarray:
+    """The target in encoded units, capped at +-clip."""
+    return np.clip((np.asarray(y, dtype=float) - centre) / scale, -clip, clip)
 
 
 def device() -> str:
@@ -122,12 +133,16 @@ def load(path, dev: str):
 
     if "bucket_edges" in state:
         edges = state["bucket_edges"]
+        # nanoTabPFN-A0B0-s1 was trained before the cap existed; it would have touched one
+        # of its 56000 tables. It is read with the cap like every other arm.
         meta = dict(encoding=state["encoding"], max_context=int(state["max_context"]),
-                    max_features=int(state["max_features"]))
+                    max_features=int(state["max_features"]),
+                    target_clip=float(state.get("target_clip", TARGET_CLIP)))
     else:
         # The released regressor: buckets in a sibling file, trained on 50-row tables.
         edges = torch.load(path.with_name(path.stem + "_buckets.pth"), map_location="cpu")
-        meta = dict(encoding="meansd", max_context=None, max_features=None)
+        meta = dict(encoding="meansd", max_context=None, max_features=None,
+                    target_clip=TARGET_CLIP)
     if meta["encoding"] not in ENCODINGS:
         raise ValueError(f"{path.name}: unknown encoding {meta['encoding']!r}")
     dist = FullSupportBarDistribution(edges.float().to(dev))
@@ -160,7 +175,8 @@ def predict(path, Xtr, ytr, Xte, levels, dev: str | None = None):
                          f"{meta['max_features']}")
 
     centre, scale = encode_stats(ytr, meta["encoding"])
-    y_enc = torch.tensor((ytr - centre) / scale, dtype=torch.float32, device=dev)[None]
+    y_enc = torch.tensor(encode(ytr, centre, scale, meta["target_clip"]),
+                         dtype=torch.float32, device=dev)[None]
     x_ctx = torch.tensor(Xtr, device=dev)
     q = np.empty((len(Xte), len(levels)))
     with torch.no_grad():

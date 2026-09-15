@@ -64,6 +64,18 @@ def test_robust_encoding_is_the_repo_robust_sd():
     assert scale == pytest.approx(y.std(ddof=1) + nanotabpfn.EPS)
 
 
+def test_the_encoded_target_is_capped_where_the_robust_scale_collapses():
+    """A context whose middle half is nearly constant has a robust scale near zero; one
+    extreme value would otherwise reach 1e18 encoded units and NaN under fp16."""
+    rng = np.random.default_rng(5)
+    y = np.r_[1.0 + rng.normal(scale=1e-6, size=99), 1e12]
+    centre, scale = nanotabpfn.encode_stats(y, "robust")
+    e = nanotabpfn.encode(y, centre, scale)
+    assert np.isfinite(e).all()
+    assert np.abs(e).max() == nanotabpfn.TARGET_CLIP
+    assert np.abs(nanotabpfn.encode(y[:99], centre, scale)).max() < nanotabpfn.TARGET_CLIP
+
+
 def test_the_adapter_refuses_an_ensemble_and_an_unknown_arm():
     X = np.zeros((10, 2))
     with pytest.raises(ValueError):

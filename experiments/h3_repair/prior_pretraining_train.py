@@ -18,6 +18,9 @@ experiment makes is versioned. What differs from the original:
     of a table by statistics of all rows, which the loss never uses;
   - fp16 autocast with a gradient scaler, because the RTX 2060 has no bf16; the loss is
     computed in float32;
+  - the encoded target is capped at +-`--target_clip` (1e4) in the context, the loss and
+    the edges. Without it the first B1 run met encoded values of 2e9 on contexts whose
+    robust scale is a millionth of the sd, and its loss was NaN from step 50;
   - a micro-batch of several tables uses the smallest split among them, so every table
     keeps at least that many context rows;
   - a resumable checkpoint every `--ckpt_every` steps, and a CSV of the loss.
@@ -57,6 +60,8 @@ def parse():
     p.add_argument("--w_sd", type=float, default=2.0)
     p.add_argument("--shift_lo", type=float, default=4.0)
     p.add_argument("--shift_hi", type=float, default=50.0)
+    p.add_argument("--target_clip", type=float, default=1e4,
+                   help="cap on the encoded target in the context, the loss and the edges")
     p.add_argument("--amp", type=int, default=1, help="fp16 autocast, 1 or 0")
     p.add_argument("--sdpa", type=int, default=1,
                    help="call attention with need_weights=False, 1 or 0")
@@ -115,7 +120,7 @@ class Tables:
         """(X, y encoded by the context statistics, k) with the context cut at `split`."""
         X, y, k, own_split, info = self.raw(t)
         centre, scale = encode_stats(y[:split], self.encoding)
-        return X, (y - centre) / scale, k, info
+        return X, encode(y, centre, scale, self.args.target_clip), k, info
 
 
 def fit_in_memory(model, sdpa: bool, grad_ckpt: bool):
@@ -171,8 +176,8 @@ def main():
     from pfns.bar_distribution import FullSupportBarDistribution
     from tfmplayground.models.nanotabpfn import NanoTabPFNModel
 
-    global apply_a1, encode_stats
-    from common.adapters.nanotabpfn import encode_stats
+    global apply_a1, encode, encode_stats
+    from common.adapters.nanotabpfn import encode, encode_stats
     from common.prior_arms import apply_a1
 
     name = f"nanoTabPFN-{args.arm}-s{args.seed}"
@@ -219,7 +224,8 @@ def main():
                                        mlp_hidden_size=args.hidden,
                                        num_outputs=args.n_buckets),
                      model=model.state_dict(), bucket_edges=edges.cpu(),
-                     encoding=tables.encoding, max_context=tables.max_split,
+                     encoding=tables.encoding, target_clip=args.target_clip,
+                     max_context=tables.max_split,
                      max_features=tables.max_features, config=vars(args), step=step,
                      pointer=pointer, seconds=seconds)
         if not final_weights:

@@ -21,6 +21,7 @@ for SEED in 1 2; do
     fi
     $PY -u experiments/h3_repair/prior_pretraining_train.py --dump "$DUMPS" \
       --arm $ARM --seed $SEED --steps 7000 --batch_size 4 --accumulate 2 \
-      --n_buckets 1000 --edge_tables 2000 --log_every 50 --ckpt_every 250 || exit 1
+      --n_buckets 1000 --edge_tables 2000 --target_clip 10000 \
+      --log_every 50 --ckpt_every 250 || exit 1
   done
 done

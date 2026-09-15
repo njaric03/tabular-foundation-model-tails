@@ -18,15 +18,18 @@ from common import append, env, generator, gradients, metrics, models, paths, qu
 
 quiet.silence()
 
-N_TRAIN, N_TEST = 2000, 900
+# A knob since nanoTabPFN; see shape_of_x.py. Files without n_train hold 2000.
+N_TRAIN = env.integer("N_TRAIN", 2000)
+N_TEST = 900
 LEVELS = gradients.LEVELS
 N_EST = env.integer("N_EST", 4)
 SEEDS = env.seeds(env.integer("SEEDS", 20))
 MODELS = env.models("GBM,TabICLv2,TabPFN-V3")
 OUTPUT = env.text("OUTPUT", "scale_of_x.csv")
 
-COLUMNS = ["model", "seed", "tercile", "n_est", "median_true", "median_model", "xi_mean"]
-KEY = ["model", "seed", "tercile", "n_est"]
+COLUMNS = ["model", "seed", "tercile", "n_est", "n_train", "median_true", "median_model",
+           "xi_mean"]
+KEY = ["model", "seed", "tercile", "n_est", "n_train"]
 
 
 def main():
@@ -41,7 +44,8 @@ def main():
         _, tercile = gradients.generator_terciles(test.X)
         median_true = test.s * metrics.gpd_quantile(0.5, test.xi)
         for name in MODELS:
-            rows = [dict(model=name, seed=seed, tercile=t + 1, n_est=N_EST) for t in range(3)]
+            rows = [dict(model=name, seed=seed, tercile=t + 1, n_est=N_EST, n_train=N_TRAIN)
+                    for t in range(3)]
             if all(append.key(r, KEY) in done for r in rows):
                 continue
             q = models.quantiles(name, train.X, train.y, test.X, seed=seed,

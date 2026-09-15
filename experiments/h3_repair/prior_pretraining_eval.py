@@ -20,6 +20,8 @@ direction of an effect, not its size in the production models.
         context row rescaled to an sd shift in [4, 50] (`common/prior_arms.py`).
     B0  context target standardised by mean and sd, as shipped.
     B1  by median and IQR / 1.349, in the edges, the loss and the adapter alike.
+        Both encodings cap the encoded target at +-1e4, which fp16 needs: the cap touches
+        0.7% of A0B1 contexts, 2.6% of A1B1 contexts and one table of 56000 under A0B0.
 
 WHAT IS MEASURED
 ----------------
