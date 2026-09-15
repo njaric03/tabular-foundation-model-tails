@@ -44,7 +44,9 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              # TabPFN's CPU output depends on the thread count bit for bit: the same
              # generator cells give an implied xi of 0.6516 at 6 threads and 0.7003 at 3.
              # An unset value means the library default, which depends on the machine.
-             "OMP_NUM_THREADS", "MKL_NUM_THREADS"]
+             "OMP_NUM_THREADS", "MKL_NUM_THREADS",
+             # nanoTabPFN runs on the GPU when there is one; kernels differ in the last bits.
+             "TFMP_DEVICE"]
 
 COLUMNS = (["utc", "output", "script", "git_sha", "git_dirty", "python",
             "platform", "venv"]

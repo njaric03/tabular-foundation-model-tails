@@ -14,7 +14,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SCRIPTS = sorted(p for p in (ROOT / "experiments").rglob("*.py"))
 MODEL_PACKAGES = {"tabpfn", "tabicl", "tabdpt", "tabfm", "exaonetabular", "torch",
-                  "xgboost", "catboost"}
+                  "xgboost", "catboost", "tfmplayground", "pfns", "h5py"}
 
 
 @pytest.mark.parametrize("path", SCRIPTS, ids=lambda p: p.stem)

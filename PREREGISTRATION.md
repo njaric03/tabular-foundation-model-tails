@@ -1221,3 +1221,36 @@ RUNNING
     python -u experiments/h3_repair/tail_splice.py
     DATASETS=AutoClaims MODELS=GBM REPEATS=2 python -u tail_splice.py
 ```
+
+---
+
+## Thread count, 15.9.2026
+
+```
+No prediction was written before this run. It checks one sentence of an earlier outcome,
+`clip_context_real.py` P1 of 11.9.2026: "Within one environment TabPFN is deterministic:
+6 and 12 threads give identical output." That holds only at a fixed thread count.
+
+    XI=0.7 SEEDS=2 SD_SHIFTS=1,20 OMP_NUM_THREADS=t MKL_NUM_THREADS=t \
+      python -u experiments/h3_repair/clip_context.py        t = 3, 4, 6, 10, 12
+
+At a7f3ae9 in venv-tfm, 52 cells per thread count, all in `results/side/thread_count.csv`.
+
+OUTCOME
+-------
+6, 10 and 12 threads give the same output bit for bit. 3 and 4 do not: against 6
+threads, pinball at 0.99 moves by a median 0.3% (worst 4%), at 0.999 by 1.2 to 1.3%
+(worst 18% and 52%), the implied xi by at most 0.05, the borders over the data not at all.
+
+Arm effects move less. An arm's median pinball at 0.99 against clip_200 moves across the
+five thread counts by at most 0.12 points for sd_cap, 0.4 to 1.0 for the rank arms and
+log, and 2.4 for raw at a shift of 20, where the effect is +10 to +12.5%. Only rank_exp
+at a shift of 20 changes sign, within half a point of zero.
+
+The committed `clip_context.csv` equals the 6-thread run on 32 of the 36 non-rank cells
+the two share and the 4-thread run on the other 4. Its rank cells differ from the current
+code by a median 0.4% and at most 1.6%, the splice fix of 3cb55cc.
+
+Nothing is remeasured. A difference between arms under one point at 0.99 is not read as
+an effect, and 0.999 is not read per cell. Runs from here on set OMP_NUM_THREADS=6.
+```

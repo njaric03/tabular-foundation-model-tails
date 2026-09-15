@@ -1,0 +1,78 @@
+{
+  "written": "2026-09-15",
+  "purpose": "Everything outside git that the prior pre-training experiment depends on: code at recorded commits, package versions, the GPU, and the sha256 of every downloaded or generated file. Files themselves live under .cache/tfmp/.",
+  "machine": {
+    "gpu": "NVIDIA GeForce RTX 2060, 6 GB, driver 591.86 (CUDA 13.1), WDDM",
+    "os": "Windows 11 Pro 10.0.26200",
+    "python": "3.12.10"
+  },
+  "code": {
+    "TFM-Playground": {"url": "https://github.com/automl/TFM-Playground", "commit": "7b37681364101ab7167742856de9ed8b4d243b90", "install": "pip install -e --no-deps"},
+    "ticl": {"url": "https://github.com/microsoft/ticl", "commit": "3c36d9c1785844d5e983b0baf0ef4116670aa809", "why": "imported at the top of tfmplayground.external_priors"},
+    "tabpfn-v1-prior": {"url": "https://github.com/automl/tabpfn-v1-prior", "commit": "778f0d0eb10f35ca85964fbc27ecb8baee9146a4", "why": "imported at the top of tfmplayground.external_priors"}
+  },
+  "packages": {
+    "torch": "2.9.1+cu126",
+    "pfns": "0.3.0",
+    "tabicl": "2.2.0",
+    "h5py": "3.16.0",
+    "schedulefree": "1.4.1",
+    "openml": "0.15.1",
+    "numpy": "2.5.3",
+    "scikit-learn": "1.9.1",
+    "xgboost": "3.4.1",
+    "mlflow": "3.16.0"
+  },
+  "downloads": {
+    ".cache/tfmp/released/nanotabpfn_regressor.pth": {
+      "url": "https://ml.informatik.uni-freiburg.de/research-artifacts/pfefferle/TFM-Playground/nanotabpfn_regressor.pth",
+      "bytes": 6870361,
+      "sha256": "1f954e0bcc786ba961bf5150810a4c16236ad36fa95cebd67e4f99caa53b9c36",
+      "use": "smoke test of the quantile adapter only; trained on 50-row tables, not an arm",
+      "layout": "bare state dict from before TFM-Playground e88b8d9: embedding 128, hidden 512, 6 layers, 100 outputs; 2 heads by that era's rule embedding // 64"
+    },
+    ".cache/tfmp/released/nanotabpfn_regressor_buckets.pth": {
+      "url": "https://ml.informatik.uni-freiburg.de/research-artifacts/pfefferle/TFM-Playground/nanotabpfn_regressor_buckets.pth",
+      "bytes": 1549,
+      "sha256": "d7338f12a114eb39a1f744718e75c01fe0487a17f8854214cba8c0603bf6f227"
+    }
+  },
+  "pilot": {
+    "dump": "64 tables, experiments/h3_repair/prior_pretraining_dump.py defaults, 12 s on CPU; largest z 4.00 and largest sd shift of a whole table 1.0074. Too few tables: the full shards reach z 22.6, see dumps",
+    "throughput": {
+      "batch 1, no sdpa, no checkpointing": "peak 7863 MB on a 6 GB card, 0.11 to 0.15 tables/s",
+      "batch 1, sdpa and checkpointing": "peak 615 MB, 3.3 tables/s",
+      "batch 4, sdpa and checkpointing": "peak 2320 MB, 5.3 tables/s",
+      "batch 8, sdpa and checkpointing": "peak 4577 MB, 2.6 tables/s",
+      "batch 4, accumulate 2, 1000 buckets, arm A1B0": "peak 2333 MB, 5.3 tables/s"
+    },
+    "equivalence": "on CPU float32, checkpointing changes outputs and gradients by 0; need_weights=False by at most 4.2e-07 in outputs and 3.7e-09 in gradients"
+  },
+  "budget": {
+    "decided": "2026-09-15, after the pilot: about 3 GPU hours per run, 1000 buckets, 2 pre-training seeds",
+    "steps": 7000,
+    "batch_size": 4,
+    "accumulate": 2,
+    "tables_per_run": 56000,
+    "n_buckets": 1000,
+    "edge_tables": 2000,
+    "pretrain_seeds": [1, 2],
+    "model": {"heads": 6, "embedding": 192, "hidden": 768, "layers": 6},
+    "lr": 0.0001,
+    "amp": "fp16",
+    "sdpa": 1,
+    "grad_ckpt": 1,
+    "a1": {"p_tail": 0.5, "p_contam": 0.3, "xi_range": [0.0, 1.0], "w_sd": 2.0, "shift_range": [4.0, 50.0], "shift_draw": "log-uniform"},
+    "why_steps_not_hours": "every arm gets the same optimiser steps and the same tables in the same order; wall time is recorded per run"
+  },
+  "dumps": {
+    "generation": "four processes in parallel, OMP_NUM_THREADS=1, prior_pretraining_dump.py defaults (mix_scm, 1024 rows, 2 to 32 features, context 512 to 896, gen_batch 16, batch_size_per_gp 4), seeds 2026 to 2029; training reads them in this order",
+    ".cache/tfmp/dumps/base_s2026_14000.h5": {"tables": 14000, "skipped": 24, "seconds": 3115, "mb": 936.3, "sha256": "9d1c75f1b642977666865eedb6b85870d25391352d4aa7307400da707cb100a6"},
+    ".cache/tfmp/dumps/base_s2027_14000.h5": {"tables": 14000, "skipped": 29, "mb": 932.8, "sha256": "30f9b7f58b057f036dc34addc4645ad07404be408196ba02c87abee1022f0ac5"},
+    ".cache/tfmp/dumps/base_s2028_14000.h5": {"tables": 14000, "skipped": 23, "seconds": 3189, "mb": 927.4, "sha256": "67f30dc20457fc6e1a693f85c5588dec4dfe6564182cb77d620c5d0a385ddf87"},
+    ".cache/tfmp/dumps/base_s2029_14000.h5": {"tables": 14000, "skipped": 21, "mb": 929.2, "sha256": "b7b408d816520895c57ea8a7d9594f02a0c94a9f8c0155a88134188fd5437935"},
+    "checks": "every shard: all y finite, no constant table, 1024 rows, padding columns zero; the first tables of the four shards differ",
+    "arm_A0_as_generated": "seed 2026, all 14000 tables: max z beyond 4.05 in 3.16% (5: 1.44%, 10: 0.31%, largest 22.6), as often on the lower side (431 tables); sd shift of the whole table median 1.0052, 99.9% 1.132, largest 1.413; sd shift of the context 4 or more in 2 tables, 20 or more in none, largest 10.1"
+  },
+  "arms": {}
+}

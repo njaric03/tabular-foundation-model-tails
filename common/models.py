@@ -28,8 +28,12 @@ TABPFN_PATHS = {
     "TabPFN-v2.6": "tabpfn-v2.6-regressor-v2.6_default.ckpt",
 }
 
+# Small models pre-trained here, one per arm of prior (A) and target encoding (B) and
+# pre-training seed; see common/adapters/nanotabpfn.py.
+NANOTABPFN = [f"nanoTabPFN-A{a}B{b}-s{s}" for a in (0, 1) for b in (0, 1) for s in (1, 2, 3)]
+
 SUPPORTED = ["GBM", "XGB", "CB", "TabICLv2", "TabPFN-V3", "TabPFN-v2.5",
-             "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM"]
+             "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM"] + NANOTABPFN
 
 # CATEGORICAL=native passes the columns `datasets.prepare` coded from categories to
 # TabPFN as `categorical_features_indices`; the script sets CATEGORICAL_INDICES from
@@ -95,6 +99,10 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
             raise ValueError(f"TabDPT quantiles are read from one member; n_est={n_est}")
         from common.adapters import tabdpt
         return tabdpt.quantiles(Xtr, ytr, Xte, seed, levels)
+
+    if name in NANOTABPFN:
+        from common.adapters import nanotabpfn
+        return nanotabpfn.quantiles(name, Xtr, ytr, Xte, seed, levels, n_est)
 
     if name == "TabICLv2":
         m = tabicl_regressor(seed, n_est)
