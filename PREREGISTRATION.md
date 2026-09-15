@@ -1254,3 +1254,79 @@ code by a median 0.4% and at most 1.6%, the splice fix of 3cb55cc.
 Nothing is remeasured. A difference between arms under one point at 0.99 is not read as
 an effect, and 0.999 is not read per cell. Runs from here on set OMP_NUM_THREADS=6.
 ```
+
+## `experiments/h3_repair/prior_pretraining_eval.py`, 15.9.2026
+
+```
+Is the upper-tail failure in the pre-training prior or in the architecture? A nanoTabPFN
+of TFM-Playground's architecture, pre-trained on a GPU machine under a 2 x 2 of prior (A0
+TabICL's SCM prior, A1 with heavy tails and contaminated contexts) and target encoding
+(B0 mean and sd, B1 median and IQR / 1.349). The predictions were committed in 66aebe1,
+before any model existed.
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+Q1, the gate. Under A0B0, a shift of 20 or more lowers the median predicted Q(0.99) against
+the clean context of the same seed in at least 8 of 10 generator seeds per pre-training
+seed, at both xi, and moves the implied xi at a shift of 50 down by at least 0.2 or below
+zero. If A0B0 does not reproduce the failure, the small model is not a valid proxy: that is
+the result, and Q2 to Q5 are not interpreted.
+
+Q2. A1B0 loses less of Q(0.99) at shifts 20 and 50 than A0B0, by at least half of A0B0's
+loss, paired over cells; its pinball at 0.99 on a clean context is at most 5% worse than
+A0B0's.
+
+Q3. A1B0 captures a larger share of the conditional tail shape than A0B0 in
+`shape_of_x.py` with the same seeds.
+
+Q4. A0B1 keeps the borders over the data within 10% of its clean-context count at every
+shift, where A0B0 loses more than half at a shift of 50; A1B1 has the lowest pinball at
+0.99 under shifts 20 and 50 of the four arms.
+
+Q5. No arm reaches the shape share of the GBM control in `shape_of_x.py`.
+
+OUTCOME, 15.9.2026: THE GATE FAILS ON BOTH PRE-TRAINING SEEDS
+-------------------------------------------------------------
+Only arm A0B0 was evaluated, on pre-training seeds 1 and 2 (7000 steps of 8 tables each,
+1000 buckets), 10 generator seeds, xi 0.7 and 0.9, 768 context rows. The rows are in
+`results/h3_repair/prior_pretraining_eval.csv`. Seed 1 was read on the CPU at
+OMP_NUM_THREADS=4 and seed 2 on the GPU; the effects below are factors of 12 and more,
+where the thread count moved TabPFN's pinball at 0.99 by at most 4%.
+
+Q1  FAILED. A shift of 20 or 50 lowers the median predicted Q(0.99) against the clean
+    context in 0 of 10 generator seeds, for both pre-training seeds and both xi. It raises
+    it instead, 12 to 16 times at a shift of 20 and 34 to 47 times at 50. The implied xi
+    at a shift of 50 rises, from +0.76 to +1.56 on the clean context to +2.22 to +2.26,
+    and falls by 0.2 or below zero in 0 of 10 seeds. The grid does stretch as in TabPFN:
+    the borders over the data fall from 654 on a clean context to 170 at a shift of 50
+    (xi 0.7; 612 to 200 at xi 0.9), the same for both seeds, since the edges and the
+    encoding are the same. The small model reads the stretched grid as a heavier tail
+    where TabPFN reads it as a lighter one. By the rule above it is not a valid proxy for
+    this failure, and Q2 to Q5 are not interpreted.
+
+    It is no proxy for part one either. In `shape_of_x.py` and `scale_of_x.py` at 768
+    training rows, 20 seeds, one member, A0B0 reproduces -0.002 and -0.010 of the true
+    shape slope and -0.002 and -0.001 of the true change in the conditional median: it
+    ignores x. The GBM control at the same size keeps 0.31 of the shape and 0.85 of the
+    scale. After 56000 tables the small model has learned a marginal distribution, not a
+    conditional one.
+
+Q2, Q3, Q4, Q5  NOT TESTED, because the gate failed. A1B0-s1 was stopped at step 250 of
+    7000. A0B1-s1 had diverged before the gate was read (median loss 1.49 at step 3000,
+    12.47 at 7000, only the decoder grown) with the encoded target capped at 1e4, so B1
+    would have needed another fix before any comparison.
+
+What this does not say: that the failure lies in the architecture rather than the prior.
+A model this weak cannot separate the two. What it says: the direction of the grid effect
+depends on what the network has learned to put into the stretched bars, so the question
+needs a model that at least tracks the conditional scale, which this budget on an RTX 2060
+did not reach.
+
+    medians over xi 0.7 and 0.9 and 10 generator seeds
+    arm       Q(0.99) at shift >= 20  implied xi at 50  clean pinball 0.99  shape share
+    A0B0-s1   +3163%                  2.255             3.615               -0.002
+    A0B0-s2   +3421%                  2.225             4.444               -0.010
+    A0B1-s1   diverged                -                 -                   -
+    A1B0-s1   stopped at step 250     -                 -                   -
+    A1B1      not trained             -                 -                   -
+```

@@ -89,8 +89,38 @@
       "edges": [-13.1, 21.8],
       "target_clip": "none: trained before the cap. Of its 56000 tables, 3 exceed 100 encoded units and 1 exceeds 10000 (48170.8), so the cap would have changed one table. Kept by decision of 2026-09-15; the adapter reads it with the cap"
     },
+    "gate": {
+      "nanoTabPFN-A0B0-s1": "Q1 fails: results/h3_repair/prior_pretraining_eval.csv, 80 cells on CPU, 2026-09-15 18:31 to 18:34. Q(0.99) lower than on the clean context in 0 of 10 seeds at sd shifts 20 and 50 and both xi, rising 13 to 40 times; implied xi at a shift of 50 up by 1.35 (xi 0.7) and 0.69 (xi 0.9); borders over the data 654 to 170 (xi 0.7)",
+      "decision": "2026-09-15: confirm on pre-training seed 2 of A0B0 before writing the outcome; no other arm is trained or interpreted",
+      "nanoTabPFN-A0B0-s2": "Q1 fails the same way, 80 cells on the GPU, 2026-09-15 21:57: lower Q(0.99) in 0 of 10 seeds at shifts 20 and 50 and both xi, rising 12 to 47 times; implied xi at 50 up by 1.47 (xi 0.7) and 0.92 (xi 0.9); borders over the data identical to seed 1",
+      "part_one": "shape_of_x and scale_of_x at 768 rows, 20 seeds, one member: shape share -0.002 (s1) and -0.010 (s2), scale share -0.002 and -0.001; GBM at 768 rows 0.314 and 0.845",
+      "conclusion": "the gate fails on both pre-training seeds; Q2 to Q5 not tested; outcome in experiments/h3_repair/prior_pretraining_eval.py and PREREGISTRATION.md"
+    },
+    "nanoTabPFN-A0B0-s2": {
+      "checkpoint": ".cache/tfmp/checkpoints/nanoTabPFN-A0B0-s2.pth",
+      "bytes": 17965470,
+      "sha256": "2a8ad0ad4a8b10bed7aa14923450e3b4738211b756036cbf96cfff110fcdc0cd",
+      "ran": "2026-09-15 18:50 to 21:55, same flags as run/prior_pretraining.sh, with target_clip 10000 (A0B0-s1 had none; one table of 56000 differs)",
+      "seconds": 11097,
+      "tables_per_s": 5.046,
+      "peak_mb": 2477,
+      "last_logged_loss": 1.13652,
+      "edges": [-13.1, 21.8]
+    },
+    "stopped": {
+      "nanoTabPFN-A1B0-s1": "stopped 2026-09-15 18:47 at step 250 of 7000 after the gate failed; resumable from .cache/tfmp/work/nanoTabPFN-A1B0-s1.pth"
+    },
     "failed": {
-      "nanoTabPFN-A0B1-s1 without target_clip": "2026-09-15 14:45 to 14:52, stopped at step 150 of 7000: edges [-6.25e6, 2.21e9], loss NaN at steps 50 and 150. Log in .cache/tfmp/failed/"
+      "nanoTabPFN-A0B1-s1 without target_clip": "2026-09-15 14:45 to 14:52, stopped at step 150 of 7000: edges [-6.25e6, 2.21e9], loss NaN at steps 50 and 150. Log in .cache/tfmp/failed/",
+      "nanoTabPFN-A0B1-s1 with target_clip 1e4": {
+        "ran": "2026-09-15 15:21 to 18:29, 7000 steps, 11288 s",
+        "sha256": "514d9ec3d13dd4bb7ee8fc2a1395ecf8b705cfb6f0deed67c3489d8a58e6f561",
+        "edges": [-10000.0, 10000.0],
+        "loss": "median per 500 steps 1.63, 1.57, 1.51, 1.49, 1.49, 1.52 up to step 3000, then 2.53, 3.73, 5.34, 6.76, 8.36, 10.07, 11.07, 12.47: diverged, no NaN",
+        "weights": "parameter norm against A0B0-s1: every encoder and block within 1%, the decoder 1.33 times larger",
+        "on the generator": "xi 0.7, seed 7000, 768 rows: median Q(0.99) 3.44 against a true 34.5, the same at sd shifts 20 and 50",
+        "files": ".cache/tfmp/failed/diverged-clip1e4_*"
+      }
     }
   }
 }
