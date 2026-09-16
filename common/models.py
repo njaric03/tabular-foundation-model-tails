@@ -29,8 +29,11 @@ TABPFN_PATHS = {
 }
 
 # Small models pre-trained here, one per arm of prior (A) and target encoding (B) and
-# pre-training seed; see common/adapters/nanotabpfn.py.
-NANOTABPFN = [f"nanoTabPFN-A{a}B{b}-s{s}" for a in (0, 1) for b in (0, 1) for s in (1, 2, 3)]
+# pre-training seed; see common/adapters/nanotabpfn.py. Seeds 1 to 3 are the first
+# setting, 1024-row tables; 11 and 12 the second, 256-row tables, whose contexts are
+# shorter and whose checkpoints must not overwrite the first.
+NANOTABPFN = [f"nanoTabPFN-A{a}B{b}-s{s}" for a in (0, 1) for b in (0, 1)
+              for s in (1, 2, 3, 11, 12)]
 
 SUPPORTED = ["GBM", "XGB", "CB", "TabICLv2", "TabPFN-V3", "TabPFN-v2.5",
              "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM"] + NANOTABPFN

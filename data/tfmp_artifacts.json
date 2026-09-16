@@ -48,6 +48,38 @@
     },
     "equivalence": "on CPU float32, checkpointing changes outputs and gradients by 0; need_weights=False by at most 4.2e-07 in outputs and 3.7e-09 in gradients"
   },
+  "second_setting": {
+    "why": "the first setting failed its own gate and the model ignores x. On 200 held-out prior tables, A0B0-s1 beats a head told only the context marginal by 0.20 nats in 156 of 200 tables, but the R2 of its predicted median is -0.006 and positive in 6 of 200: after 56000 tables of 1024 rows it predicts nearly a constant. Rows cost quadratically in the attention between datapoints, so the second setting buys tables with rows",
+    "tables": "256 rows, 2 to 16 features, context 128 to 224",
+    "generation": "16.7 tables/s in one process against 4.5 at 1024 rows; 4 shards of 60000, seeds 5026 to 5029",
+    "training_throughput": "batch 16: 17.5 tables/s at 1278 MB; batch 32: 29.9 at 2479 MB; batch 48: 7.5 at 3635 MB, which spills. Batch 32 chosen",
+    "budget": "10000 steps of 32 tables, 320000 tables, about 3 hours per run at 30 tables/s",
+    "seeds": "11 and 12, so the checkpoints of the 1024-row setting (seeds 1 and 2) stay as they are and the results say which setting a row came from",
+    "dumps": {
+      ".cache/tfmp/dumps/small_s5026_60000.h5": {"tables": 60000, "skipped": 126, "seconds": 3389, "mb": 576, "sha256": "04cad33e257f9802081b27a802c7f5cca4b58bb5491e86b76b9b064b98c0e641"},
+      ".cache/tfmp/dumps/small_s5027_60000.h5": {"tables": 60000, "skipped": 87, "mb": 576, "sha256": "04c97ddb94fb9b6587b93112c9ada9c28912f3f964d109ff5a5b7819d25e6a43"},
+      ".cache/tfmp/dumps/small_s5028_60000.h5": {"tables": 60000, "mb": 572, "sha256": "a6c5866935399db94804a003724fd6f36512426a2dfb5121cf023de01bca746c"},
+      ".cache/tfmp/dumps/small_s5029_60000.h5": {"tables": 60000, "skipped": 111, "mb": 575, "sha256": "c98294d18baeb7ba6ec949f3b32e25820da268440b06879d92a760ae8d8ce32d"},
+      "checks": "all four: y finite, no constant table, 256 rows, 1 to 16 features, context 128 to 223, largest z 11.5; the first tables of the four differ",
+      "held_out": ".cache/tfmp/dumps/heldout_1024_200.h5, 200 tables at 1024 rows, seed 3026, for the diagnostic above"
+    },
+    "evaluation": "N_TRAIN=200, inside the 128 to 224 rows of pre-training",
+    "decided": "2026-09-16 01:20, on a 10 hour budget: A0B0 first, then the gate; the other arms only if the gate reproduces the failure",
+    "nanoTabPFN-A0B0-s11": {
+      "sha256": "8bf87b012501a65de89b2c8b7a3470182ca0cf44ed02051861ac3151362e829e",
+      "ran": "2026-09-16 02:11 to 04:57, 10000 steps of 32 tables, 320000 tables, 32.3 tables/s, peak 2536 MB",
+      "loss": "median per 1000 steps 1.377, 1.259, 1.203, 1.156, 1.152, 1.128, 1.113, 1.122, 1.104, 1.095; no NaN, single spikes to 52",
+      "held_out": "R2 of the predicted median -0.012, above 0 in 11 of 200; NLL 0.128 nats better than a head told only the context marginal",
+      "in_sample": "on 200 tables it trained on: R2 -0.014, above 0 in 14 of 200. Not a generalisation gap",
+      "gate": "Q1 fails again: Q(0.99) lower in 0 of 10 seeds at shifts 20 and 50 and both xi, rising 13 to 34 times; implied xi at 50 up by 1.08 to 1.38; borders over the data 674 to 101",
+      "part_one": "shape share and scale share at 200 rows, 20 seeds: about 0.00"
+    },
+    "why_the_models_do_not_learn": {
+      "measured": "on a plain linear task (y = 2 x0 - x1 + noise, 200 context rows, 5 seeds) read through the same adapter: the released nanoTabPFN regressor gets R2 +0.62, A0B0-s1 -0.010, A0B0-s11 -0.017",
+      "reading": "the adapter is not the problem; the two runs here never learned to predict a conditional median, in sample as well as out",
+      "hypothesis": "optimiser steps, not tables. TFM-Playground's pretrain_regression.py defaults to 100 steps x 10000 epochs at batch 1, a million updates on 50-row tables; these runs made 7000 and 10000 updates. The next test follows their recipe: 50-row, 3-feature tables, small batch, many steps"
+    }
+  },
   "budget": {
     "decided": "2026-09-15, after the pilot: about 3 GPU hours per run, 1000 buckets, 2 pre-training seeds",
     "steps": 7000,
