@@ -16,8 +16,8 @@ experiment makes is versioned. What differs from the original:
     first `--edge_tables` tables, the values the loss is evaluated on, with pfns'
     `get_bucket_limits`. TFM-Playground's `make_global_bucket_edges` standardises all rows
     of a table by statistics of all rows, which the loss never uses;
-  - fp16 autocast with a gradient scaler, because the RTX 2060 has no bf16; the loss is
-    computed in float32;
+  - fp16 autocast with a gradient scaler by default, because the RTX 2060 has no bf16;
+    `--amp bf16` on a card that has it drops the scaler. The loss is computed in float32;
   - the encoded target is capped at +-`--target_clip` (1e4) in the context, the loss and
     the edges. Without it the first B1 run met encoded values of 2e9 on contexts whose
     robust scale is a millionth of the sd, and its loss was NaN from step 50;
@@ -47,6 +47,9 @@ def parse():
     p.add_argument("--batch_size", type=int, default=1, help="tables per micro-batch")
     p.add_argument("--accumulate", type=int, default=8, help="micro-batches per step")
     p.add_argument("--lr", type=float, default=1e-4)
+    p.add_argument("--warmup", type=int, default=0,
+                   help="steps over which the learning rate is warmed up; at 3e-4 without "
+                        "it, half of the runs blew up in the first thousand steps")
     p.add_argument("--heads", type=int, default=6)
     p.add_argument("--embedding", type=int, default=192)
     p.add_argument("--hidden", type=int, default=768)
@@ -60,9 +63,13 @@ def parse():
     p.add_argument("--w_sd", type=float, default=2.0)
     p.add_argument("--shift_lo", type=float, default=4.0)
     p.add_argument("--shift_hi", type=float, default=50.0)
+    p.add_argument("--preload", type=float, default=4.0,
+                   help="read dumps into memory when they fit in this many GB; 0 to stream")
     p.add_argument("--target_clip", type=float, default=1e4,
                    help="cap on the encoded target in the context, the loss and the edges")
-    p.add_argument("--amp", type=int, default=1, help="fp16 autocast, 1 or 0")
+    p.add_argument("--amp", default="fp16",
+                   help="fp16 (with a gradient scaler), bf16 (without one), or none; "
+                        "1 and 0 are read as fp16 and none, as the earlier runs wrote them")
     p.add_argument("--sdpa", type=int, default=1,
                    help="call attention with need_weights=False, 1 or 0")
     p.add_argument("--grad_ckpt", type=int, default=1,
@@ -80,6 +87,7 @@ class Tables:
 
     def __init__(self, paths, args):
         import h5py
+        import numpy as np
         self.files = [h5py.File(p, "r") for p in paths.split(",")]
         self.offsets, n = [], 0
         for f in self.files:
@@ -88,6 +96,20 @@ class Tables:
         self.n = n
         self.max_features = max(f["X"].shape[2] for f in self.files)
         self.max_split = max(int(f["train_test_split_index"][:].max()) for f in self.files)
+        # Reading a table out of HDF5 costs more than the step it feeds: at 50 rows the GPU
+        # held 98 MB and ran at 37 tables per second, the same rate as at 256 rows. Dumps
+        # that fit in memory are read once.
+        self.mem = None
+        size = sum(f["X"].size * 4 + f["y"].size * 4 for f in self.files)
+        if args.preload and size <= args.preload * 2 ** 30:
+            t0 = time.time()
+            self.mem = dict(
+                X=np.concatenate([f["X"][:] for f in self.files]),
+                y=np.concatenate([f["y"][:] for f in self.files]),
+                num_features=np.concatenate([f["num_features"][:] for f in self.files]),
+                split=np.concatenate([f["train_test_split_index"][:] for f in self.files]))
+            print(f"preloaded {n} tables, {size / 2 ** 30:.2f} GB, in "
+                  f"{time.time() - t0:.0f}s", flush=True)
         self.args = args
         self.a1 = args.arm.startswith("A1")
         self.encoding = "meansd" if args.arm.endswith("B0") else "robust"
@@ -102,11 +124,17 @@ class Tables:
     def raw(self, t):
         import numpy as np
         t %= self.n
-        f, i = self.locate(t)
-        k = int(f["num_features"][i])
-        split = int(f["train_test_split_index"][i])
-        X = f["X"][i, :, :k].astype(np.float32)
-        y = f["y"][i].astype(np.float64)
+        if self.mem is not None:
+            k = int(self.mem["num_features"][t])
+            split = int(self.mem["split"][t])
+            X = self.mem["X"][t, :, :k]
+            y = self.mem["y"][t].astype(np.float64)
+        else:
+            f, i = self.locate(t)
+            k = int(f["num_features"][i])
+            split = int(f["train_test_split_index"][i])
+            X = f["X"][i, :, :k].astype(np.float32)
+            y = f["y"][i].astype(np.float64)
         info = {}
         if self.a1:
             a = self.args
@@ -194,8 +222,19 @@ def main():
                             num_outputs=args.n_buckets).to(dev)
     fit_in_memory(model, bool(args.sdpa), bool(args.grad_ckpt))
     optimizer = schedulefree.AdamWScheduleFree(model.parameters(), lr=args.lr,
-                                               weight_decay=0.0)
-    scaler = torch.amp.GradScaler("cuda", enabled=bool(args.amp) and dev == "cuda")
+                                               weight_decay=0.0,
+                                               warmup_steps=args.warmup)
+    amp = {"1": "fp16", "0": "none"}.get(str(args.amp), str(args.amp))
+    if amp not in ("fp16", "bf16", "none"):
+        raise SystemExit(f"--amp {args.amp!r}: expected fp16, bf16 or none")
+    # Without including_emulation=False torch reports bf16 on a Turing card (RTX 2060,
+    # T4) and the run silently trains in emulated bf16.
+    if amp == "bf16" and dev == "cuda" and \
+            not torch.cuda.is_bf16_supported(including_emulation=False):
+        raise SystemExit(f"--amp bf16 on {torch.cuda.get_device_name(0)}, which has no bf16")
+    amp_dtype = torch.bfloat16 if amp == "bf16" else torch.float16
+    use_autocast = amp != "none" and dev == "cuda"
+    scaler = torch.amp.GradScaler("cuda", enabled=amp == "fp16" and dev == "cuda")
 
     step, pointer, seconds = 0, 0, 0.0
     if work.exists():
@@ -266,7 +305,7 @@ def main():
             if not (torch.isfinite(x).all() and torch.isfinite(y).all()):
                 skipped += 1
                 continue
-            with torch.autocast("cuda", dtype=torch.float16, enabled=scaler.is_enabled()):
+            with torch.autocast("cuda", dtype=amp_dtype, enabled=use_autocast):
                 out = model((x, y[:, :split]), train_test_split_index=split)
             loss = dist(out.float(), y[:, split:]).mean() / args.accumulate
             scaler.scale(loss).backward()
