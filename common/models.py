@@ -35,10 +35,15 @@ TABPFN_PATHS = {
 # 61 to 71 later local attempts; 81 and 82 the runs on a Colab GPU in bf16.
 # The seed says which setting a checkpoint and a result row belong to.
 NANOTABPFN = [f"nanoTabPFN-A{a}B{b}-s{s}" for a in (0, 1) for b in (0, 1)
-              for s in (1, 2, 3, 11, 12, 41, 42, 61, 62, 63, 71, 81, 82)]
+              for s in (1, 2, 3, 11, 12, 41, 42, 61, 62, 63, 71, 72, 81, 82, 91, 92)]
+
+# TabICLv2 after continued pre-training on the prior arms of
+# experiments/h3_repair/tabicl_prior_finetune.py, read from local checkpoints.
+TABICL_FT = [f"TabICLv2-FT-A{a}-s{s}" for a in (0, 1) for s in (1, 2)]
+TABICL_FT_DIR = ".cache/tfmp/tabicl_ft"
 
 SUPPORTED = ["GBM", "XGB", "CB", "TabICLv2", "TabPFN-V3", "TabPFN-v2.5",
-             "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM"] + NANOTABPFN
+             "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM"] + NANOTABPFN + TABICL_FT
 
 # CATEGORICAL=native passes the columns `datasets.prepare` coded from categories to
 # TabPFN as `categorical_features_indices`; the script sets CATEGORICAL_INDICES from
@@ -71,10 +76,18 @@ def tabpfn_regressor(name: str, seed: int, n_est: int):
     return TabPFNRegressor(**kw)
 
 
-def tabicl_regressor(seed: int, n_est: int):
-    """An unfitted TabICLRegressor, seeded."""
+def tabicl_regressor(seed: int, n_est: int, name: str = "TabICLv2"):
+    """An unfitted TabICLRegressor, seeded; a fine-tuned arm loads its local checkpoint
+    and never downloads another in its place."""
     from tabicl import TabICLRegressor
-    return TabICLRegressor(n_estimators=n_est, device="cpu", random_state=seed)
+    kw = dict(n_estimators=n_est, device="cpu", random_state=seed)
+    if name in TABICL_FT:
+        from common import paths
+        path = paths.ROOT / TABICL_FT_DIR / f"{name}.ckpt"
+        if not path.exists():
+            raise FileNotFoundError(f"{path} is missing; fine-tune the arm first")
+        kw.update(model_path=str(path), allow_auto_download=False)
+    return TabICLRegressor(**kw)
 
 
 def tabpfn_quantiles(m, X, levels) -> np.ndarray:
@@ -109,8 +122,8 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
         from common.adapters import nanotabpfn
         return nanotabpfn.quantiles(name, Xtr, ytr, Xte, seed, levels, n_est)
 
-    if name == "TabICLv2":
-        m = tabicl_regressor(seed, n_est)
+    if name == "TabICLv2" or name in TABICL_FT:
+        m = tabicl_regressor(seed, n_est, name)
         m.fit(Xtr, ytr)
         return np.asarray(m.predict(Xte, output_type="quantiles", alphas=levels),
                           dtype=float)
@@ -209,8 +222,8 @@ def predictive_mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.n
     Xtr, Xte = np.asarray(Xtr, float), np.asarray(Xte, float)
     ytr = np.asarray(ytr, float)
 
-    if name == "TabICLv2":
-        m = tabicl_regressor(seed, n_est)
+    if name == "TabICLv2" or name in TABICL_FT:
+        m = tabicl_regressor(seed, n_est, name)
     elif name.startswith("TabPFN"):
         m = tabpfn_regressor(name, seed, n_est)
     else:

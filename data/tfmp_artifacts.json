@@ -7,9 +7,21 @@
     "python": "3.12.10"
   },
   "code": {
-    "TFM-Playground": {"url": "https://github.com/automl/TFM-Playground", "commit": "7b37681364101ab7167742856de9ed8b4d243b90", "install": "pip install -e --no-deps"},
-    "ticl": {"url": "https://github.com/microsoft/ticl", "commit": "3c36d9c1785844d5e983b0baf0ef4116670aa809", "why": "imported at the top of tfmplayground.external_priors"},
-    "tabpfn-v1-prior": {"url": "https://github.com/automl/tabpfn-v1-prior", "commit": "778f0d0eb10f35ca85964fbc27ecb8baee9146a4", "why": "imported at the top of tfmplayground.external_priors"}
+    "TFM-Playground": {
+      "url": "https://github.com/automl/TFM-Playground",
+      "commit": "7b37681364101ab7167742856de9ed8b4d243b90",
+      "install": "pip install -e --no-deps"
+    },
+    "ticl": {
+      "url": "https://github.com/microsoft/ticl",
+      "commit": "3c36d9c1785844d5e983b0baf0ef4116670aa809",
+      "why": "imported at the top of tfmplayground.external_priors"
+    },
+    "tabpfn-v1-prior": {
+      "url": "https://github.com/automl/tabpfn-v1-prior",
+      "commit": "778f0d0eb10f35ca85964fbc27ecb8baee9146a4",
+      "why": "imported at the top of tfmplayground.external_priors"
+    }
   },
   "packages": {
     "torch": "2.9.1+cu126",
@@ -48,6 +60,23 @@
     },
     "equivalence": "on CPU float32, checkpointing changes outputs and gradients by 0; need_weights=False by at most 4.2e-07 in outputs and 3.7e-09 in gradients"
   },
+  "tabicl_finetune_probe": {
+    "when": "2026-09-16 17:00, RTX 2060, fp16 autocast, pinball loss over 999 quantiles as in tabicl/train/_run.py, synthetic linear tables, while a nanoTabPFN run held about 1 GB of the same GPU",
+    "checkpoint": "jingang/TabICL tabicl-regressor-v2-20260212.ckpt, 109 MB, the default regressor of tabicl 2.2.0",
+    "parameters": "col_embedder 0.87 M, row_interactor 0.40 M, icl_predictor 27.27 M, total 28.54 M: freezing the column and row stages saves activations, not parameters",
+    "measured": {
+      "1024 rows, batch 1, 32 features, col and row frozen": "peak 674 MB, 0.24 s per step",
+      "1024 rows, batch 4, 32 features, col and row frozen": "peak 1490 MB, 0.59 s per step",
+      "1024 rows, batch 1, 32 features, full": "peak 1668 MB, 0.35 s per step",
+      "2048 rows, batch 1, 32 features, col and row frozen": "peak 950 MB, 0.37 s per step",
+      "512 rows, batch 4, 16 features, full": "peak 2167 MB, 0.43 s per step"
+    },
+    "reading": "continued pre-training of TabICLv2 at the table sizes the thesis measures fits on the local GPU with room to spare, at roughly 7 tables per second. No rented GPU is needed for the fine-tuning route",
+    "correction": "the probe measured batch 4 only with the column and row stages frozen. The full model at batch 4 filled the card (5774 of 6144 MiB with another run on it) and stalled; the fine-tuning script therefore freezes those stages by default (1.27 M of 28.5 M parameters)",
+    "base_sha256": "0db9cb538f114e79026bf08f45f41ad8dd7ad2de2aaca9a5ca8cd3bd9748ae7a",
+    "smoke": "2026-09-16 17:11: two steps of 4 tables from base_s2026, arm A1, frozen col and row: 1479 MB, 6.4 tables/s; the checkpoint loads through TabICLRegressor(model_path=...), its quantiles are monotone, and its median still follows the signal (correlation 0.78)",
+    "runs": "run/tabicl_prior_finetune.sh: FT-A0 and FT-A1 on seeds 1 and 2, 20000 tables each from base_s2026 and base_s2027, lr 1e-5, weight decay 0.01, 10% warmup then cosine, clip 1.0, fp16"
+  },
   "third_setting": {
     "finding": "the learning rate was the whole problem. At 50 rows and batch 16, 10000 steps at TFM-Playground's default lr 1e-4 give R2 -0.046 on a plain linear task with 35 context rows; the same run at 3e-4 gives +0.821, against +0.463 for their released regressor. Both took 11 minutes. The two earlier settings, which learned nothing, used 1e-4",
     "tables": "50 rows, 1 to 3 features, context 20 to 39, the size the released regressor was trained at",
@@ -67,7 +96,7 @@
       "colab": "the Colab plan on this account offers CPU, T4 and a TPU; H100, A100, L4 and G4 need Colab Pro+. A T4 is Turing like the RTX 2060, without real bf16",
       "seed_72_fp32": "to separate fp16 from the recipe: 256-row tables, fp32 (--amp none), checkpointing, batch 8, lr 3e-4, no warmup, 1000 buckets, 2026-09-16 13:51 to 15:23, 11582 steps, 92656 tables, 17.2 tables/s at 1074 MB. The loss stayed at 1.40 to 1.49 from step 200 to the end, with one spike to 111 at step 5000; linear-task R2 -0.010, held-out prior R2 -0.007 and positive in 0 of 200, NLL gain over the context marginal 0.049 nats. DID NOT LEARN. fp16 is not the cause: at 256 rows the loss never leaves the level of the marginal, where at 50 rows and 3 features the same learning rate took it from 1.59 to 1.22 in 10000 steps"
     },
-    "second_try_seeds_61_62":"8-feature dumps (tiny8_s70*), 8000 steps, lr 3e-4, warmup 1000, two streams in parallel at 150 tables/s each, started 2026-09-16 08:24. Arms run A0B0 and A1B0 first, so the prior factor is answered even if B1 breaks again"
+    "second_try_seeds_61_62": "8-feature dumps (tiny8_s70*), 8000 steps, lr 3e-4, warmup 1000, two streams in parallel at 150 tables/s each, started 2026-09-16 08:24. Arms run A0B0 and A1B0 first, so the prior factor is answered even if B1 breaks again"
   },
   "second_setting": {
     "why": "the first setting failed its own gate and the model ignores x. On 200 held-out prior tables, A0B0-s1 beats a head told only the context marginal by 0.20 nats in 156 of 200 tables, but the R2 of its predicted median is -0.006 and positive in 6 of 200: after 56000 tables of 1024 rows it predicts nearly a constant. Rows cost quadratically in the attention between datapoints, so the second setting buys tables with rows",
@@ -77,10 +106,30 @@
     "budget": "10000 steps of 32 tables, 320000 tables, about 3 hours per run at 30 tables/s",
     "seeds": "11 and 12, so the checkpoints of the 1024-row setting (seeds 1 and 2) stay as they are and the results say which setting a row came from",
     "dumps": {
-      ".cache/tfmp/dumps/small_s5026_60000.h5": {"tables": 60000, "skipped": 126, "seconds": 3389, "mb": 576, "sha256": "04cad33e257f9802081b27a802c7f5cca4b58bb5491e86b76b9b064b98c0e641"},
-      ".cache/tfmp/dumps/small_s5027_60000.h5": {"tables": 60000, "skipped": 87, "mb": 576, "sha256": "04c97ddb94fb9b6587b93112c9ada9c28912f3f964d109ff5a5b7819d25e6a43"},
-      ".cache/tfmp/dumps/small_s5028_60000.h5": {"tables": 60000, "mb": 572, "sha256": "a6c5866935399db94804a003724fd6f36512426a2dfb5121cf023de01bca746c"},
-      ".cache/tfmp/dumps/small_s5029_60000.h5": {"tables": 60000, "skipped": 111, "mb": 575, "sha256": "c98294d18baeb7ba6ec949f3b32e25820da268440b06879d92a760ae8d8ce32d"},
+      ".cache/tfmp/dumps/small_s5026_60000.h5": {
+        "tables": 60000,
+        "skipped": 126,
+        "seconds": 3389,
+        "mb": 576,
+        "sha256": "04cad33e257f9802081b27a802c7f5cca4b58bb5491e86b76b9b064b98c0e641"
+      },
+      ".cache/tfmp/dumps/small_s5027_60000.h5": {
+        "tables": 60000,
+        "skipped": 87,
+        "mb": 576,
+        "sha256": "04c97ddb94fb9b6587b93112c9ada9c28912f3f964d109ff5a5b7819d25e6a43"
+      },
+      ".cache/tfmp/dumps/small_s5028_60000.h5": {
+        "tables": 60000,
+        "mb": 572,
+        "sha256": "a6c5866935399db94804a003724fd6f36512426a2dfb5121cf023de01bca746c"
+      },
+      ".cache/tfmp/dumps/small_s5029_60000.h5": {
+        "tables": 60000,
+        "skipped": 111,
+        "mb": 575,
+        "sha256": "c98294d18baeb7ba6ec949f3b32e25820da268440b06879d92a760ae8d8ce32d"
+      },
       "checks": "all four: y finite, no constant table, 256 rows, 1 to 16 features, context 128 to 223, largest z 11.5; the first tables of the four differ",
       "held_out": ".cache/tfmp/dumps/heldout_1024_200.h5, 200 tables at 1024 rows, seed 3026, for the diagnostic above"
     },
@@ -114,23 +163,66 @@
     "tables_per_run": 56000,
     "n_buckets": 1000,
     "edge_tables": 2000,
-    "pretrain_seeds": [1, 2],
-    "model": {"heads": 6, "embedding": 192, "hidden": 768, "layers": 6},
+    "pretrain_seeds": [
+      1,
+      2
+    ],
+    "model": {
+      "heads": 6,
+      "embedding": 192,
+      "hidden": 768,
+      "layers": 6
+    },
     "lr": 0.0001,
     "amp": "fp16",
     "sdpa": 1,
     "grad_ckpt": 1,
     "target_clip": 10000,
     "target_clip_why": "decided 2026-09-15 after the first A0B1 run: on shard 2026 the robust scale is below 0.01 sd in 2.68% of contexts, encoded targets reach 2.2e9, fp16 gives NaN. Share of contexts the cap touches (first 5000 tables): A0B0 0%, A0B1 0.70%, A1B0 0%, A1B1 2.60%; a cap at 100 would have touched 47.7% of A1B1 contexts and acted as a context repair",
-    "a1": {"p_tail": 0.5, "p_contam": 0.3, "xi_range": [0.0, 1.0], "w_sd": 2.0, "shift_range": [4.0, 50.0], "shift_draw": "log-uniform"},
+    "a1": {
+      "p_tail": 0.5,
+      "p_contam": 0.3,
+      "xi_range": [
+        0.0,
+        1.0
+      ],
+      "w_sd": 2.0,
+      "shift_range": [
+        4.0,
+        50.0
+      ],
+      "shift_draw": "log-uniform"
+    },
     "why_steps_not_hours": "every arm gets the same optimiser steps and the same tables in the same order; wall time is recorded per run"
   },
   "dumps": {
     "generation": "four processes in parallel, OMP_NUM_THREADS=1, prior_pretraining_dump.py defaults (mix_scm, 1024 rows, 2 to 32 features, context 512 to 896, gen_batch 16, batch_size_per_gp 4), seeds 2026 to 2029; training reads them in this order",
-    ".cache/tfmp/dumps/base_s2026_14000.h5": {"tables": 14000, "skipped": 24, "seconds": 3115, "mb": 936.3, "sha256": "9d1c75f1b642977666865eedb6b85870d25391352d4aa7307400da707cb100a6"},
-    ".cache/tfmp/dumps/base_s2027_14000.h5": {"tables": 14000, "skipped": 29, "mb": 932.8, "sha256": "30f9b7f58b057f036dc34addc4645ad07404be408196ba02c87abee1022f0ac5"},
-    ".cache/tfmp/dumps/base_s2028_14000.h5": {"tables": 14000, "skipped": 23, "seconds": 3189, "mb": 927.4, "sha256": "67f30dc20457fc6e1a693f85c5588dec4dfe6564182cb77d620c5d0a385ddf87"},
-    ".cache/tfmp/dumps/base_s2029_14000.h5": {"tables": 14000, "skipped": 21, "mb": 929.2, "sha256": "b7b408d816520895c57ea8a7d9594f02a0c94a9f8c0155a88134188fd5437935"},
+    ".cache/tfmp/dumps/base_s2026_14000.h5": {
+      "tables": 14000,
+      "skipped": 24,
+      "seconds": 3115,
+      "mb": 936.3,
+      "sha256": "9d1c75f1b642977666865eedb6b85870d25391352d4aa7307400da707cb100a6"
+    },
+    ".cache/tfmp/dumps/base_s2027_14000.h5": {
+      "tables": 14000,
+      "skipped": 29,
+      "mb": 932.8,
+      "sha256": "30f9b7f58b057f036dc34addc4645ad07404be408196ba02c87abee1022f0ac5"
+    },
+    ".cache/tfmp/dumps/base_s2028_14000.h5": {
+      "tables": 14000,
+      "skipped": 23,
+      "seconds": 3189,
+      "mb": 927.4,
+      "sha256": "67f30dc20457fc6e1a693f85c5588dec4dfe6564182cb77d620c5d0a385ddf87"
+    },
+    ".cache/tfmp/dumps/base_s2029_14000.h5": {
+      "tables": 14000,
+      "skipped": 21,
+      "mb": 929.2,
+      "sha256": "b7b408d816520895c57ea8a7d9594f02a0c94a9f8c0155a88134188fd5437935"
+    },
     "checks": "every shard: all y finite, no constant table, 1024 rows, padding columns zero; the first tables of the four shards differ",
     "arm_A0_as_generated": "seed 2026, all 14000 tables: max z beyond 4.05 in 3.16% (5: 1.44%, 10: 0.31%, largest 22.6), as often on the lower side (431 tables); sd shift of the whole table median 1.0052, 99.9% 1.132, largest 1.413; sd shift of the context 4 or more in 2 tables, 20 or more in none, largest 10.1"
   },
@@ -144,7 +236,10 @@
       "tables_per_s": 4.955,
       "peak_mb": 2477,
       "last_logged_loss": 1.13012,
-      "edges": [-13.1, 21.8],
+      "edges": [
+        -13.1,
+        21.8
+      ],
       "target_clip": "none: trained before the cap. Of its 56000 tables, 3 exceed 100 encoded units and 1 exceeds 10000 (48170.8), so the cap would have changed one table. Kept by decision of 2026-09-15; the adapter reads it with the cap"
     },
     "gate": {
@@ -163,7 +258,10 @@
       "tables_per_s": 5.046,
       "peak_mb": 2477,
       "last_logged_loss": 1.13652,
-      "edges": [-13.1, 21.8]
+      "edges": [
+        -13.1,
+        21.8
+      ]
     },
     "stopped": {
       "nanoTabPFN-A1B0-s1": "stopped 2026-09-15 18:47 at step 250 of 7000 after the gate failed; resumable from .cache/tfmp/work/nanoTabPFN-A1B0-s1.pth"
@@ -173,12 +271,23 @@
       "nanoTabPFN-A0B1-s1 with target_clip 1e4": {
         "ran": "2026-09-15 15:21 to 18:29, 7000 steps, 11288 s",
         "sha256": "514d9ec3d13dd4bb7ee8fc2a1395ecf8b705cfb6f0deed67c3489d8a58e6f561",
-        "edges": [-10000.0, 10000.0],
+        "edges": [
+          -10000.0,
+          10000.0
+        ],
         "loss": "median per 500 steps 1.63, 1.57, 1.51, 1.49, 1.49, 1.52 up to step 3000, then 2.53, 3.73, 5.34, 6.76, 8.36, 10.07, 11.07, 12.47: diverged, no NaN",
         "weights": "parameter norm against A0B0-s1: every encoder and block within 1%, the decoder 1.33 times larger",
         "on the generator": "xi 0.7, seed 7000, 768 rows: median Q(0.99) 3.44 against a true 34.5, the same at sd shifts 20 and 50",
         "files": ".cache/tfmp/failed/diverged-clip1e4_*"
       }
     }
+  },
+  "curriculum": {
+    "why": "every run from scratch at more than 3 features stayed at the loss of the context marginal; a model that had learned on 50 rows and 3 features was carried on instead",
+    "nanoTabPFN-A0B0-s91": "stage 1, 2026-09-16 16:53 to 17:15: from A0B0-s42 (R2 +0.848), 10000 steps of 16 tables from the 8-feature 50-row dumps at lr 3e-4, loss 1.35 to 1.26; linear-task R2 at 35 rows +0.911, the best of any local model and above the released regressor's +0.463",
+    "gate_s91": "Q1 fails. At N_TRAIN=35, 10 seeds, xi 0.7 and 0.9: Q(0.99) lower than on the clean context in 0 of 10 at every shift; its median ratio to the clean value is 4.19, 20.3 and 51.1 at shifts 4, 20 and 50 (xi 0.7), 4.05, 19.9 and 50.0 (xi 0.9), so the predicted quantile scales with the context sd almost exactly; implied xi +2.19 clean and +3.69 at a shift of 50; borders over the data 69 to 4.5. The prediction in encoded units hardly moves with the leverage row, so the raw quantile inflates with the sd, where TabPFN's collapses. On the clean GPD context the model is also far off (median Q(0.99) 1183 against a true 34.5): it never saw a heavy tail",
+    "stage_2": "nanoTabPFN-A0B0-s92 from s91 on the 256-row dumps small_s5026 and small_s5027, fp16 with checkpointing, batch 16, lr 3e-4, 100 buckets and s91's edges, 2026-09-16 17:18 to 18:33, stopped at 1.25 h after 3755 steps and 60000 tables at 13 tables/s; loss about 1.00 throughout, where every run from scratch at 256 rows stayed at 1.40. The work checkpoint was copied to checkpoints/nanoTabPFN-A0B0-s92.pth for the adapter",
+    "s92_learning": "linear-task R2 at 200 context rows +0.950 (5 seeds, 0.94 to 0.95); on 200 held-out prior tables R2 median -0.003 but positive in 85 of 200 (0 of 200 for the fp32 run from scratch), NLL gain over the context marginal 0.187 nats. LEARNED",
+    "gate_s92": "Q1 HOLDS for this pre-training seed, the first model of the experiment to reproduce the failure. At N_TRAIN=200, 10 seeds: Q(0.99) lower than on the clean context in 10 of 10 at a shift of 20 (both xi) and in 10 and 9 of 10 at 50, its median falling to 0.04 and 0.015 to 0.020 of the clean value; the implied xi at 50 falls by 2.48 (xi 0.7, from +2.41 to -0.105) and 2.50 (xi 0.9, to +0.109), down by 0.2 or more in 10 of 10 at both; borders over the data 65 to 9. At a shift of 4 Q(0.99) still rises (lower in 1 and 2 of 10). Caveat: on the clean context the model overstates the tail badly (median Q(0.99) 1471 against a true 35 at xi 0.7, implied xi +2.41), so part of the collapse moves towards the truth; the direction is the one TabPFN shows, the calibration is not"
   }
 }

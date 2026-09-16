@@ -63,6 +63,9 @@ def parse():
     p.add_argument("--w_sd", type=float, default=2.0)
     p.add_argument("--shift_lo", type=float, default=4.0)
     p.add_argument("--shift_hi", type=float, default=50.0)
+    p.add_argument("--init", default="",
+                   help="start from the weights and bucket edges of this checkpoint instead "
+                        "of from scratch: a curriculum from a model that already learned")
     p.add_argument("--preload", type=float, default=4.0,
                    help="read dumps into memory when they fit in this many GB; 0 to stream")
     p.add_argument("--target_clip", type=float, default=1e4,
@@ -79,76 +82,6 @@ def parse():
     p.add_argument("--max_hours", type=float, default=0.0,
                    help="stop cleanly after this wall time; 0 means no limit")
     return p.parse_args()
-
-
-class Tables:
-    """Tables of one or more dumps, in the order given, with arm A1 applied and the target
-    encoded. Table t is the t-th table of the concatenation, wrapping at the end."""
-
-    def __init__(self, paths, args):
-        import h5py
-        import numpy as np
-        self.files = [h5py.File(p, "r") for p in paths.split(",")]
-        self.offsets, n = [], 0
-        for f in self.files:
-            self.offsets.append(n)
-            n += f["y"].shape[0]
-        self.n = n
-        self.max_features = max(f["X"].shape[2] for f in self.files)
-        self.max_split = max(int(f["train_test_split_index"][:].max()) for f in self.files)
-        # Reading a table out of HDF5 costs more than the step it feeds: at 50 rows the GPU
-        # held 98 MB and ran at 37 tables per second, the same rate as at 256 rows. Dumps
-        # that fit in memory are read once.
-        self.mem = None
-        size = sum(f["X"].size * 4 + f["y"].size * 4 for f in self.files)
-        if args.preload and size <= args.preload * 2 ** 30:
-            t0 = time.time()
-            self.mem = dict(
-                X=np.concatenate([f["X"][:] for f in self.files]),
-                y=np.concatenate([f["y"][:] for f in self.files]),
-                num_features=np.concatenate([f["num_features"][:] for f in self.files]),
-                split=np.concatenate([f["train_test_split_index"][:] for f in self.files]))
-            print(f"preloaded {n} tables, {size / 2 ** 30:.2f} GB, in "
-                  f"{time.time() - t0:.0f}s", flush=True)
-        self.args = args
-        self.a1 = args.arm.startswith("A1")
-        self.encoding = "meansd" if args.arm.endswith("B0") else "robust"
-
-    def locate(self, t):
-        """(file, index within it) of table t of the concatenation."""
-        t %= self.n
-        for f, start in zip(reversed(self.files), reversed(self.offsets)):
-            if t >= start:
-                return f, t - start
-
-    def raw(self, t):
-        import numpy as np
-        t %= self.n
-        if self.mem is not None:
-            k = int(self.mem["num_features"][t])
-            split = int(self.mem["split"][t])
-            X = self.mem["X"][t, :, :k]
-            y = self.mem["y"][t].astype(np.float64)
-        else:
-            f, i = self.locate(t)
-            k = int(f["num_features"][i])
-            split = int(f["train_test_split_index"][i])
-            X = f["X"][i, :, :k].astype(np.float32)
-            y = f["y"][i].astype(np.float64)
-        info = {}
-        if self.a1:
-            a = self.args
-            rng = np.random.default_rng([a.seed, t])
-            y, info = apply_a1(X, y, k, split, rng, p_tail=a.p_tail, p_contam=a.p_contam,
-                               xi_lo=a.xi_lo, xi_hi=a.xi_hi, w_sd=a.w_sd,
-                               lo=a.shift_lo, hi=a.shift_hi)
-        return X, y, k, split, info
-
-    def encoded(self, t, split):
-        """(X, y encoded by the context statistics, k) with the context cut at `split`."""
-        X, y, k, own_split, info = self.raw(t)
-        centre, scale = encode_stats(y[:split], self.encoding)
-        return X, encode(y, centre, scale, self.args.target_clip), k, info
 
 
 def fit_in_memory(model, sdpa: bool, grad_ckpt: bool):
@@ -204,9 +137,7 @@ def main():
     from pfns.bar_distribution import FullSupportBarDistribution
     from tfmplayground.models.nanotabpfn import NanoTabPFNModel
 
-    global apply_a1, encode, encode_stats
-    from common.adapters.nanotabpfn import encode, encode_stats
-    from common.prior_arms import apply_a1
+    from common.prior_dumps import Tables
 
     name = f"nanoTabPFN-{args.arm}-s{args.seed}"
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -248,6 +179,18 @@ def main():
         edges = state["bucket_edges"]
         step, pointer, seconds = state["step"], state["pointer"], state["seconds"]
         print(f"resuming {name} at step {step}", flush=True)
+    elif args.init:
+        # A curriculum: the weights and the edges of a model that learned on smaller
+        # tables. Keeping its edges keeps the meaning of the decoder's outputs; the
+        # optimiser starts fresh.
+        init = torch.load(args.init, map_location="cpu", weights_only=False)
+        model.load_state_dict(init["model"])
+        edges = init["bucket_edges"]
+        if len(edges) - 1 != args.n_buckets:
+            raise SystemExit(f"--init has {len(edges) - 1} buckets, --n_buckets is "
+                             f"{args.n_buckets}")
+        print(f"initialised from {args.init}, step {init.get('step')}, edges "
+              f"[{edges[0]:.3g}, {edges[-1]:.3g}]", flush=True)
     else:
         t_edges = time.time()
         edges = bucket_edges(tables, args.edge_tables, args.n_buckets)

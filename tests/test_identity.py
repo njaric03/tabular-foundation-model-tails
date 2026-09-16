@@ -71,6 +71,18 @@ def test_tabdpt_quantiles_refuse_an_ensemble_they_would_not_measure():
         models.quantiles("TabDPT", X, np.ones(10), X, seed=0, levels=[0.5], n_est=4)
 
 
+def test_a_finetuned_tabicl_arm_is_a_model_name_and_refuses_a_missing_checkpoint():
+    """A fine-tuned arm must never fall back to downloading the base checkpoint."""
+    assert models.parse_list("TabICLv2-FT-A1-s1") == ["TabICLv2-FT-A1-s1"]
+    pytest.importorskip("tabicl")
+    missing = "TabICLv2-FT-A0-s2"
+    path = os.path.join(ROOT, models.TABICL_FT_DIR, f"{missing}.ckpt")
+    if os.path.exists(path):
+        pytest.skip("the checkpoint exists here")
+    with pytest.raises(FileNotFoundError):
+        models.tabicl_regressor(0, 1, missing)
+
+
 def test_the_rank_test_clusters_by_target_vector():
     d = pd.DataFrame([dict(dataset=n, scale_share=1.0, shape_share=0.5)
                       for n in ["218_house_8L", "house_16H", "diamonds"]])
