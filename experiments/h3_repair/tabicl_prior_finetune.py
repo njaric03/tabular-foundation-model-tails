@@ -58,6 +58,48 @@ bins below 2 sd is at most 5% above the base model's.
 F4. Where the leverage is, FT-A1 predicts better than the control: its pinball at 0.99 in
 the bins at 2 sd and above is lower than FT-A0's in at least 8 of those 10 subsamples.
 
+OUTCOME, 16.9.2026
+------------------
+Four arms fine-tuned, FT-A0 and FT-A1 on seeds 1 and 2, 20000 tables each, 17:12 to 19:17;
+evaluated by run/tabicl_prior_finetune_eval.sh, rows in
+`results/h3_repair/clip_context_real_tabicl_ft.csv`. The base model was measured again in
+the same environment (tabicl 2.2.0) and reproduces its committed rows (tabicl 2.1.1) to
+7.8e-06 on all 20 cells. A subsample's value is the mean over the two seeds.
+
+F1  FAILS, narrowly and usefully. FT-A0's median d_q99 at 4 sd and above is -11.1%
+    against the base model's -15.4%, 4.3 points and inside the bound, but its median
+    pinball at 0.99 below 2 sd is 5.2% lower than the base model's, outside it by 0.2.
+    Continued training on the model's own prior is not a no-op: it improves the clean
+    contexts and takes more than a quarter of the leverage loss away with no heavy tail
+    and no contamination. The comparison for the prior is FT-A1 against FT-A0.
+
+F2  FAILS. FT-A1's median d_q99 at 4 sd and above is -9.0%, not -7.7% or closer, though
+    closer to zero than the base model's in 5 of 5 subsamples (-15.4, -14.4, -19.2, -13.0
+    and -27.7% to -1.2, -9.0, -14.3, -7.0 and -20.1%). The seeds disagree: -13.0% for
+    seed 1, -5.0% for seed 2.
+
+F3  HOLDS. FT-A1 costs nothing on clean contexts: its median pinball at 0.99 below 2 sd
+    is 6.5% below the base model's, and above it in 2 of 10 subsamples.
+
+F4  HOLDS, at the threshold. At 2 sd and above FT-A1's pinball at 0.99 is lower than
+    FT-A0's in 8 of 10 subsamples (one-sided sign test p = 0.055), median ratio 0.966;
+    against the base model in 9 of 10, median ratio 0.952.
+
+What this says. Heavy tails and contaminated contexts in TabICLv2's prior move its tail
+under leverage in the predicted direction, but the part owed to the prior beyond
+fine-tuning as such is small (median d_q99 at 4 sd and above -9.0% against FT-A0's
+-11.1%), not consistent across the two seeds, and at the edge of significance on ten
+subsamples of a single dataset. A cap on the context still removes the rest in every
+arm (clip_200 at 4 sd and above: +2.4% and +2.5% for FT-A1, -3.6% and -3.7% for FT-A0).
+The prior is not the whole of the failure, and the evidence that it is part of it is
+weak; more seeds and a second dataset would be needed to say more.
+
+    medians, subsample values averaged over the two seeds
+    model      d_q99 at 4 sd+   pinball 0.99 below 2 sd   pinball 0.99 at 2 sd+ vs base
+    base       -15.4%           504                        1
+    FT-A0      -11.1%           478 (-5.2%)
+    FT-A1       -9.0%           471 (-6.5%)                0.952 (lower in 9 of 10)
+
     venv-tfmp/Scripts/python.exe -u experiments/h3_repair/tabicl_prior_finetune.py \\
         --dump .cache/tfmp/dumps/base_s2026_14000.h5 --arm A1 --seed 1 --tables 20000
 """

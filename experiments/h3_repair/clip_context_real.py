@@ -73,6 +73,12 @@ ARMS = ([("without_max", 0.0), ("raw", 0.0)] + [("clip", c) for c in CLIP_C]
         + [("log", 0.0), ("tail_log", transforms.TAIL_LOG_C), ("evt_trim", 0.0),
            ("sd_cap", transforms.TAU), ("rank_emp", 0.0), ("rank_gpd", 0.0),
            ("rank_gpd_trim", 0.0), ("rank_exp", 0.0)])
+# VARIANTS limits the arms for a run that needs only some of them, as clip_200 is named;
+# the rows of an arm do not depend on which other arms run, and the reference
+# (without_max) is fitted either way.
+_ARM_NAMES = [a if a != "clip" else f"clip_{c:g}" for a, c in ARMS]
+VARIANTS = env.names("VARIANTS", _ARM_NAMES)
+ARMS = [arm for arm, n in zip(ARMS, _ARM_NAMES) if n in VARIANTS]
 
 
 def arm_row(q, q_ref, yte):

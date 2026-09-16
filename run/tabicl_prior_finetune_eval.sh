@@ -16,5 +16,8 @@ export OMP_NUM_THREADS=6 MKL_NUM_THREADS=6 MLFLOW_DISABLE_AGENT_HINT=1
 PY=${PY:-venv-tfmp/Scripts/python.exe}
 FT=TabICLv2,TabICLv2-FT-A0-s1,TabICLv2-FT-A1-s1,TabICLv2-FT-A0-s2,TabICLv2-FT-A1-s2
 
-MODELS=${MODELS:-$FT} DATASETS=freMTPL2sev OUTPUT=clip_context_real_tabicl_ft.csv \
+# Only the arms the predictions need, and clip_200 as the repair to compare with: 300 fits
+# on the CPU instead of 1300.
+MODELS=${MODELS:-$FT} DATASETS=freMTPL2sev VARIANTS=without_max,raw,clip_200 \
+  OUTPUT=clip_context_real_tabicl_ft.csv \
   $PY -u experiments/h3_repair/clip_context_real.py

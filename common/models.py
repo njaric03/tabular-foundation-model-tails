@@ -35,7 +35,7 @@ TABPFN_PATHS = {
 # 61 to 71 later local attempts; 81 and 82 the runs on a Colab GPU in bf16.
 # The seed says which setting a checkpoint and a result row belong to.
 NANOTABPFN = [f"nanoTabPFN-A{a}B{b}-s{s}" for a in (0, 1) for b in (0, 1)
-              for s in (1, 2, 3, 11, 12, 41, 42, 61, 62, 63, 71, 72, 81, 82, 91, 92)]
+              for s in (1, 2, 3, 11, 12, 41, 42, 61, 62, 63, 71, 72, 81, 82, 91, 92, 93)]
 
 # TabICLv2 after continued pre-training on the prior arms of
 # experiments/h3_repair/tabicl_prior_finetune.py, read from local checkpoints.

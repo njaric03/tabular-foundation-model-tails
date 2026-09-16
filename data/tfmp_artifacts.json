@@ -75,7 +75,16 @@
     "correction": "the probe measured batch 4 only with the column and row stages frozen. The full model at batch 4 filled the card (5774 of 6144 MiB with another run on it) and stalled; the fine-tuning script therefore freezes those stages by default (1.27 M of 28.5 M parameters)",
     "base_sha256": "0db9cb538f114e79026bf08f45f41ad8dd7ad2de2aaca9a5ca8cd3bd9748ae7a",
     "smoke": "2026-09-16 17:11: two steps of 4 tables from base_s2026, arm A1, frozen col and row: 1479 MB, 6.4 tables/s; the checkpoint loads through TabICLRegressor(model_path=...), its quantiles are monotone, and its median still follows the signal (correlation 0.78)",
-    "runs": "run/tabicl_prior_finetune.sh: FT-A0 and FT-A1 on seeds 1 and 2, 20000 tables each from base_s2026 and base_s2027, lr 1e-5, weight decay 0.01, 10% warmup then cosine, clip 1.0, fp16"
+    "runs": "run/tabicl_prior_finetune.sh: FT-A0 and FT-A1 on seeds 1 and 2, 20000 tables each from base_s2026 and base_s2027, lr 1e-5, weight decay 0.01, 10% warmup then cosine, clip 1.0, fp16",
+    "outcome": {
+      "trained": "2026-09-16 17:12 to 19:17, FT-A0 and FT-A1 on seeds 1 and 2, 20000 tables each; final pinball A0 0.241 and 0.243, A1 0.145 and 0.146 (not comparable across arms: A1 trains on other targets)",
+      "evaluated": "2026-09-16 20:40 to 21:02, clip_context_real on freMTPL2sev, arms without_max, raw and clip_200, 300 rows; the base model in tabicl 2.2.0 reproduces its tabicl 2.1.1 rows to 7.8e-06",
+      "F1": "FAILS narrowly: FT-A0 d_q99 at 4 sd+ -11.1% against base -15.4% (inside 5 points), clean pinball 5.2% lower (outside 5%). Fine-tuning on the own prior is not a no-op",
+      "F2": "FAILS: FT-A1 d_q99 at 4 sd+ -9.0% (needs -7.7%), closer to zero than base in 5 of 5; seed 1 -13.0%, seed 2 -5.0%",
+      "F3": "HOLDS: FT-A1 clean pinball 6.5% below base",
+      "F4": "HOLDS at the threshold: FT-A1 pinball at 2 sd+ below FT-A0 in 8 of 10 (one-sided p 0.055), median ratio 0.966",
+      "reading": "the prior moves the tail in the predicted direction, but the part beyond fine-tuning as such is small, seed-dependent and at the edge of significance on one dataset"
+    }
   },
   "third_setting": {
     "finding": "the learning rate was the whole problem. At 50 rows and batch 16, 10000 steps at TFM-Playground's default lr 1e-4 give R2 -0.046 on a plain linear task with 35 context rows; the same run at 3e-4 gives +0.821, against +0.463 for their released regressor. Both took 11 minutes. The two earlier settings, which learned nothing, used 1e-4",
