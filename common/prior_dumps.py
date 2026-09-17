@@ -5,7 +5,7 @@
     X, y, k, split, info = tables.raw(t)       # one table, A1 applied if the arm is A1
     X, y_enc, k, info = tables.encoded(t, split)
 
-`args` carries `arm` ("A0B0", "A1B1", ...), `seed`, `preload` (GB), `target_clip` and the
+`args` carries `arm` ("A0B0", "A1B1", "ATB0", "ACB0", ...), `seed`, `preload` (GB), `target_clip` and the
 A1 settings (`p_tail`, `p_contam`, `xi_lo`, `xi_hi`, `w_sd`, `shift_lo`, `shift_hi`). The
 A1 draws of table t depend only on (seed, t), so two arms of one seed see the same tables
 and the same draws. Shared by the nanoTabPFN pre-training and the TabICLv2 fine-tuning.
@@ -48,7 +48,9 @@ class Tables:
             print(f"preloaded {n} tables, {size / 2 ** 30:.2f} GB, in "
                   f"{time.time() - t0:.0f}s", flush=True)
         self.args = args
-        self.a1 = args.arm.startswith("A1")
+        # A1 applies both treatments, AT the heavy tail alone, AC the contamination alone.
+        self.a1 = args.arm[:2] in ("A1", "AT", "AC")
+        self.tail, self.contam = args.arm[1] in "1T", args.arm[1] in "1C"
         self.encoding = "robust" if args.arm.endswith("B1") else "meansd"
 
     def locate(self, t):
@@ -77,7 +79,7 @@ class Tables:
             a = self.args
             rng = np.random.default_rng([a.seed, t])
             y, info = apply_a1(X, y, k, split, rng, p_tail=a.p_tail, p_contam=a.p_contam,
-                               xi_lo=a.xi_lo, xi_hi=a.xi_hi, w_sd=a.w_sd,
+                               tail=self.tail, contam=self.contam, xi_lo=a.xi_lo, xi_hi=a.xi_hi, w_sd=a.w_sd,
                                lo=a.shift_lo, hi=a.shift_hi)
         return X, y, k, split, info
 

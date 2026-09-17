@@ -41,7 +41,9 @@ TFMP = ROOT / ".cache" / "tfmp"
 def parse():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     p.add_argument("--dump", required=True)
-    p.add_argument("--arm", required=True, choices=["A0B0", "A0B1", "A1B0", "A1B1"])
+    # ATB0 and ACB0 are A1B0 with the heavy tail alone and the contamination alone.
+    p.add_argument("--arm", required=True,
+                   choices=["A0B0", "A0B1", "A1B0", "A1B1", "ATB0", "ACB0"])
     p.add_argument("--seed", type=int, required=True)
     p.add_argument("--steps", type=int, required=True, help="optimiser steps")
     p.add_argument("--batch_size", type=int, default=1, help="tables per micro-batch")

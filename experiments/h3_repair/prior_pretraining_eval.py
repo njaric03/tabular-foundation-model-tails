@@ -102,6 +102,115 @@ did not reach.
     A1B0-s1   stopped at step 250     -                 -                   -
     A1B1      not trained             -                 -                   -
 
+SECOND OUTCOME, 17.9.2026: A CURRICULUM THAT LEARNS, AND THE PRIOR DECIDES THE COLLAPSE
+-------------------------------------------------------------------------------------
+Every later run from scratch at more than 3 features or more than 50 rows stayed at the
+loss of the context marginal (`data/tfmp_artifacts.json`). A model that learned at 50 rows
+and 3 features was carried on instead: A0B0-s42 to 8 features (A0B0-s91, linear-task R2
++0.911 at 35 rows), then to 256 rows for 3755 steps of 16 tables in each arm
+(`run/prior_pretraining_curriculum.sh`). Every arm starts from s91, so the arms differ only
+in the prior and the encoding of that last stage. Seed 92 reads two 256-row shards, seed 93
+the other two. Evaluation at N_TRAIN=200, inside the 128 to 223 rows of pre-training.
+Learning check (linear task, 200 rows): A0B0 +0.950 and +0.948, A1B0 +0.939 and +0.935;
+A0B1-s92 and A1B1-s92 end at NaN and learn nothing. Rows in
+`results/h3_repair/prior_pretraining_eval.csv` (s92) and `prior_pretraining_eval_curriculum_1.csv`
+and `_2.csv`; shares in `shape_of_x_nanotabpfn_n200_curriculum.csv` and its scale twin.
+
+Q1  HALF. A0B0-s92 holds: Q(0.99) below the clean value in 10, 10, 10 and 9 of 10 seeds at
+    shifts 20 and 50 and both xi, falling to 2 to 4% of it, the implied xi at 50 down by
+    2.50 to -0.06 in 20 of 20. A0B0-s93 holds at a shift of 50 (10 and 10 of 10) and for
+    the implied xi (down by 2.09 in 20 of 20) but not at 20 (6 and 7 of 10). The borders
+    over the data fall from 64 to 9, as in TabPFN.
+
+Q2  HOLDS on both seeds. A0B0 loses a median 97% and 94% of Q(0.99) at shifts 20 and 50;
+    A1B0 loses none and rises by 71% and 38%, at most half of A0B0's loss in 31 and 30 of 40
+    cells. Median Q(0.99) over both xi, clean / 20 / 50: A0B0-s92 1991 / 105 / 29, A1B0-s92
+    25 / 40 / 43, against true values near 35 (xi 0.7) and 69 (xi 0.9). Pinball at 0.99
+    under shifts 20 and 50 is
+    lower for A1B0 in 40 of 40 cells on each seed (sign test p = 9e-13); on the clean
+    context it is 5.6 times lower, not 5% higher.
+
+Q3  HOLDS on both seeds. Shape share at 200 rows, 20 seeds: A1B0 +1.093 and +1.071, A0B0
+    +0.100 and -0.080. Scale share: A1B0 0.410 and 0.384, A0B0 0.324 and 0.356.
+
+Q4  NOT TESTED. Both B1 arms reached NaN when the encoding changed at the last stage.
+
+Q5  WRONG as written, and empty at this size. GBM at 200 rows has a shape share of -0.428
+    (scale 0.782): 200 rows do not give a tree a usable Q(0.99), so no arm could fail to
+    reach it. A1B0 exceeds it at +1.09.
+
+What this says. In a model of TabPFN's architecture that learns, trained identically up
+to its last stage, one leverage row collapses the upper tail under the standard prior and
+does not under a prior with heavy tails and contaminated contexts, while the grid stretches
+exactly the same in both (64 to 9 borders over the data). Stretching the grid is not
+enough for the collapse; what the network has learned to put in the stretched bars
+decides it. That supports the reading of `clip_context_real.py`, that EXAONE and TabICLv2
+differ by what they learned and not by their pipeline, and it matches the direction of the
+TabICLv2 fine-tuning (`tabicl_prior_finetune.py`), where the same prior helped a little.
+
+What this does not say. A1 adds two things at once, a GPD tail whose shape follows a
+feature and a contaminated context row, and the generator of this experiment is a GPD
+with a covariate-dependent shape: part or all of A1B0's gain may be that its prior now
+resembles the test family, which also explains its clean calibration and shape share. An
+arm with the tail alone and one with the contamination alone would separate the two. The
+arms share their first two stages, the contexts are 200 rows against the thesis's 768 to
+2000, the model is small, and A0B0's clean tail is far off (Q(0.99) near 1900 against a
+true 35 to 69), so the size of the effect does not transfer to the production models.
+
+THIRD OUTCOME, 17.9.2026: THE TAIL ALONE STOPS THE COLLAPSE, THE CONTAMINATION ALONE ONCE
+----------------------------------------------------------------------------------------
+Arms ATB0 (A1's heavy tail alone) and ACB0 (its contaminated context alone), streams 3 and
+4 of `run/prior_pretraining_curriculum.sh`, as A1B0 in every other respect and with A1's
+own draws on the same tables: at step 200 a tail in 0.4913 of seed 92's tables and a
+contamination in 0.2981, the shares of A1B0-s92. The predictions R0 to R4 were committed
+in e7b763e, before any step was read. Rows in `prior_pretraining_eval_curriculum_3.csv`
+and `_4.csv`; shares appended to the curriculum shape and scale files. "Meets Q2" is Q2's
+criterion as it was read for A1B0, a reading that reproduces A1B0's 31 and 30 of 40.
+
+               meets Q2   median Q(0.99)         clean pinball    shape share
+               (of 40)    clean / 20 / 50        / A0B0's
+    A0B0-s92       -      1991 /  105 /  29       1                +0.100
+    A1B0-s92      31        25 /   40 /  43       0.19             +1.093
+    ATB0-s92      35        20 /   77 / 121       0.16             +1.419
+    ACB0-s92      14       189 /   37 /  23       0.50             +0.673
+    A0B0-s93       -      1860 /  202 /  79       1                -0.080
+    A1B0-s93      30        25 /   36 /  30       0.22             +1.071
+    ATB0-s93      33        20 /  147 / 279       0.18             +0.702
+    ACB0-s93      24        45 /   58 /  33       0.39             +0.562
+
+R0  HOLDS. Linear-task R2 at 200 rows: ATB0 +0.947 and +0.944, ACB0 +0.950 and +0.944.
+
+R1  WRONG. ACB0 meets Q2 on seed 93 (24 of 40) but not on 92 (14 of 40), where its Q(0.99)
+    still falls by a median 77% and 85% at shifts 20 and 50. Its pinball at 0.99 under
+    those shifts is lower than A0B0's in 40 of 40 cells on both seeds.
+
+R2  WRONG. ATB0 meets Q2 on both seeds (35 and 33 of 40), although its prior showed no
+    context row at a shift of 20 in the 2000 tables measured before the run.
+
+R3  HALF. ATB0's shape share is above 0.5 (+1.419 and +0.702), but so is ACB0's (+0.673 and
+    +0.562). The scale shares do not separate the arms (0.307 to 0.411; A0B0 0.324, 0.356).
+
+R4  HALF. ATB0's clean pinball is 0.16 and 0.18 of A0B0's, but ACB0's is at most half too,
+    0.495 and 0.386 (ratio of the medians over 20 cells).
+
+The reading fixed in advance, seed by seed: on 92 the tail meets Q2 and the contamination
+does not, "the resemblance carries it"; on 93 both do, "either treatment suffices". Only
+the tail meets it on both seeds, so the claim narrows. In this experiment a prior with a
+GPD tail stops the collapse, and that tail cannot be told apart from the GPD family of the
+test. That contaminated contexts in the prior protect against a leverage row is not shown.
+
+Not predicted, read after the outcome. Q2's criterion counts a rise as no loss, and the
+tail alone meets it by overshooting: its median Q(0.99) climbs to 121 and 279 at a shift of
+50 against a true 35 to 69, and its implied xi at 50 rises (+0.09 and +0.66), where A1B0's
+moves by -0.12 and -0.33. Shown heavy tails but never a contaminated row, the network
+reads the leverage row as a heavier tail. Under shifts 20 and 50 the pinball at 0.99 of
+A1B0 is lower than ATB0's in 29 and 34 of 40 cells (median ratio of ATB0 to A1B0 1.06 and
+1.49) and lower than ACB0's in 33 and 32 (1.03 and 1.05). Neither treatment alone does as
+well under leverage as the two together, while on the clean context the tail alone is a
+little better than both (lower than A1B0 in 13 and 17 of 20). The borders over the data
+fall from 64 to 9 in all four arms on both seeds: the grid stretches the same under four
+priors, and what the network puts in the stretched bars differs.
+
     MODELS=nanoTabPFN-A0B0-s1 SEEDS=2 SD_SHIFTS=1,50 \\
       venv-tfmp/Scripts/python.exe -u experiments/h3_repair/prior_pretraining_eval.py
 """

@@ -35,7 +35,7 @@ import numpy as np
 
 from common import paths
 
-NAME = re.compile(r"^nanoTabPFN-A[01]B[01]-s\d+$")
+NAME = re.compile(r"^nanoTabPFN-A[01TC]B[01]-s\d+$")
 CHECKPOINTS = paths.ROOT / ".cache" / "tfmp" / "checkpoints"
 ENCODINGS = ("meansd", "robust")
 # The constant TFM-Playground adds to the sd; the robust scale gets the same floor.

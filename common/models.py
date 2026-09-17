@@ -36,6 +36,9 @@ TABPFN_PATHS = {
 # The seed says which setting a checkpoint and a result row belong to.
 NANOTABPFN = [f"nanoTabPFN-A{a}B{b}-s{s}" for a in (0, 1) for b in (0, 1)
               for s in (1, 2, 3, 11, 12, 41, 42, 61, 62, 63, 71, 72, 81, 82, 91, 92, 93)]
+# Arm A1B0 split into its two treatments, the heavy tail alone (AT) and the contaminated
+# context alone (AC), in the 256-row stage of the curriculum.
+NANOTABPFN += [f"nanoTabPFN-A{a}B0-s{s}" for a in ("T", "C") for s in (92, 93)]
 
 # TabICLv2 after continued pre-training on the prior arms of
 # experiments/h3_repair/tabicl_prior_finetune.py, read from local checkpoints.

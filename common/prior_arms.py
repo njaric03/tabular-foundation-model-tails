@@ -74,15 +74,20 @@ def contaminate(y, split: int, rng, lo: float = SHIFT_LO, hi: float = SHIFT_HI):
 
 
 def apply_a1(X, y, k: int, split: int, rng, p_tail: float = P_TAIL,
-             p_contam: float = P_CONTAM, **kw):
-    """One table under arm A1. Returns (y, info) where info records what was drawn."""
+             p_contam: float = P_CONTAM, tail: bool = True, contam: bool = True, **kw):
+    """One table under arm A1. Returns (y, info) where info records what was applied.
+
+    `tail=False` or `contam=False` gives one treatment alone (arms AT and AC). A tail that
+    is off is still drawn and then discarded, so the contamination draws the same row and
+    shift as under A1; a contamination that is off is the last draw and is skipped.
+    """
     info = dict(tail=False, contam=False, shift=1.0)
     if rng.random() < p_tail:
-        y, info["feature"], _ = heavy_tail(X, y, k, rng,
-                                           **{a: kw[a] for a in ("xi_lo", "xi_hi", "w_sd")
-                                              if a in kw})
-        info["tail"] = True
-    if rng.random() < p_contam:
+        y_tail, j, _ = heavy_tail(X, y, k, rng,
+                                  **{a: kw[a] for a in ("xi_lo", "xi_hi", "w_sd") if a in kw})
+        if tail:
+            y, info["feature"], info["tail"] = y_tail, j, True
+    if contam and rng.random() < p_contam:
         y, info["row"], info["shift"] = contaminate(
             y, split, rng, **{a: kw[a] for a in ("lo", "hi") if a in kw})
         info["contam"] = True

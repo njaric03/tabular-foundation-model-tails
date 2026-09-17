@@ -55,6 +55,29 @@ def test_heavy_tail_reads_each_rank_through_its_own_gpd():
     assert np.isfinite(new).all() and (new > 0).all()
 
 
+def test_one_treatment_alone_keeps_the_draws_of_a1():
+    """Arm AT gets A1's tail on the tables where A1 has one, arm AC A1's row and shift."""
+    rng = np.random.default_rng(6)
+    X = rng.normal(size=(256, 4))
+    y = X[:, 0] + rng.normal(size=256)
+    seen = set()
+    for t in range(60):
+        both, a = prior_arms.apply_a1(X, y, 4, 200, np.random.default_rng([1, t]))
+        tail, b = prior_arms.apply_a1(X, y, 4, 200, np.random.default_rng([1, t]),
+                                      contam=False)
+        cont, c = prior_arms.apply_a1(X, y, 4, 200, np.random.default_rng([1, t]),
+                                      tail=False)
+        assert not b["contam"] and not c["tail"] and b["tail"] == a["tail"]
+        rows = np.delete(np.arange(256), a["row"]) if a["contam"] else np.arange(256)
+        np.testing.assert_array_equal(tail[rows], both[rows])
+        np.testing.assert_array_equal(cont[rows], y[rows])
+        assert c["contam"] == a["contam"]
+        if a["contam"]:
+            assert c["row"] == a["row"] and c["shift"] == pytest.approx(a["shift"], rel=1e-9)
+        seen.add((a["tail"], a["contam"]))
+    assert len(seen) == 4
+
+
 def test_robust_encoding_is_the_repo_robust_sd():
     y = np.random.default_rng(3).lognormal(size=500)
     centre, scale = nanotabpfn.encode_stats(y, "robust")

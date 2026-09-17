@@ -17,6 +17,10 @@
 #
 #     STREAM=1 sh run/prior_pretraining_curriculum.sh
 #     STREAM=2 sh run/prior_pretraining_curriculum.sh
+#
+# Streams 3 and 4 split A1B0 into its two treatments, the heavy tail alone (ATB0) and the
+# contaminated context alone (ACB0), on both seeds, one of each per stream. Each takes A1's
+# draws on the same tables, so the three arms differ only in what is applied.
 set -x
 export OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 MLFLOW_DISABLE_AGENT_HINT=1
 PY=${PY:-venv-tfmp/Scripts/python.exe}
@@ -45,5 +49,7 @@ run() {
 case "${STREAM:-1}" in
   1) run A1B0 92; run A0B1 92 ;;
   2) run A0B0 93; run A1B0 93; run A1B1 92 ;;
+  3) run ATB0 92; run ACB0 93 ;;
+  4) run ACB0 92; run ATB0 93 ;;
 esac
 echo "STREAM_DONE"
