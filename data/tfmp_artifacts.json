@@ -317,6 +317,13 @@
       "R3": "HALF: shape share ATB0 +1.419 and +0.702, but ACB0 +0.673 and +0.562 is above 0.5 too",
       "R4": "HALF: clean pinball over A0B0's, ATB0 0.16 and 0.18, but ACB0 0.495 and 0.386 is at most half too",
       "reading": "only the tail meets Q2 on both seeds, so the claim narrows to a GPD-tailed prior, which cannot be told apart from the test family; under leverage A1B0's pinball beats ATB0 in 29 and 34 of 40 and ACB0 in 33 and 32, so neither treatment alone matches both together; borders over the data 64 to 9 in all four arms"
+    },
+    "other_tails": {
+      "runs": "2026-09-17 13:04 to 13:10 on the GPU, no training: prior_pretraining_eval.py with FAMILIES=frechet,burr,studentt (1920 cells) and prior_pretraining_real.py on five claim tables with at most 16 features (3200 cells), the eight models A0B0, A1B0, ATB0 and ACB0 of seeds 92 and 93; predictions committed in 77f3176",
+      "families": "F0 holds (A0B0 falls in 29 to 39 of 40); F1 WRONG, A1B0 meets Q2 on 2 of 6 family-seed pairs, ATB0 on 3, neither on burr; F2 holds, pinball under shifts 20 and 50 below A0B0 in 40 of 40 for every arm, family and seed",
+      "claims": "R0 holds on 5 of 5 tables for s92 and 2 of 5 for s93; R1 holds (ATB0 meets Q2 on none), R2 WRONG (A1B0 on none), R3 half",
+      "criterion": "Q2's loss is against each model's own clean Q(0.99), which is about 40 times the truth for A0B0 on the GPD and the families and 30 to 37 times for every arm on the claims, so a fall under leverage is partly a move towards the truth. By pinball at 0.99 relative to the clean context, one leverage row at a shift of 20 or 50 makes A0B0 2.9 to 7.4 times worse on all three test sets, and A1B0, ATB0 and ACB0 no worse in 35 of 36 seed-shift-test-set cells (0.05 to 0.97; ATB0-s93 at 50 on the GPD 1.54)",
+      "reading": "the leverage response of the modified priors carries over to other tail bodies and to real claims; their clean calibration does not (A1B0 clean Q(0.99) 0.54 to 0.58 of the truth on the GPD, 32 on the claims)"
     }
   }
 }

@@ -16,6 +16,7 @@ from typing import NamedTuple
 
 import numpy as np
 from scipy.stats import norm
+from scipy.stats import t as student_t
 
 from common.metrics import gpd_quantile, truncated_mean_std
 
@@ -26,6 +27,11 @@ XI_LO, XI_HI = 0.15, 0.90
 
 # Pass as `xi` for a shape that depends on x4.
 XI_OF_X = "xi(x)"
+
+# Tail families with the same tail index xi and scale s and another body; see
+# `family_sample`. Student's t is folded, |T_nu| with nu = 1 / xi.
+FAMILIES = ("gpd", "frechet", "burr", "studentt")
+BURR_C = 2.0
 
 
 class Data(NamedTuple):
@@ -78,6 +84,52 @@ def gpd(n: int, rng, *, xi, d: int = 5, w: np.ndarray | None = None,
     if clip:
         U = np.clip(U, 1e-9, 1 - 1e-9)
     return Data(X=c.X, y=c.s * gpd_quantile(U, c.xi), s=c.s, xi=c.xi)
+
+
+def family_quantile(family: str, a, xi, s):
+    """The true conditional quantile at level `a` of one of FAMILIES, row by row."""
+    a = np.asarray(a, dtype=float)
+    if family == "gpd":
+        core = ((1 - a) ** (-xi) - 1) / xi
+    elif family == "frechet":
+        core = (-np.log(a)) ** (-xi)
+    elif family == "burr":
+        core = ((1 - a) ** (-xi * BURR_C) - 1) ** (1.0 / BURR_C)
+    elif family == "studentt":
+        core = student_t.ppf(0.5 + a / 2.0, df=1.0 / xi)   # |T_nu|
+    else:
+        raise ValueError(family)
+    return s * core
+
+
+def family_sample(family: str, U, xi, s):
+    """Draws of one of FAMILIES from uniforms `U`, with tail index `xi` and scale `s`.
+
+    Written apart from `family_quantile`, in the association the published runs of
+    `tail_families.py` used, from where both were moved unchanged.
+    """
+    if family == "gpd":
+        return s * ((1 - U) ** (-xi) - 1) / xi
+    if family == "frechet":
+        return s * (-np.log(U)) ** (-xi)
+    if family == "burr":
+        return s * ((1 - U) ** (-xi * BURR_C) - 1) ** (1.0 / BURR_C)
+    if family == "studentt":
+        return s * np.abs(student_t.ppf(U, df=1.0 / xi))
+    raise ValueError(family)
+
+
+def family(name: str, n: int, rng, *, xi, clip: bool = True) -> Data:
+    """n draws of y | x from family `name` on the design of `gpd`: X, then U.
+
+    With the same rng the families share X and U and differ only in the map from U to y.
+    `clip` caps U to [1e-9, 1 - 1e-9], as `tail_families.py` did for every family.
+    """
+    c = covariates(n, rng, xi=xi)
+    U = rng.random(n)
+    if clip:
+        U = np.clip(U, 1e-9, 1 - 1e-9)
+    return Data(X=c.X, y=family_sample(name, U, c.xi, c.s), s=c.s, xi=c.xi)
 
 
 def true_mean(p: Data) -> np.ndarray:

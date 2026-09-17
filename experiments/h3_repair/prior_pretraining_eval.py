@@ -211,6 +211,18 @@ little better than both (lower than A1B0 in 13 and 17 of 20). The borders over t
 fall from 64 to 9 in all four arms on both seeds: the grid stretches the same under four
 priors, and what the network puts in the stretched bars differs.
 
+FOURTH OUTCOME, 17.9.2026: OTHER TAIL FAMILIES, AND WHAT Q2 MEASURES
+-------------------------------------------------------------------
+With FAMILIES=frechet,burr,studentt (`prior_pretraining_eval_families.csv`), the same
+design with a tail of the same index and another body: F0 and F2 hold, F1 is wrong (A1B0
+meets Q2 on 2 of 6 family-seed pairs, ATB0 on 3). A0B0 puts the clean Q(0.99) about 40
+times too high on the families and on the GPD alike, so its fall under leverage is partly a
+fall towards the truth, and Q2's loss against the clean prediction is not a measure of
+collapse. By pinball at 0.99, one leverage row at a shift of 20 or 50 makes A0B0 4.4 to 7.4
+times worse than on its clean context on the GPD and the families, and none of A1B0, ATB0
+and ACB0 worse except ATB0-s93 at 50 on the GPD (1.54). The full outcome, with five real
+claim tables, is in `prior_pretraining_real.py` and PREREGISTRATION.md.
+
     MODELS=nanoTabPFN-A0B0-s1 SEEDS=2 SD_SHIFTS=1,50 \\
       venv-tfmp/Scripts/python.exe -u experiments/h3_repair/prior_pretraining_eval.py
 """
@@ -227,23 +239,30 @@ SD_SHIFTS = env.floats("SD_SHIFTS", [1, 4, 20, 50])
 SEEDS = env.seeds(env.integer("SEEDS", 10))
 N_TRAIN = env.integer("N_TRAIN", 768)
 N_TEST = env.integer("N_TEST", 900)
+# The tail family of the generator, one of `generator.FAMILIES`: same tail index and scale,
+# another body. gpd draws through `generator.gpd`, as every row did before this knob.
+FAMILIES = env.names("FAMILIES", "gpd")
 MODELS = env.models(",".join(f"nanoTabPFN-{a}-s{s}" for s in (1, 2)
                              for a in ("A0B0", "A0B1", "A1B0", "A1B1")))
 LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ["50", "90", "99", "999"]
 OUTPUT = env.text("OUTPUT", "prior_pretraining_eval.csv")
 
-COLUMNS = ["model", "arm", "pretrain_seed", "xi", "sd_shift_target", "sd_shift", "seed",
-           "n_train", "n_test", "borders_in_data", "xi_implied", "xi_ratio",
+COLUMNS = ["model", "arm", "pretrain_seed", "family", "xi", "sd_shift_target", "sd_shift",
+           "seed", "n_train", "n_test", "borders_in_data", "xi_implied", "xi_ratio",
            "q50", "q90", "q99", "q999", "pb50", "pb90", "pb99", "pb999", "seconds", "reason"]
-KEY = ["model", "xi", "sd_shift_target", "seed", "n_train", "n_test"]
+KEY = ["model", "family", "xi", "sd_shift_target", "seed", "n_train", "n_test"]
 
 
 def measure(cell):
     xi, target, seed = cell["xi"], cell["sd_shift_target"], cell["seed"]
     rng = np.random.default_rng(seed)
-    train = generator.gpd(cell["n_train"], rng, xi=xi, clip=True)
-    test = generator.gpd(cell["n_test"], rng, xi=xi, clip=True)
+    if cell["family"] == "gpd":
+        train = generator.gpd(cell["n_train"], rng, xi=xi, clip=True)
+        test = generator.gpd(cell["n_test"], rng, xi=xi, clip=True)
+    else:
+        train = generator.family(cell["family"], cell["n_train"], rng, xi=xi)
+        test = generator.family(cell["family"], cell["n_test"], rng, xi=xi)
 
     X, y, shift = train.X, train.y, 1.0
     if target > 1.0:
@@ -270,9 +289,14 @@ def main():
     for m in MODELS:
         if m not in models.NANOTABPFN:
             raise SystemExit(f"{m} is not a nanoTabPFN arm")
+    for f in FAMILIES:
+        if f not in generator.FAMILIES:
+            raise SystemExit(f"{f} is not one of {generator.FAMILIES}")
     cells = [dict(model=m, arm=m.split("-")[1], pretrain_seed=int(m.rsplit("-s", 1)[1]),
-                  xi=xi, sd_shift_target=target, seed=seed, n_train=N_TRAIN, n_test=N_TEST)
-             for m in MODELS for xi in XI for target in SD_SHIFTS for seed in SEEDS]
+                  family=f, xi=xi, sd_shift_target=target, seed=seed, n_train=N_TRAIN,
+                  n_test=N_TEST)
+             for f in FAMILIES for m in MODELS for xi in XI for target in SD_SHIFTS
+             for seed in SEEDS]
     seconds = runner.run(OUTPUT, COLUMNS, KEY, cells, measure,
                          show=lambda r: f"borders {r['borders_in_data']:>4}  xi "
                                         f"{r['xi_implied']:+.3f}  q99 {r['q99']:.3f}  "
@@ -285,14 +309,16 @@ def report():
     d = tables.ok_rows(pd.read_csv(paths.result(OUTPUT)))
     if d.empty:
         return
-    unit = ["model", "xi", "seed"]
+    if "family" not in d:
+        d["family"] = "gpd"                 # written before the knob, when gpd was the only one
+    unit = ["model", "family", "xi", "seed"]
     clean = d[d.sd_shift_target == 1].set_index(unit)[["q99", "borders_in_data"]]
     j = d.join(clean, on=unit, rsuffix="_clean")
     j["q99_loss"] = 1.0 - j.q99 / j.q99_clean
     for col in ("borders_in_data", "xi_implied", "q99_loss", "pb99", "pb999"):
         print(f"\n=== {col}, median by arm ===")
-        print(j.pivot_table(index=["xi", "sd_shift_target"], columns="arm", values=col,
-                            aggfunc="median").round(4).to_string())
+        print(j.pivot_table(index=["family", "xi", "sd_shift_target"], columns="arm",
+                            values=col, aggfunc="median").round(4).to_string())
 
 
 if __name__ == "__main__":

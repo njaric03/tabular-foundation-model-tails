@@ -53,6 +53,20 @@ def subsamples(y, rng, n_fit, n_test, per_bin, max_attempts):
     return found
 
 
+def clean_subsamples(X, y, n_fit, n_test, repeats, max_attempts):
+    """[(X, y, X_test, y_test, natural shift), ...]: `repeats` subsamples of the positive
+    rows whose context has a natural sd shift below 1.2, drawn from seed 31337 as every
+    real-data script draws them. Raises when fewer are found."""
+    ok = np.isfinite(y) & (y > 0)
+    X, y = X[ok], y[ok]
+    found = subsamples(y, np.random.default_rng(31337), n_fit, n_test, repeats,
+                       max_attempts)[0]
+    if len(found) < repeats:
+        raise ValueError(f"{len(found)} clean subsamples of {repeats}")
+    return [(X[i[:n_fit]], y[i[:n_fit]], X[i[n_fit:]], y[i[n_fit:]], shift)
+            for i, shift, _ in found]
+
+
 def shift_if_corrupted(yf, factor):
     """The sd shift of the context if row i alone were multiplied by `factor`, for every
     i at once."""

@@ -63,3 +63,19 @@ def test_true_mean_is_infinite_at_xi_one_and_finite_below():
     assert np.all(np.isinf(generator.true_mean(p)))
     p = generator.gpd(10, np.random.default_rng(0), xi=0.5)
     assert np.allclose(generator.true_mean(p), p.s / 0.5)
+
+
+def test_the_families_share_x_and_u_and_match_their_quantiles():
+    """With one rng every family draws the same X and U; only the map from U to y differs,
+    so y / s has the same order in every family whose map is monotone (all but the folded
+    t, |T(U)|), and each follows its own quantile function."""
+    draws = {f: generator.family(f, 20_000, np.random.default_rng(9), xi=0.7)
+             for f in generator.FAMILIES}
+    ref = draws["gpd"]
+    for f, p in draws.items():
+        assert np.array_equal(p.X, ref.X) and np.array_equal(p.s, ref.s)
+        if f != "studentt":
+            assert np.array_equal(np.argsort(p.y / p.s), np.argsort(ref.y / ref.s))
+        for a in (0.5, 0.9):
+            assert np.quantile(p.y / p.s, a) == pytest.approx(
+                generator.family_quantile(f, a, 0.7, 1.0), rel=0.03)

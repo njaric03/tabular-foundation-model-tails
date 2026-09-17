@@ -16,14 +16,12 @@ family's true quantiles, so the GPD assumption of the measure drops out of the c
 """
 import numpy as np
 import pandas as pd
-from scipy.stats import t as student_t
 
 from common import env, generator, gradients, metrics, models, paths, quiet, runner, tables
 
 quiet.silence()
 
 N_TRAIN, N_TEST = 2000, 900
-BURR_C = 2.0
 N_EST = env.integer("N_EST", 4)
 FAMILIES = env.names("FAMILIES", "gpd,frechet,burr,studentt")
 SEEDS = env.seeds(env.integer("SEEDS", 5))
@@ -35,33 +33,8 @@ COLUMNS = ["n_est", "family", "model", "seed", "shape_share", "scale_share",
 KEY = ["family", "model", "seed", "n_est"]
 
 
-def quantile(family, a, xi, s):
-    """The true conditional quantile at level `a`, row by row."""
-    a = np.asarray(a, dtype=float)
-    if family == "gpd":
-        core = ((1 - a) ** (-xi) - 1) / xi
-    elif family == "frechet":
-        core = (-np.log(a)) ** (-xi)
-    elif family == "burr":
-        core = ((1 - a) ** (-xi * BURR_C) - 1) ** (1.0 / BURR_C)
-    elif family == "studentt":
-        core = student_t.ppf(0.5 + a / 2.0, df=1.0 / xi)   # |T_nu|
-    else:
-        raise ValueError(family)
-    return s * core
-
-
-def sample(family, U, xi, s):
-    # Written apart from `quantile`, in the association the published runs used.
-    if family == "gpd":
-        return s * ((1 - U) ** (-xi) - 1) / xi
-    if family == "frechet":
-        return s * (-np.log(U)) ** (-xi)
-    if family == "burr":
-        return s * ((1 - U) ** (-xi * BURR_C) - 1) ** (1.0 / BURR_C)
-    if family == "studentt":
-        return s * np.abs(student_t.ppf(U, df=1.0 / xi))
-    raise ValueError(family)
+# Moved unchanged to common/generator.py, where prior_pretraining_eval.py reads them too.
+quantile, sample = generator.family_quantile, generator.family_sample
 
 
 def draw(family, n, rng):

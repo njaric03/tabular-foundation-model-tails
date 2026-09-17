@@ -1571,3 +1571,236 @@ little better than both (lower than A1B0 in 13 and 17 of 20). The borders over t
 fall from 64 to 9 in all four arms on both seeds: the grid stretches the same under four
 priors, and what the network puts in the stretched bars differs.
 ```
+
+## `prior_pretraining_eval.py` on other tail families and `prior_pretraining_real.py`, 17.9.2026
+
+```
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+The tail of the prior alone (ATB0) kept Q(0.99) under a leverage row on both seeds, but
+that prior is a GPD and so is the test. The same eight models (A0B0, A1B0, ATB0 and ACB0 on
+seeds 92 and 93) are read twice more, without further training, at 200 context rows:
+
+  families  `prior_pretraining_eval.py`, FAMILIES=frechet,burr,studentt: Q2's design,
+            leverage row, shifts 1, 4, 20 and 50, xi 0.7 and 0.9 and 10 seeds, with a tail
+            of the same index and scale and another body (`generator.family`, the samplers
+            of `tail_families.py` moved unchanged). One seed gives every family the same X
+            and U.
+  real      `prior_pretraining_real.py`: 20 subsamples of 200 context and 1000 held-out
+            positive rows per dataset, drawn from seed 31337 with a natural sd shift below
+            1.2, from the five claim tables with at most 16 features (freMTPL2sev,
+            beMTPL97, ausprivauto0405, norauto, AutoClaims). The same added row at the
+            context's feature mean, at shifts 4, 20 and 50. Neither tail nor body chosen.
+
+Why not the natural leverage of `clip_context_real.py`. At 200 rows the natural sd shifts
+of freMTPL2sev reach 4.4 to 14.9, and at a shift of 4 on the GPD, in rows already
+committed, A0B0's Q(0.99) does not collapse but rises (it falls in 3 and 2 of 20 cells).
+A test there could not show a collapse to prevent.
+
+Seen before this was written, and disclosed: the gpd branch of the changed
+`prior_pretraining_eval.py` reproduces two committed A0B0-s92 cells in every compared digit;
+the three families give finite quantiles for ATB0-s93 at one seed and xi 0.9 (values
+printed); all five datasets give 20 clean subsamples where a shift of 50 is reachable; one
+real cell of AutoClaims was checked for finite output only. And one natural freMTPL2sev
+subsample of `clip_context_real.py` (bin 4-inf, repeat 0, shift 5.9) was fitted before the
+design above was chosen: median Q(0.99) without its largest row / with it, A0B0-s92 728412 /
+1947485, ATB0-s92 837518 / 22139, GBM 6371 / 7783; the Q(0.99) of all claims is 18278.
+
+Criteria, as for A1B0 and the ablation. The loss is 1 - Q(0.99) / Q(0.99) of the clean
+context of the same cell. "Meets Q2": a loss at shifts 20 and 50 at most half of A0B0's
+(same pre-training seed, same cell) in more than 20 of 40 cells, per family or dataset and
+per seed. On the families a cell is (xi, seed, shift), on real data (subsample, shift).
+
+F0, gate. A0B0's Q(0.99) falls at shifts 20 and 50 in more than 20 of 40 cells, per family
+    and seed. F1 and F2 are read on the families that pass.
+F1. ATB0 and A1B0 meet Q2 on every family that passes, on both seeds.
+F2. ATB0, A1B0 and ACB0 each have a lower pinball at 0.99 than A0B0 under shifts 20 and 50
+    in more than 30 of 40 cells, per family and seed.
+
+R0, gate. As F0, per dataset and seed. R1 to R3 are read on the datasets that pass.
+R1. ATB0 meets Q2 on at most half of the passing datasets on each seed: on claims its tail
+    no longer resembles the test, and the one natural subsample above showed it collapsing.
+R2. A1B0 meets Q2 on at least half of the passing datasets on each seed.
+R3. Pinball at 0.99 under shifts 20 and 50: ATB0 lower than A1B0 in fewer than 20 of 40
+    cells on more than half of the passing datasets, on each seed.
+
+ACB0 is read and not predicted on either set: on the GPD its two seeds disagreed.
+
+Reading fixed in advance.
+  F1 and ATB0 meeting Q2 on more than half of the passing datasets on both seeds: the tail
+    protects beyond the GPD, and the
+    resemblance reading of the ablation is rejected.
+  F1 and R1: the protection holds for any tail of the prior's index but not for claims;
+    the claim stays with synthetic tails.
+  F1 failing: it depends on the GPD body, and the ablation's narrowing stands as written.
+  R0 failing on most datasets: the small model does not reproduce the failure on claims,
+    and real data does not decide between the readings.
+```
+
+## `prior_pretraining_eval.py` on other tail families and `prior_pretraining_real.py`, outcome, 17.9.2026
+
+```
+OUTCOME, 17.9.2026: THE CRITERION FAILS BEFORE THE PRIORS DO
+-----------------------------------------------------------
+The predictions are those committed in 77f3176. Rows in
+`results/h3_repair/prior_pretraining_eval_families.csv` (1920) and
+`prior_pretraining_real.csv` (3200); no cell failed. "Meets Q2" counts, of 40 cells, those
+where the loss of Q(0.99) at shifts 20 and 50 is at most half of A0B0's; it takes more
+than 20.
+
+                          seed   A0B0 falls    meets Q2:  A1B0   ATB0   ACB0
+    families  burr         92        39                    19     12     22
+              frechet      92        39                    25     20     22
+              studentt     92        35                    18     22     12
+              burr         93        32                    18     18     24
+              frechet      93        32                    19     22     24
+              studentt     93        29                    22     25     16
+    claims    AutoClaims   92        40                     0      0      0
+              ausprivauto  92        39                     0     10      0
+              beMTPL97     92        38                     4      6      0
+              freMTPL2sev  92        40                     0      0      0
+              norauto      92        40                     0      0      0
+              AutoClaims   93        20                     0      0      0
+              ausprivauto  93        20                     0      5      0
+              beMTPL97     93        25                     4      8      9
+              freMTPL2sev  93        21                     0      0      0
+              norauto      93        20                     0      0      0
+
+F0  HOLDS on every family and seed (29 to 39 of 40).
+F1  WRONG. A1B0 meets Q2 on 2 of the 6 family-seed pairs and ATB0 on 3; neither on burr.
+    ACB0, not predicted, meets it on 4.
+F2  HOLDS. Pinball at 0.99 under shifts 20 and 50 is lower than A0B0's in 40 of 40 cells for
+    each of the three arms, on every family and seed.
+
+R0  HOLDS on all five tables for seed 92, and on seed 93 only on beMTPL97 and freMTPL2sev.
+    On the other three, A0B0's Q(0.99) falls at a shift of 50 only (20 of 40); at 20 it
+    rises.
+R1  HOLDS. ATB0 meets Q2 on none of the passing tables (0 of 5, 0 of 2).
+R2  WRONG. A1B0 meets it on none either (0 of 5, 0 of 2), and nor does ACB0.
+R3  HALF. ATB0's pinball under leverage is lower than A1B0's in fewer than 20 of 40 cells on
+    2 of 5 tables for seed 92 (12 to 27 of 40, median ratio 0.98 to 1.06) and on 2 of 2
+    for seed 93 (8 and 17).
+
+By the reading fixed in advance, F1 failing leaves the ablation's narrowing as written.
+
+Not predicted, read after the outcome, and it changes what Q1, Q2, F1 and R1 to R3 can
+mean. Their loss is measured against each model's own clean Q(0.99), and that is far off.
+Median over cells of the predicted Q(0.99) over the true one (GPD and families: the true
+conditional quantile; claims: the empirical 0.99 quantile of the 1000 held-out rows), and
+the median pinball at 0.99 over the same model's clean pinball, seed 92 / 93:
+
+                    Q(0.99) / true                            pinball / clean pinball
+                    clean         shift 20      shift 50      shift 20      shift 50
+    GPD       A0B0  42.4 / 40.0   2.30 / 5.51   0.71 / 1.68   4.36 / 5.95   7.02 / 6.18
+              A1B0  0.58 / 0.54   0.79 / 0.78   0.87 / 0.62   0.66 / 0.62   0.67 / 0.63
+              ATB0  0.51 / 0.52   1.70 / 3.23   2.38 / 6.01   0.83 / 0.97   0.84 / 1.54
+              ACB0  4.65 / 0.95   0.75 / 1.14   0.46 / 0.66   0.23 / 0.52   0.25 / 0.41
+    families  A0B0  41.3 / 38.9   2.42 / 12.1   0.76 / 2.15   4.79 / 6.09   7.36 / 6.71
+              A1B0  0.94 / 2.86   0.84 / 0.85   0.90 / 0.72   0.29 / 0.31   0.28 / 0.31
+              ATB0  7.57 / 5.35   1.73 / 3.28   2.48 / 6.14   0.29 / 0.33   0.34 / 0.66
+              ACB0  2.92 / 0.99   0.81 / 1.14   0.54 / 0.69   0.24 / 0.47   0.25 / 0.36
+    claims    A0B0  34.1 / 36.8   2.21 / 235    0.59 / 0.72   3.50 / 7.38   2.85 / 4.88
+              A1B0  32.2 / 32.6   1.17 / 1.15   1.13 / 1.00   0.06 / 0.05   0.06 / 0.05
+              ATB0  31.1 / 30.1   1.46 / 2.26   0.95 / 1.60   0.07 / 0.09   0.08 / 0.08
+              ACB0  32.4 / 30.8   0.80 / 0.90   0.67 / 0.84   0.06 / 0.06   0.06 / 0.06
+
+A0B0 puts the clean Q(0.99) about 40 times too high on every test set, so its "collapse"
+under leverage is a fall towards the truth: 0.59 to 2.15 of it at a shift of 50, 2.2 to 12
+at 20, and 235 once. On the claims every arm is 30 times too high, and Q2 scores each fall
+towards the truth as a failure. Relative Q(0.99) does not measure a collapse when the clean
+prediction is off by more than the collapse. Pinball does, and by pinball the picture is
+the same on all three test sets and both seeds. One leverage row at a shift of 20 or 50
+makes A0B0's pinball at 0.99 2.9 to 7.4 times worse than on its clean context. Under each
+of the three modified priors it gets no worse, 0.05 to 0.97 of the clean pinball, in 35 of
+the 36 arm-seed-shift-test-set cells of the table; the exception is ATB0-s93 at 50 on the
+GPD (1.54). Under leverage, A1B0's Q(0.99) lands at 0.62 to 1.17 of the truth, ACB0's at
+0.46 to 1.14, ATB0's at 0.95 to 6.14: the tail alone overshoots on every test set.
+
+What carries over from the GPD, then, is the leverage response: a prior with heavy tails, a
+contaminated context row or both keeps the pinball at 0.99 from degrading under one
+leverage row, on tails of another body and on five claim tables nobody built to resemble
+the priors. What does not carry over is the clean calibration. A1B0's clean Q(0.99) is 0.54
+to 0.58 of the truth on the GPD, 0.94 and 2.86 on the families and 32 on the claims, as bad
+as A0B0's there; its clean pinball is 0.19 and 0.22 of A0B0's on the GPD, 0.30 to 0.42 on
+the families and 0.65 to 1.20 on the claims. The resemblance the ablation feared explains
+the clean calibration, and on this evidence not the response to leverage.
+
+Limits. Five tables are five units per seed, three families three; the 40 cells of one
+table are not independent. The pinball ratios are medians over cells without a test, and
+the empirical Q(0.99) of 1000 held-out claims is itself noisy. On the claims every arm is
+calibrated so badly that a leverage row improves it, so "no worse under leverage" is a
+weaker statement there than on the GPD. The models are small, the contexts are 200 rows,
+and the clean miscalibration of every arm off the GPD says the 256-row stage did not teach
+a usable tail for real claims.
+```
+
+## `experiments/h3_repair/pinball_reference.py`, read after the outcomes, 17.9.2026
+
+```
+READ AFTER THE OUTCOMES, 17.9.2026: PINBALL OVER A REFERENCE NO MODEL ENTERS
+--------------------------------------------------------------------------
+Not predicted. Median over cells of a model's pinball over the oracle's (generator) or over
+the context quantile's (claims); 1 is the reference. On 900 or 1000 test rows 0.999 sees
+about one exceedance, so that level reads mostly overshoot.
+
+nanoTabPFN arms at 200 context rows, pre-training seed 92 / 93, at 0.99:
+
+                   clean          shift 4        shift 20       shift 50
+    GPD      A0B0  12.0 / 11.8    30.9 / 26.6    54.4 / 48.5    84.1 / 70.8
+             A1B0  1.71 / 1.73    1.13 / 1.15    1.15 / 1.12    1.11 / 1.14
+             ATB0  1.35 / 1.35    1.11 / 1.12    1.15 / 1.42    1.28 / 2.18
+             ACB0  4.74 / 3.20    4.09 / 1.66    1.11 / 1.17    1.24 / 1.19
+    families A0B0  11.7 / 11.7    28.9 / 27.5    58.8 / 53.8    85.5 / 72.5
+             A1B0  4.19 / 4.20    1.20 / 1.16    1.12 / 1.10    1.08 / 1.13
+             ATB0  4.02 / 4.01    1.09 / 1.10    1.20 / 1.43    1.28 / 2.28
+             ACB0  4.57 / 3.19    3.15 / 1.53    1.10 / 1.22    1.22 / 1.18
+    claims   A0B0  19.8 / 21.7    50.6 / 39.6    69.7 / 157     55.6 / 105
+             A1B0  17.3 / 17.7    2.04 / 1.14    1.06 / 0.99    1.01 / 0.99
+             ATB0  13.7 / 15.1    14.4 / 14.9    1.12 / 1.54    1.02 / 1.36
+             ACB0  18.7 / 17.3    2.15 / 1.16    1.00 / 1.00    1.03 / 0.99
+
+At 0.999 and a shift of 50: A0B0 188 to 205 on the generator, 298 and 320 on the claims;
+A1B0 1.22 to 1.55 and 1.18 / 0.84; ACB0 1.53 to 2.01 and 0.94 / 0.81; ATB0 75 to 131 and
+13.7 / 106. At a shift of 4 on the generator: ATB0 3.9 to 5.8, A1B0 3.8 to 7.7, ACB0 9.0
+to 13.5, A0B0 17.1 to 17.8.
+
+TabPFN-V3 at 2000 context rows (`clip_context.csv`, 20 seeds, xi 0.7 and 0.9), clean and
+at shifts 4 / 20 / 50:
+
+    raw        0.99  1.05   1.09 / 1.19 / 1.23     0.999  1.17   1.27 / 1.70 / 2.03
+    sd_cap     0.99  1.05   1.06 at every shift     0.999  1.12   1.03 at every shift
+    clip_200   0.99  1.04   1.04 at every shift     0.999  1.14   1.08 at every shift
+    rank_gpd   0.99  1.02   1.01 at every shift     0.999  1.18   1.25 / 1.31 / 1.36
+    rank_emp   0.99  1.02   1.04 at every shift     0.999  1.15   2.20 / 8.14 / 19.5
+
+What the reference adds.
+
+1. Against the oracle the small model's failure is larger than its own clean pinball
+   showed: A0B0 is 12 times the oracle on a clean context and 71 to 86 times at a shift of
+   50. Under a shift of 20 or 50 the modified priors sit at 1.1 to 1.4 (ATB0-s93 at 50,
+   2.2 and 2.3), in most cells closer to the oracle than on their own clean contexts
+   (1.35 to 4.74).
+2. At 0.999 the ablation's order reverses at large shifts. The tail alone is 75 to 131
+   times the oracle at 50, in A0B0's range, while both arms that carry the contamination
+   stay within about 2. At a shift of 4 the tail alone and both together are close (3.8 to
+   7.7) and the contamination alone is worst (9.0 to 13.5). Which treatment matters depends
+   on the level and on the shift.
+3. On the claims no arm beats the quantile of its clean context, a forecaster that ignores
+   every feature: 14 to 22 times worse at 0.99 on a clean context, and at 0.5 and 0.9 within
+   3% of it. Under a shift of 20 or 50, A1B0 and ACB0 match it (0.99 to 1.06). At 200 rows
+   the small models add almost nothing to the marginal of these tables.
+4. The production model is a different case. TabPFN-V3 is within 5% of the oracle at 0.99
+   on a clean context, and one leverage row at a shift of 50 moves it to 1.23, and at 0.999
+   from 1.17 to 2.03. In the same cells its implied xi falls from 0.61 and 0.75 to -0.30
+   and -0.29, and the borders over the data from about 2550 to about 200. The mechanism
+   measures show a change of tail family; the pinball shows what that costs a forecast, 17%
+   more at 0.99 and 74% more at 0.999. Both belong in part two, and they are not
+   interchangeable. The caps hold it at 1.03 to 1.08 at both levels under every shift. The
+   rank transforms and log are the sharpest at 0.99 (1.01 to 1.04), and the empirical rank
+   reaches 19.5 times the oracle at 0.999 at a shift of 50: the level dependence of part
+   three, in these units.
+
+The oracle is exact on the generator. The context quantile on the claims is a baseline and
+not an oracle, and 1000 held-out claims give it noise of its own. Medians over cells, not
+tests; the units are those of the sections above.
+```
