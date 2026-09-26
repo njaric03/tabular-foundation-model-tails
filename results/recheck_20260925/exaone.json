@@ -1,0 +1,29 @@
+{
+  "kind": "exaone",
+  "environment": {
+    "python": "3.11.0",
+    "packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.5",
+      "scikit-learn": "1.9.0",
+      "torch": "2.14.0+cpu",
+      "tabpfn": "8.4.0",
+      "tabicl": "2.1.1",
+      "exaonetabular": "1.0.0"
+    },
+    "torch_threads": 4,
+    "device": "cpu"
+  },
+  "results": {
+    "shape": [
+      48,
+      4
+    ],
+    "monotone": true,
+    "finite": true,
+    "repeat_max_abs_gap": 0.0,
+    "fast_vs_per_level_max_abs_gap": 0.0,
+    "affine_max_relative_gap": 3.748507729614712e-07
+  },
+  "execution": "completed"
+}

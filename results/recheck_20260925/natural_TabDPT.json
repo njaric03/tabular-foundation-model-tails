@@ -1,0 +1,86 @@
+{
+  "kind": "natural",
+  "environment": {
+    "python": "3.11.0",
+    "packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.5",
+      "scikit-learn": "1.9.0",
+      "torch": "2.14.0+cpu",
+      "tabdpt": "1.2.0"
+    },
+    "torch_threads": 4,
+    "device": "cpu"
+  },
+  "results": {
+    "model": "TabDPT",
+    "bin": "4.0-inf",
+    "repeat": 0,
+    "context_sd_shift": 4.884899964701051,
+    "repeat_max_abs_gap": 0.0,
+    "affine_diagnostics": [
+      {
+        "scale": 6557.630939066401,
+        "offset": 1933.38244460644,
+        "residual_over_prediction_sd": 1.0324508017832416e-06,
+        "rank": 2
+      },
+      {
+        "scale": 32033.36539130759,
+        "offset": 2634.50855021244,
+        "residual_over_prediction_sd": 5.974889696097323e-07,
+        "rank": 2
+      },
+      {
+        "scale": 32033.36539130759,
+        "offset": 2634.50855021244,
+        "residual_over_prediction_sd": 5.974889696097323e-07,
+        "rank": 2
+      }
+    ],
+    "comparisons": {
+      "without_max": {
+        "d_q99": {
+          "measured": 0.0,
+          "historical": 0.0,
+          "absolute_gap": 0.0,
+          "relative_gap": 0.0
+        },
+        "pb99": {
+          "measured": 553.8049271167736,
+          "historical": 553.805049009715,
+          "absolute_gap": 0.00012189294147901819,
+          "relative_gap": 2.2010081290696196e-07
+        },
+        "pb999": {
+          "measured": 238.2520561680497,
+          "historical": 238.2518857068596,
+          "absolute_gap": 0.0001704611900947839,
+          "relative_gap": 7.154662788462289e-07
+        }
+      },
+      "raw": {
+        "d_q99": {
+          "measured": 0.049258385251088964,
+          "historical": 0.0492558983505264,
+          "absolute_gap": 2.486900562564953e-06,
+          "relative_gap": 5.048939610982398e-05
+        },
+        "pb99": {
+          "measured": 578.594551657028,
+          "historical": 578.59449139103,
+          "absolute_gap": 6.026599794495269e-05,
+          "relative_gap": 1.041593012751711e-07
+        },
+        "pb999": {
+          "measured": 264.86765131547486,
+          "historical": 264.87078887809827,
+          "absolute_gap": 0.00313756262340803,
+          "relative_gap": 1.1845634759112805e-05
+        }
+      }
+    },
+    "indices_sha256": "5ce9237c9291f4fae6b23c80ed8ab617af7e6066d27a342ef6433234aea933c1"
+  },
+  "execution": "completed"
+}

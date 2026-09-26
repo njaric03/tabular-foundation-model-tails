@@ -1,0 +1,26 @@
+[
+  {
+    "filename": "tabpfn-v2.5-regressor-v2.5_real.ckpt",
+    "snapshot_revision": null,
+    "size": 40831868,
+    "sha256": "8ab42d2d0abe3886a2c54a336b2abf251658a23a9b3f6559c4fdf0c024f48e63"
+  },
+  {
+    "filename": "tabpfn-v3-regressor-v3_default.ckpt",
+    "snapshot_revision": null,
+    "size": 233289807,
+    "sha256": "311ce18d97e9533d8585eaadafe040fbdd8070533209ed8696641dadc97a7301"
+  },
+  {
+    "filename": "tabdpt1_2.safetensors",
+    "snapshot_revision": "a5ca6e01c0fa09ec68c73e958e5199d1932abb3a",
+    "size": 254098072,
+    "sha256": "06680220fd66c4524051706b98c1c659a674d19d3a766cd0bb276505e99faccd"
+  },
+  {
+    "filename": "exaone-tabular-regressor-v1_default.safetensors",
+    "snapshot_revision": "093ad1c2613e1e95d26df8610451d2e02ed53cbe",
+    "size": 84502160,
+    "sha256": "24891e14e649c6509f07ee62b5583e06544b68eaf9a9195ee58777eb9cf6fa0d"
+  }
+]

@@ -17,9 +17,7 @@ freeze() {
   fi
 }
 
-freeze system           python
 freeze venv-tfm         venv-tfm/Scripts/python.exe
 freeze venv-tabfm       venv-tabfm/Scripts/python.exe
 freeze venv-tabdpt      venv-tabdpt/Scripts/python.exe
-freeze venv-graph       venv-graph/Scripts/python.exe
 freeze venv-data        venv-data/Scripts/python.exe

@@ -1,0 +1,16 @@
+{
+  "pb99": {
+    "cap_vs_raw_median_change": -0.1703806614090818,
+    "cap_better_count": 9,
+    "n": 10,
+    "error_vs_clean_median_change": 0.2062035116929435,
+    "cap_vs_clean_median_change": -0.010592075940461965
+  },
+  "pb999": {
+    "cap_vs_raw_median_change": -0.43124000633966053,
+    "cap_better_count": 9,
+    "n": 10,
+    "error_vs_clean_median_change": 0.7664453221967604,
+    "cap_vs_clean_median_change": -0.014063820224932577
+  }
+}

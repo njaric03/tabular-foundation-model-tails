@@ -1,0 +1,68 @@
+{
+  "kind": "natural",
+  "environment": {
+    "python": "3.11.0",
+    "packages": {
+      "numpy": "2.4.6",
+      "pandas": "3.0.5",
+      "scikit-learn": "1.9.0",
+      "torch": "2.14.0+cpu",
+      "tabpfn": "8.4.0",
+      "tabicl": "2.1.1"
+    },
+    "torch_threads": 4,
+    "device": "cpu"
+  },
+  "results": {
+    "model": "TabPFN-v2.5",
+    "bin": "4.0-inf",
+    "repeat": 0,
+    "context_sd_shift": 4.884899964701051,
+    "repeat_max_abs_gap": 0.0,
+    "affine_diagnostics": [],
+    "comparisons": {
+      "without_max": {
+        "d_q99": {
+          "measured": 0.0,
+          "historical": 0.0,
+          "absolute_gap": 0.0,
+          "relative_gap": 0.0
+        },
+        "pb99": {
+          "measured": 558.4619908025392,
+          "historical": 558.4611650652344,
+          "absolute_gap": 0.0008257373048081718,
+          "relative_gap": 1.478593958653717e-06
+        },
+        "pb999": {
+          "measured": 354.4374794684375,
+          "historical": 354.4354553805469,
+          "absolute_gap": 0.0020240878906179205,
+          "relative_gap": 5.7107376248369875e-06
+        }
+      },
+      "raw": {
+        "d_q99": {
+          "measured": -0.4121682951641124,
+          "historical": -0.4121739765797307,
+          "absolute_gap": 5.681415618297159e-06,
+          "relative_gap": 1.378402310947001e-05
+        },
+        "pb99": {
+          "measured": 620.0231712175782,
+          "historical": 620.0233179680664,
+          "absolute_gap": 0.00014675048817025527,
+          "relative_gap": 2.3668543410784026e-07
+        },
+        "pb999": {
+          "measured": 227.72361024773434,
+          "historical": 227.9003761989064,
+          "absolute_gap": 0.17676595117205807,
+          "relative_gap": 0.0007756281675365935
+        }
+      }
+    },
+    "indices_sha256": "5ce9237c9291f4fae6b23c80ed8ab617af7e6066d27a342ef6433234aea933c1"
+  },
+  "execution": "completed"
+}

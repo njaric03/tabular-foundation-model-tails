@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .cache/
 scikit_learn_data/
+tmp/
 
 # Model weights are never in the repository; TabFM's 6.6 GB come from run/download_tabfm.sh.
 *.safetensors
@@ -18,10 +19,12 @@ scikit_learn_data/
 # Only CSVs that a finding cites or a script reads are kept (rule 3); the rest is local.
 archive/
 
-# Output of two processes racing on one CSV, and superseded versions of a result.
-*.KONTAMINIRANO.csv
-*.v1.csv
-*.stara.csv
+# Generated supplement files; keep the note, its source and instructions.
+/output/
+/supplement/*
+!/supplement/README.md
+!/supplement/jaric_extreme_context_targets.tex
+!/supplement/jaric_extreme_context_targets.pdf
 
 # Working files, including the locks and temporary files of common/files.py.
 *.tmp

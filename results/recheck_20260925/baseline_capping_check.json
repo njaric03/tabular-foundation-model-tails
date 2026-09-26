@@ -1,0 +1,59 @@
+{
+  "packages": {
+    "xgboost": "3.2.0",
+    "catboost": "1.2.10",
+    "numpy": "2.4.6",
+    "scikit-learn": "1.9.0"
+  },
+  "scope": "One recorded high-leverage insurance context, repeat 0.",
+  "results": [
+    {
+      "model": "XGB",
+      "arm": "raw",
+      "bin": "4.0-inf",
+      "repeat": 0,
+      "n_fit": 2000,
+      "n_test": 1000,
+      "seed": 7000,
+      "pb99": 648.1493160002931,
+      "historical_pb99": 648.1493160002931,
+      "relative_gap": 0.0
+    },
+    {
+      "model": "XGB",
+      "arm": "clip",
+      "bin": "4.0-inf",
+      "repeat": 0,
+      "n_fit": 2000,
+      "n_test": 1000,
+      "seed": 7000,
+      "pb99": 603.2964218749269,
+      "historical_pb99": 603.2964218749269,
+      "relative_gap": 0.0
+    },
+    {
+      "model": "CB",
+      "arm": "raw",
+      "bin": "4.0-inf",
+      "repeat": 0,
+      "n_fit": 2000,
+      "n_test": 1000,
+      "seed": 7000,
+      "pb99": 2946.126433679848,
+      "historical_pb99": 2946.126433679848,
+      "relative_gap": 0.0
+    },
+    {
+      "model": "CB",
+      "arm": "clip",
+      "bin": "4.0-inf",
+      "repeat": 0,
+      "n_fit": 2000,
+      "n_test": 1000,
+      "seed": 7000,
+      "pb99": 956.4644239637668,
+      "historical_pb99": 956.4644239637668,
+      "relative_gap": 0.0
+    }
+  ]
+}
