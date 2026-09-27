@@ -4,9 +4,6 @@ Experiments for my master's thesis on how tabular foundation models predict
 large target values, how one extreme value in the context changes their predictions,
 and whether capping that value improves accuracy.
 
-[Research supplement (PDF)](supplement/jaric_extreme_context_targets.pdf)
-· [LaTeX source](supplement/jaric_extreme_context_targets.tex)
-
 ## Main results
 
 On 40 synthetic tasks, one added extreme target made the context standard deviation
@@ -34,9 +31,8 @@ python -m analysis.supplement_figures
 ```
 
 This uses stored results and needs no model weights, data download or GPU.
-Figures and plotted values are written to `supplement/`; README images go to
-`figures/`. See the [supplement instructions](supplement/README.md) to rebuild
-the PDF and package the ZIP.
+Plotted values are written to `supplement/`, which is not tracked; README images go
+to `figures/`.
 
 ## Code and results
 

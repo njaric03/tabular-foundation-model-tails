@@ -19,12 +19,9 @@ tmp/
 # Only CSVs that a finding cites or a script reads are kept (rule 3); the rest is local.
 archive/
 
-# Generated supplement files; keep the note, its source and instructions.
+# Generated outputs; the application note is kept outside this repository.
 /output/
-/supplement/*
-!/supplement/README.md
-!/supplement/jaric_extreme_context_targets.tex
-!/supplement/jaric_extreme_context_targets.pdf
+/supplement/
 
 # Working files, including the locks and temporary files of common/files.py.
 *.tmp

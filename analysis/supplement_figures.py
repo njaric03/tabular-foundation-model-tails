@@ -90,7 +90,7 @@ def natural():
     x = d[(d.arm_c == 'raw') & (d.bin == '4.0-inf')].copy()
     x['ratio'] = 1 + x.d_q99
     x[['model', 'repeat', 'sd_shift', 'ratio']].to_csv(DATA/'natural_sensitivity.csv', index=False)
-    fig, ax = plt.subplots(figsize=(6.5, 2.15), layout='constrained')
+    fig, ax = plt.subplots(figsize=(6.5, 1.85), layout='constrained')
     dots(ax, x, 'ratio', 5, 'Lower predictions', 'Higher predictions', SLATE)
     ax.axvline(1, color=INK, lw=.8, zorder=0)
     ax.set_xscale('log')
@@ -108,7 +108,7 @@ def natural():
     cap = cap.reset_index()
     cap[['model', 'bin', 'repeat', 'relative_change']].to_csv(DATA/'natural_capping.csv',
                                                              index=False)
-    fig, ax = plt.subplots(figsize=(6.5, 2.15), layout='constrained')
+    fig, ax = plt.subplots(figsize=(6.5, 1.85), layout='constrained')
     dots(ax, cap, 'relative_change', 10, 'Lower loss', 'Higher loss', BLUE)
     ax.axvline(0, color=INK, lw=.8, zorder=0)
     ax.set_xlim(-1, .3)
@@ -166,7 +166,7 @@ def synthetic():
     med = long.pivot_table(index=['variant', 'sd_shift_target'], columns='quantile',
                            values='relative_change', aggfunc='median')[LEVELS]
 
-    fig, ax = plt.subplots(figsize=(6.5, 2.05), layout='constrained')
+    fig, ax = plt.subplots(figsize=(6.5, 1.7), layout='constrained')
     bars(ax, [med.loc[('raw', s)].to_numpy() for s in (4, 20, 50)],
          ['4×', '20×', '50×'], ORANGES, 'One added target multiplies the context SD by')
     save(fig, 'synthetic_error')
@@ -174,7 +174,7 @@ def synthetic():
     # The added target always exceeds the cap, so the capped context is the same at every
     # shift; 50x is shown.
     assert np.allclose(med.loc[('clip', 4)], med.loc[('clip', 50)])
-    fig, ax = plt.subplots(figsize=(6.5, 2.05), layout='constrained')
+    fig, ax = plt.subplots(figsize=(6.5, 1.7), layout='constrained')
     bars(ax, [med.loc[('raw', 50)].to_numpy(), med.loc[('clip', 50)].to_numpy()],
          ['Without capping', 'With capping'], [ORANGES[-1], BLUE],
          'Context SD multiplied by 50')
