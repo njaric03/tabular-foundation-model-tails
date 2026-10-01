@@ -1804,3 +1804,14 @@ The oracle is exact on the generator. The context quantile on the claims is a ba
 not an oracle, and 1000 held-out claims give it noise of its own. Medians over cells, not
 tests; the units are those of the sections above.
 ```
+
+## Correction to the sd shift quoted for freMTPL2sev, 1.10.2026
+
+```
+Two predictions above quote 19.9 as the sd shift of freMTPL2sev, the worst of 99 public
+datasets. That value is from the survey of 27.8.2026, which read the table one row per
+claim: 26 639 rows, as OpenML serves it. Every run since the re-measurement of 11.9.2026
+reads claims summed per policy and joined to the policy covariates, 24 944 rows. On that
+table the worst sd shift is 14.5, still the largest of the 99 (Brazilian_houses follows at
+6.0). The predictions are left as they were written; outcomes read against them use 14.5.
+```

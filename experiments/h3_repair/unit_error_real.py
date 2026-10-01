@@ -75,6 +75,11 @@ FACTORS = [1.0, 100.0]
 ARMS = [("raw", 0.0), ("clip", 50.0), ("clip", 200.0), ("log", 0.0),
         ("tail_log", transforms.TAIL_LOG_C), ("evt_trim", 0.0), ("sd_cap", transforms.TAU),
         ("rank_emp", 0.0), ("rank_gpd", 0.0), ("rank_gpd_trim", 0.0), ("rank_exp", 0.0)]
+# VARIANTS limits the arms, named as in clip_context_real.py. The clean raw context is the
+# reference and is fitted either way; the rows of an arm do not depend on the others.
+_ARM_NAMES = [a if a != "clip" else f"clip_{c:g}" for a, c in ARMS]
+VARIANTS = env.names("VARIANTS", _ARM_NAMES)
+ARMS = [arm for arm, n in zip(ARMS, _ARM_NAMES) if n in VARIANTS]
 LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ("50", "90", "99", "999")
 OUTPUT = env.text("OUTPUT", "unit_error_real.csv")

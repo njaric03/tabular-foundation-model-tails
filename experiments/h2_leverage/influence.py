@@ -13,7 +13,7 @@ standardises the target by a plain sd would move everywhere.
 
 DOSE_MODE=max sets y0 = dose * max(y_train). max(y_train) is itself heavy-tailed, so one
 nominal dose is not one treatment across seeds; DOSE_MODE=sd sets y0 so the sd shift
-equals the dose, the axis the prevalence survey is measured on (worst of 99 tables: 19.9).
+equals the dose, the axis the prevalence survey is measured on (worst of 99 tables: 14.5).
 
     XI=0.7 SEEDS=3 MODELS=TabICLv2 python -u experiments/h2_leverage/influence.py
     DOSE_MODE=sd DOSES=2,4,10,20 OUTPUT=influence_sd.csv \

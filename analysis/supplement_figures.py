@@ -17,6 +17,12 @@ ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / 'results/h3_repair'
 BINS_LEV = ['2.0-4.0', '4.0-inf']
 TFM = ['TabPFN-v2.5', 'TabPFN-v2.6', 'TabPFN-V3', 'TabICLv2', 'EXAONE', 'TabDPT']
+# Models released in September 2026, drawn when their files exist (run/new_models.sh).
+NEW = {'TabPFN-v3.5': 'clip_context_real_tabpfn35.csv',
+       'Causilo': 'clip_context_real_causilo.csv',
+       'LimiX-2': 'clip_context_real_limix2.csv'}
+NEW = {m: f for m, f in NEW.items() if (RESULTS / f).exists()}
+TFM += list(NEW)
 ORDER = TFM + ['GBM', 'XGB', 'CB']
 OUT = ROOT / 'supplement'
 FIG = OUT / 'figures'
@@ -31,7 +37,8 @@ LEVELS, TAGS = [.5, .9, .99, .999], ['50', '90', '99', '999']
 PERCENTILES = ['Median', '90th', '99th', '99.9th']
 LABELS = {'TabPFN-v2.5': 'TabPFN-2.5', 'TabPFN-v2.6': 'TabPFN-2.6',
           'TabPFN-V3': 'TabPFN-3', 'TabICLv2': 'TabICLv2', 'EXAONE': 'EXAONE-Tabular',
-          'TabDPT': 'TabDPT', 'GBM': 'Scikit-learn GBM', 'XGB': 'XGBoost',
+          'TabDPT': 'TabDPT', 'TabPFN-v3.5': 'TabPFN-3.5', 'Causilo': 'Causilo',
+          'LimiX-2': 'LimiX-2', 'GBM': 'Scikit-learn GBM', 'XGB': 'XGBoost',
           'CB': 'CatBoost'}
 plt.rcParams.update({'font.family': 'serif', 'font.serif': ['STIXGeneral'],
                      'mathtext.fontset': 'stix', 'font.size': 11,
@@ -46,7 +53,7 @@ plt.rcParams.update({'font.family': 'serif', 'font.serif': ['STIXGeneral'],
 
 def load_natural():
     frames = [pd.read_csv(RESULTS / name) for name in
-              ('clip_context_real.csv', 'clip_context_real_v25v26.csv')]
+              ('clip_context_real.csv', 'clip_context_real_v25v26.csv', *NEW.values())]
     d = pd.concat(frames)
     d = d[d.reason.fillna('') == ''].copy()
     key = ['dataset', 'model', 'bin', 'repeat', 'arm', 'clip_c', 'n_est', 'n_fit', 'n_test']
@@ -90,7 +97,7 @@ def natural():
     x = d[(d.arm_c == 'raw') & (d.bin == '4.0-inf')].copy()
     x['ratio'] = 1 + x.d_q99
     x[['model', 'repeat', 'sd_shift', 'ratio']].to_csv(DATA/'natural_sensitivity.csv', index=False)
-    fig, ax = plt.subplots(figsize=(6.5, 1.85), layout='constrained')
+    fig, ax = plt.subplots(figsize=(6.5, 1.85 * len(ORDER) / 9), layout='constrained')
     dots(ax, x, 'ratio', 5, 'Lower predictions', 'Higher predictions', SLATE)
     ax.axvline(1, color=INK, lw=.8, zorder=0)
     ax.set_xscale('log')
@@ -108,7 +115,7 @@ def natural():
     cap = cap.reset_index()
     cap[['model', 'bin', 'repeat', 'relative_change']].to_csv(DATA/'natural_capping.csv',
                                                              index=False)
-    fig, ax = plt.subplots(figsize=(6.5, 1.85), layout='constrained')
+    fig, ax = plt.subplots(figsize=(6.5, 1.85 * len(ORDER) / 9), layout='constrained')
     dots(ax, cap, 'relative_change', 10, 'Lower loss', 'Higher loss', BLUE)
     ax.axvline(0, color=INK, lw=.8, zorder=0)
     ax.set_xlim(-1, .3)

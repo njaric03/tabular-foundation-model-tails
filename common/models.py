@@ -20,12 +20,21 @@ SYNONYMS = {
     "TabPFNv3": "TabPFN-V3", "TabPFN-v3": "TabPFN-V3",
     "TabPFNv2": "TabPFN-v2.5", "TabICL": "TabICLv2",
     "GradientBoosting": "GBM", "XGBoost": "XGB", "CatBoost": "CB",
+    "TabPFN-3.5": "TabPFN-v3.5", "TabPFN-3.5-Fast": "TabPFN-v3.5-Fast",
 }
 
 # TabPFN generations other than V3, selected through `model_path`; 8.4.0 ships them.
 TABPFN_PATHS = {
     "TabPFN-v2.5": "tabpfn-v2.5-regressor-v2.5_real.ckpt",
     "TabPFN-v2.6": "tabpfn-v2.6-regressor-v2.6_default.ckpt",
+}
+# 9.0.0 adds 3.5 and makes it the default, so under 9.0.0 an unpinned V3 would silently
+# be 3.5. V3 is pinned there to the file 8.4.0 loads by default; under 8.4.0 it stays
+# unpinned, as every existing V3 row was measured.
+TABPFN_PATHS_9 = {
+    "TabPFN-V3": "tabpfn-v3-regressor-v3_default.ckpt",
+    "TabPFN-v3.5": "tabpfn-v3.5-20260909.safetensors",
+    "TabPFN-v3.5-Fast": "tabpfn-v3.5-fast-20260909.safetensors",
 }
 
 # Small models pre-trained here, one per arm of prior (A) and target encoding (B) and
@@ -46,7 +55,8 @@ TABICL_FT = [f"TabICLv2-FT-A{a}-s{s}" for a in (0, 1) for s in (1, 2)]
 TABICL_FT_DIR = ".cache/tfmp/tabicl_ft"
 
 SUPPORTED = ["GBM", "XGB", "CB", "TabICLv2", "TabPFN-V3", "TabPFN-v2.5",
-             "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM"] + NANOTABPFN + TABICL_FT
+             "TabPFN-v2.6", "EXAONE", "TabDPT", "TabFM",
+             "TabPFN-v3.5", "TabPFN-v3.5-Fast", "Causilo", "LimiX-2"] + NANOTABPFN + TABICL_FT
 
 # CATEGORICAL=native passes the columns `datasets.prepare` coded from categories to
 # TabPFN as `categorical_features_indices`; the script sets CATEGORICAL_INDICES from
@@ -69,10 +79,16 @@ def normalise(name: str) -> str:
 
 def tabpfn_regressor(name: str, seed: int, n_est: int):
     """An unfitted TabPFNRegressor of generation `name`, seeded, with this repo's settings."""
+    from importlib.metadata import version
+
     from tabpfn import TabPFNRegressor
     kw = dict(n_estimators=n_est, device="cpu", random_state=seed,
               ignore_pretraining_limits=True)
-    if name in TABPFN_PATHS:
+    if int(version("tabpfn").split(".")[0]) >= 9:
+        kw["model_path"] = TABPFN_PATHS_9.get(name) or TABPFN_PATHS[name]
+    elif name in TABPFN_PATHS_9 and name != "TabPFN-V3":
+        raise RuntimeError(f"{name} needs tabpfn 9; this venv has {version('tabpfn')}")
+    elif name in TABPFN_PATHS:
         kw["model_path"] = TABPFN_PATHS[name]
     if CATEGORICAL and CATEGORICAL_INDICES:
         kw["categorical_features_indices"] = list(CATEGORICAL_INDICES)
@@ -112,6 +128,14 @@ def quantiles(name: str, Xtr, ytr, Xte, seed: int, levels, n_est: int = 1) -> np
         m = exaone.create(seed=seed, n_est=n_est)
         m.fit(Xtr, ytr)
         return np.asarray(exaone.quantiles(m, Xte, levels), dtype=float)
+
+    if name == "Causilo":
+        from common.adapters import causilo
+        return causilo.quantiles(Xtr, ytr, Xte, seed, levels, n_est)
+
+    if name == "LimiX-2":
+        from common.adapters import limix
+        return limix.quantiles(Xtr, ytr, Xte, seed, levels, n_est)
 
     if name == "TabDPT":
         # The bin head is read from one forward pass. Accepting n_est > 1 would put
@@ -225,6 +249,12 @@ def predictive_mean(name: str, Xtr, ytr, Xte, seed: int, n_est: int = 1) -> np.n
     Xtr, Xte = np.asarray(Xtr, float), np.asarray(Xte, float)
     ytr = np.asarray(ytr, float)
 
+    if name == "Causilo":
+        from common.adapters import causilo
+        return causilo.mean(Xtr, ytr, Xte, seed, n_est)
+    if name == "LimiX-2":
+        from common.adapters import limix
+        return limix.mean(Xtr, ytr, Xte, seed, n_est)
     if name == "TabICLv2" or name in TABICL_FT:
         m = tabicl_regressor(seed, n_est, name)
     elif name.startswith("TabPFN"):

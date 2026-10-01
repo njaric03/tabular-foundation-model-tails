@@ -19,6 +19,11 @@ improved in **7 of 10**; the other models improved in **9 or 10**. These are sel
 samples from one dataset; the results do not establish that capping helps on every new
 task.
 
+The figure includes LimiX-2 and Causilo, released in September 2026 and first and third
+on the TabArena leaderboard of 28 September. Like the models measured before, both
+standardise the target by its mean and standard deviation; one added row moves their
+upper quantiles ([notebook](analysis/models_2026_09.ipynb)).
+
 ![Change in 99th-percentile loss after capping insurance claims](figures/natural_capping.png)
 
 ## Reproduce the figures
@@ -43,8 +48,9 @@ to `figures/`.
   which is not published in full. `requirements/`: model environments.
 - `data/`: dataset selections and sources.
 - `analysis/`: notebooks for [shape and scale](analysis/h1_shape_vs_scale.ipynb),
-  [extreme context targets](analysis/h2_leverage.ipynb) and
-  [repairs](analysis/h3_repair.ipynb).
+  [extreme context targets](analysis/h2_leverage.ipynb),
+  [repairs](analysis/h3_repair.ipynb) and
+  [the models released in September 2026](analysis/models_2026_09.ipynb).
 
 [Measurement rules](RULES.md) · [Predictions and outcomes](PREREGISTRATION.md)
 · [Three framings of the topic](FRAMINGS.md)

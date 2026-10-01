@@ -20,7 +20,8 @@ from common import files, paths
 
 # Model packages plus the numerical stack, whose major versions differ between venvs.
 PACKAGES = ["numpy", "pandas", "scipy", "scikit-learn", "torch", "tabpfn",
-            "tabicl", "tabdpt", "tabfm", "exaone-tabular", "xgboost", "catboost"]
+            "tabicl", "tabdpt", "tabfm", "exaone-tabular", "xgboost", "catboost",
+            "causilo", "limix"]
 
 # Distribution names that differ from the PACKAGES spelling. PACKAGES also names the
 # column (`v_exaone_tabular`), and renaming a column would break the header, so the
@@ -46,7 +47,9 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              # An unset value means the library default, which depends on the machine.
              "OMP_NUM_THREADS", "MKL_NUM_THREADS",
              # nanoTabPFN runs on the GPU when there is one; kernels differ in the last bits.
-             "TFMP_DEVICE"]
+             "TFMP_DEVICE",
+             # LimiX-2 runs on the GPU when there is one, for the same reason.
+             "LIMIX_DEVICE"]
 
 COLUMNS = (["utc", "output", "script", "git_sha", "git_dirty", "python",
             "platform", "venv"]
