@@ -135,7 +135,10 @@ def _read(name, blob) -> pd.DataFrame:
     if kind == "xport-in-zip":
         with zipfile.ZipFile(io.BytesIO(blob)) as z, z.open(spec["member"]) as f:
             df = pd.read_sas(io.BytesIO(f.read()), format="xport")
-        return df[spec["keep"] + [spec["target"]]]
+        df = df[spec["keep"] + [spec["target"]]]
+        # pandas reads a SAS XPORT zero as 5.4e-79. Before 1.10.2026 these stayed in, so
+        # 6933 persons with no expenditure passed `positive_only` as positive amounts.
+        return df.mask(df.abs() < 1e-70, 0.0)
     if kind == "csv-in-zip":
         with zipfile.ZipFile(io.BytesIO(blob)) as z, z.open(spec["member"]) as f:
             df = pd.read_csv(f, header=None)

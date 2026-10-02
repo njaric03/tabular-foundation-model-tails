@@ -100,6 +100,13 @@ weak; more seeds and a second dataset would be needed to say more.
     FT-A0      -11.1%           478 (-5.2%)
     FT-A1       -9.0%           471 (-6.5%)                0.952 (lower in 9 of 10)
 
+CORRECTION, 1.10.2026. The batch is cut at its smallest split, while A1 places the
+contaminated row below each table's own split. In 104 of 6086 contaminated tables (seed 1)
+and 91 of 6018 (seed 2) that row fell among the query targets, so "test targets never
+contaminated" above does not hold for these runs. The outcomes describe these four
+checkpoints; they are not a clean test of contamination confined to the context. Details
+in PREREGISTRATION.md.
+
     venv-tfmp/Scripts/python.exe -u experiments/h3_repair/tabicl_prior_finetune.py \\
         --dump .cache/tfmp/dumps/base_s2026_14000.h5 --arm A1 --seed 1 --tables 20000
 """

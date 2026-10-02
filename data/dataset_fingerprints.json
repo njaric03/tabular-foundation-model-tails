@@ -297,8 +297,8 @@
   "n_cols": 23,
   "n_rows": 34655,
   "y_max": 580640.0,
-  "y_min": 5.397605346934028e-79,
-  "y_sha1": "6deebfe5085bc766"
+  "y_min": 0.0,
+  "y_sha1": "b6eb1afb17df43f4"
  },
  "MIP-2016-regression": {
   "n_cols": 147,

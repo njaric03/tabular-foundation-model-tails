@@ -22,7 +22,9 @@ experiment makes is versioned. What differs from the original:
     the edges. Without it the first B1 run met encoded values of 2e9 on contexts whose
     robust scale is a millionth of the sd, and its loss was NaN from step 50;
   - a micro-batch of several tables uses the smallest split among them, so every table
-    keeps at least that many context rows;
+    keeps at least that many context rows. A1 places its contaminated row below the
+    table's own split, so the row can fall among the test targets (correction of
+    1.10.2026 in PREREGISTRATION.md; not counted for these dumps);
   - a resumable checkpoint every `--ckpt_every` steps, and a CSV of the loss.
 
     venv-tfmp/Scripts/python.exe experiments/h3_repair/prior_pretraining_train.py \\

@@ -1815,3 +1815,186 @@ reads claims summed per policy and joined to the policy covariates, 24 944 rows.
 table the worst sd shift is 14.5, still the largest of the 99 (Brazilian_houses follows at
 6.0). The predictions are left as they were written; outcomes read against them use 14.5.
 ```
+
+## Correction to the fine-tuning protocol, 1.10.2026
+
+```
+Both training loops cut every table of a batch at the smallest split in that batch
+(`tabicl_prior_finetune.py:258`, `prior_pretraining_train.py:241`), while
+`prior_arms.contaminate` picks the corrupted row below each table's own split. When a
+table's own split is larger than the batch's, the corrupted row can land among the query
+targets. That contradicts the statement in the TabICLv2 fine-tuning section that test
+targets are never contaminated. The bucket edges of `prior_pretraining_train.py` read each
+table at its own split and are not affected. FT-A0 has no contamination; the shorter
+context is the intended effect of the batch cut there.
+
+Counted without training, over the 20 000 tables each arm of the TabICLv2 fine-tuning saw
+(batch 4, the starting offset of the seed, A1 defaults):
+
+    seed   split changed   contaminated   corrupted row in the query
+    1      2131            6086           104 (1.7%)
+    2      1905            6018            91 (1.5%)
+
+A corrupted query target sits 100 to 1500 context sds above the context mean; the clip
+at 1e4 does not reach it. Where the row stays in the context, the shift on the final
+context equals the drawn one on the median (largest ratio 14.5 for seed 1, 7.2 for seed 2).
+The nanoTabPFN runs share the pattern; their counts were not made.
+
+The outcomes of 16.9.2026 stand as measurements of those four checkpoints. They are not a
+clean test of contamination confined to the context. How much the deviation moved them is
+not measured. The pinball gradient with respect to a quantile is bounded, so the size of
+these query targets in the loss says nothing about their weight in training.
+```
+
+## Correction to MEPS_2016_TOTEXP, 1.10.2026
+
+```
+pandas reads a SAS XPORT zero as 5.397605346934028e-79, so 6933 of the 34 655 persons in
+MEPS HC-192 with no expenditure passed `positive_only` as positive amounts: 20% of the
+table that `external_selection.py`, `unit_error_real.py` and the prevalence runs used.
+`common/external.py` now sets every value below 1e-70 to zero; the converted table keeps
+27 722 positive rows. The fingerprint in `data/dataset_fingerprints.json` was updated by
+hand (y_sha1 6deebfe5085bc766 before, b6eb1afb17df43f4 after). Earlier MEPS rows are left
+as they were measured and are not comparable with later ones.
+```
+
+## `experiments/h3_repair/unit_error_confirm.py`, 1.10.2026
+
+```
+The frozen cap clip_200 on subsamples no earlier run has seen (draw seed 20261001), the
+five insurance tables, TabPFN-V3, TabICLv2 and GBM, 20 repeats. Three contexts per
+subsample: clean, the earlier stress test (a row whose x100 error reaches an sd shift of
+2) and a row drawn uniformly over the context, times 100.
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+A unit is a (dataset, model) pair, 15 in all; a unit's value is its median over repeats.
+
+C1, the stress test replicates. Under the visible error clip_200's pinball at 0.99 is
+below raw's in at least 10 of 15 units (16 of 21 on the earlier draws).
+
+C2, the clean cost stays small. On the clean context clip_200's pinball against raw is
+within 2% at 0.99 in every unit, and at most 10% above it at 0.999 in every unit.
+
+C3, a random error matters less. For each of the ten foundation-model units the rise of
+raw's pinball at 0.99 over the clean context is smaller under the random row than under
+the visible row.
+
+Reported without a prediction: D0 and D1, the change in mean pinball at 0.99 from the cap
+on clean contexts and under the random error, and the break-even rate p* = D0 / (D0 - D1)
+where D0 > 0 > D1.
+
+After the predictions were written, a smoke test of the code ran GBM on two repeats of
+AutoClaims and norauto into a scratch directory. It showed that clip_200 touched no clean
+context and neither corrupted row there. The predictions were not changed.
+```
+
+## `experiments/h3_repair/legit_segment.py`, 1.10.2026
+
+```
+The cost of the frozen cap to a legitimate high-risk segment, on the GPD generator at
+xi = 0.7: a visible binary feature that multiplies the conditional scale by M in 5% of
+rows, M in {1, 5, 20}, clean and under an added row at an sd shift of 20. The loss is the
+expected pinball under the true conditional law, in closed form, so the 0.999 level
+carries no Monte Carlo noise from the test targets. Seeds 7500 to 26500, unused before.
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+Expected pinball, paired over seeds, foundation models (TabPFN-V3, TabICLv2) unless said.
+
+S1, the control. At M = 1 on a clean context clip_200 changes the expected pinball at 0.99
+over the whole test set by less than 2% on the median for each foundation model.
+
+S2, the benefit replicates. At M = 1 under the shift of 20 clip_200 lowers the expected
+pinball at 0.99 in at least 18 of 20 seeds for each foundation model.
+
+S3, the segment pays. At M = 20 on a clean context:
+  (a) at least half of the clipped context rows are segment rows, on the median;
+  (b) the segment's expected pinball at 0.999 is higher under clip_200 than under raw in at
+      least 14 of 20 seeds for each foundation model;
+  (c) for each foundation model the median relative change of the segment's expected
+      pinball at 0.99 is larger than that of the whole test set.
+
+S4, the benefit survives the segment. At M = 20 under the shift of 20 clip_200 lowers the
+expected pinball at 0.99 over the whole test set in at least 15 of 20 seeds for TabPFN-V3.
+
+GBM carries no prediction, nor does M = 5. The closed form was checked against 4 million
+Monte Carlo draws, and a smoke test ran GBM on one seed into a scratch directory, both
+after the predictions were written.
+```
+
+## `experiments/h3_repair/legit_segment.py`, outcome, 1.10.2026
+
+```
+720 cells, none failed, 6584 s on CPU beside the unit-error run (6 threads each).
+Medians over 20 seeds of clip_200 against raw, expected pinball.
+
+S1  HOLDS. At M = 1 on a clean context the cap changes the expected pinball at 0.99 by
+    -0.17% (TabPFN-V3) and -0.31% (TabICLv2).
+
+S2  HALF. TabPFN-V3 is lower in 20 of 20 seeds (-9.6%). TabICLv2 is lower in 12 of 20
+    (-2.2%), and at 0.999 the cap costs it 7.4%.
+
+S3  HOLDS. (a) 3 of the 4 clipped context rows are segment rows on the median (share
+    0.82). (b) The segment's expected pinball at 0.999 rises in 18 of 20 seeds for
+    TabPFN-V3 (+5.3%) and in 20 of 20 for TabICLv2 (+15.9%). (c) At 0.99 the segment pays
+    more than the whole test set: +0.45% against -0.01% for TabPFN-V3, +10.0% against
+    +5.7% for TabICLv2.
+
+S4  HOLDS. 20 of 20 seeds for TabPFN-V3, -9.4% over the whole test set.
+
+What this says. The cost of the cap falls on the segment as predicted. Its size, and
+whether the cap pays at all, depends on what the added row does to the raw model:
+
+    raw, shift 20 against clean    TabPFN-V3        TabICLv2         GBM
+    0.99,  M = 1                   +10.0%           +2.5%            0.0%
+    0.999, M = 1                   +4.0%            -9.3%            +23.4%
+    0.999, M = 20                  +22.3%           -28.5%           +1.0%
+
+The row hurts TabPFN-V3, so the cap repairs it: -9.4% at 0.99 at M = 20 under the error,
+-6.0% and -3.6% on the segment at 0.99 and 0.999, for a clean-context cost of +0.45% and
++5.3% on the segment. The row helps TabICLv2 at 0.999, because its clean Q(0.999) sits at
+0.42 of the truth (0.12 on the segment at M = 20) and the inflated context lifts it. The cap
+removes the lift: at M = 20 under the error it raises TabICLv2's expected pinball by 9.6% at
+0.99 and 54% at 0.999 over the whole test set, by 21.6% and 72.6% on the segment. That
+the error helps TabICLv2 is a consequence of its clean underestimate, not a robustness.
+GBM moves by no more than 2.6% at 0.99; at 0.999 the cap gains under the error at M = 1 and 5
+and costs 5.6% on a clean context at M = 20.
+```
+
+## `experiments/h3_repair/unit_error_confirm.py`, outcome, 1.10.2026
+
+```
+1800 cells, none failed, 6952 s on CPU beside the segment run (6 threads each).
+
+C1  FAILS. clip_200 is below raw under the visible error in 7 of 15 units, not 10. The
+    count splits by model: TabPFN-V3 in 4 of 5 (freMTPL2sev +0.07%), TabICLv2 in 1 of 5
+    (freMTPL2sev -2.4%; elsewhere +1.0% to +5.5%), GBM in 2 of 5 and unchanged in 3. The
+    earlier 16 of 21 was the same split plus BlogFeedback and MEPS, where the cap helped
+    every model. On the five insurance tables of the earlier draws TabPFN-V3 was lower in
+    5 of 5 and TabICLv2 in 2 of 5. The prediction was set on the pooled count.
+
+C2  HOLDS. On a clean context the cap touches nothing on four tables, so its pinball equals
+    raw's. On freMTPL2sev it touches 85% of clean contexts and lowers the pinball at 0.99 by
+    0.07% to 0.6% on the median, at +0.2% and +0.9% at 0.999.
+
+C3  FAILS. The random row raises raw's pinball less than the visible row in 6 of 10
+    foundation-model units. TabPFN-V3 follows the prediction except on freMTPL2sev, where
+    neither error moves it. TabICLv2 does not: a random x100 row raises its pinball at 0.99
+    about as much as a visible one (norauto 5.9% against 5.7% by mean, ausprivauto0405
+    3.1% against -0.1%).
+
+Two regimes. D0 is zero on four tables because the cap never fires there, and negative on
+freMTPL2sev for all three models. No unit has D0 > 0, so the break-even rate p* is
+undefined everywhere: on these tables at 0.99 clip_200 costs nothing on a clean context
+and the only question is whether it helps under an error. Under the random error the cap
+fires in 15 to 35% of contexts on the four small-claim tables, leaving the corrupted value
+in place in the rest, and in every context on freMTPL2sev. Under the visible error it fires
+in 75 to 100%.
+
+Where it fires on a visible error, the cap lowers the pinball at 0.99 for TabPFN-V3 in 70
+of 90 contexts (median -1.5%) and raises it for TabICLv2 (lower in 33 of 90, median
++1.4%). The generator of `legit_segment.py` gives the same split: the cap repairs
+TabPFN-V3 and costs TabICLv2. A recommendation for clip_200 is a recommendation for
+TabPFN-V3, not for the family.
+```
