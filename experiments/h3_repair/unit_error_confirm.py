@@ -51,6 +51,13 @@ freMTPL2sev, where it lowers the 0.99 loss slightly. C3 fails, 6 of 10: a random
 hurts TabICLv2 about as much as a visible one. D0 is never positive, so p* is undefined.
 Full outcome in PREREGISTRATION.md.
 
+CATEGORICAL=native, 13.10.2026: TabPFN-V3 again on the same draws with the coded columns
+passed as categories (TabICL encodes them as ordinal codes itself). N1: the cap still
+lowers the visible-error pinball at 0.99 in at least 4 of 5 tables. N2: the clean raw
+pinball at 0.99 moves by less than 3% against the coded run in every table.
+Outcome: N1 holds, 5 of 5; N2 holds, -0.5% to +0.4%. Run with MODELS=TabPFN-V3
+CATEGORICAL=native OUTPUT=unit_error_confirm_native.csv.
+
     DATASETS=AutoClaims MODELS=GBM REPEATS=2 python -u experiments/h3_repair/unit_error_confirm.py
 """
 import time
@@ -119,6 +126,11 @@ def main():
         print(f"resuming, {len(done)} cells already measured", flush=True)
     for name in DATASETS:
         X, y = datasets.load(name, positive_only=True)
+        if models.CATEGORICAL:
+            # The columns prepare() coded from categories, handed to the model as such.
+            models.CATEGORICAL_INDICES = datasets.LAST.get("categorical", [])
+            print(f"  [categorical] {len(models.CATEGORICAL_INDICES)} of {X.shape[1]} "
+                  f"columns passed as categories", flush=True)
         for r, (idx, vis, rnd, share) in enumerate(draws(y)):
             Xf, y_clean, Xte, yte = X[idx[:N_FIT]], y[idx[:N_FIT]], X[idx[N_FIT:]], y[idx[N_FIT:]]
             natural = float(metrics.sd_shift(y_clean))

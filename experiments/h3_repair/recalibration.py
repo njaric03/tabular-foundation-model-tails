@@ -53,6 +53,13 @@ segment's excess over the oracle after raw + add is larger than after raw + mul 
 
 GBM is reported without a prediction, as is TabPFN-V3 in K3 and K4.
 
+OUTCOME, 13.10.2026
+-------------------
+K1 fails (TabPFN-V3 17, 19, 9, 14 of 20; TabICLv2 12, 12, 12, 9). K2 holds (20 of 20, gap
+-3.2% against -6.7%). K3 holds (16). K4 holds (17). K5 fails (14 and 10). Calibration takes
+half of the cap's benefit to TabPFN-V3 and none of its cost to the segment. Full outcome in
+PREREGISTRATION.md.
+
     MODELS=GBM SEEDS=2 python -u experiments/h3_repair/recalibration.py
 """
 import numpy as np

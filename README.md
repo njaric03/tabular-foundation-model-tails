@@ -10,7 +10,7 @@ and whether capping that value improves accuracy.
 leaves the scale unchanged, TabICLv2 reproduces 98% of the true change in the
 conditional scale and 44% of the change in the tail shape. TabPFN-3 reproduces 95% and
 42% with one ensemble member; its default ensemble lowers the shape to 19%. An
-extreme-value oracle on the same 2000 rows recovers 98% of the shape. Gradient boosting
+extreme-value oracle on the same 2000 rows recovers 99% of the shape. Gradient boosting
 has the same gap (87% and 45%), so it is not specific to foundation models.
 
 **One extreme context target.** On 40 synthetic tasks, one added extreme target made the
@@ -70,7 +70,7 @@ prior or from the architecture is left to later work.
   model or a dataset.
 - The four tail families of the generator (GPD, Fréchet, Burr, absolute Student t) are
   all regularly varying. Transfer to lognormal or other heavy tails is untested.
-- The oracle uses structure a general learner does not have. Its 98% does not rule out
+- The oracle uses structure a general learner does not have. Its 99% does not rule out
   sample size as a cause of the shape gap.
 - An sd shift of 4 or more appeared in subsamples of 2 of 99 public datasets. This
   describes the sampled contexts, not a rate of data errors.

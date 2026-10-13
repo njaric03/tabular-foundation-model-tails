@@ -25,7 +25,8 @@ Sections are in the order they were written, grouped here by part of the thesis.
   `head_tail_tabicl.py`.
 - Capping: `clip_context.py`, `clip_context_real.py`, `unit_error_real.py`,
   `pinball_reference.py`; the confirmation of 1.10.2026, `unit_error_confirm.py` and
-  `legit_segment.py` with their outcomes; `recalibration.py`, 2.10.2026.
+  `legit_segment.py` with their outcomes; `recalibration.py`, 2.10.2026;
+  `unit_error_confirm.py` with native categories, 13.10.2026.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2038,4 +2039,64 @@ GBM, TabPFN-V3 in K3 and K4 and the 0.999 level carry no prediction. After the p
 were written a smoke test ran GBM on one seed into a scratch directory; at M = 20 its
 multiplicative factor fell to 0.46 and raised the loss over the whole test set. The
 predictions were not changed.
+```
+
+## `experiments/h3_repair/unit_error_confirm.py` with CATEGORICAL=native, 13.10.2026
+
+```
+The confirmation of 1.10.2026 handed categorical columns to every model as integer codes.
+TabICL 2.1.1 encodes categories with its own OrdinalEncoder, so codes are what it would see
+anyway, and trees split on codes either way; only TabPFN has a categorical path
+(`categorical_features_indices`). This run repeats TabPFN-V3 on the same draws (draw seed
+20261001, same subsamples, same rows corrupted) with the coded columns passed as
+categories, into unit_error_confirm_native.csv. On freMTPL2sev alone the natural-extreme
+run of 12.9.2026 (clip_context_real_native.csv, read only on 13.10.2026) already showed
+the cap lowering TabPFN-V3's pinball at 0.99 in 9 of 10 subsamples either way.
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+A unit is a table; its value is the median over 20 repeats, as in C1.
+
+N1, the benefit does not depend on the encoding. Under the visible error clip_200's
+pinball at 0.99 is below raw's for TabPFN-V3 in at least 4 of 5 tables, as with codes.
+
+N2, the encoding moves the raw model little. On the clean context TabPFN-V3's raw pinball
+at 0.99 with categories is within 3% of the coded run's, on the median of the paired
+ratio over repeats, in every table.
+
+TabICLv2 and GBM are not rerun. No smoke test was run before these were written.
+```
+
+## `experiments/h3_repair/recalibration.py`, outcome, 13.10.2026
+
+```
+480 cells, none failed. 122 cells ran on 2.10.2026, the other 358 on 13.10.2026; seed 7700
+of TabPFN-V3 rerun on 13.10 reproduced the stored rows bit for bit in all four cells.
+
+K1  FAILS. raw + mul is lower than raw in 17 and 19 of 20 seeds for TabPFN-V3 at M = 1,
+    9 and 14 at M = 20; TabICLv2 12, 12, 12 and 9. The correction helps TabPFN-V3 without a
+    segment and is noise for TabICLv2.
+K2  HOLDS. At M = 1 under the shift of 20 cap + mul beats raw + mul in 20 of 20 seeds;
+    the median gap is -3.2% against -6.7% without calibration.
+K3  HOLDS, narrowly. 16 of 20 seeds for TabICLv2.
+K4  HOLDS. cap + mul raises TabICLv2's segment loss over raw + mul in 17 of 20 seeds.
+K5  FAILS. 14 of 20 seeds for TabICLv2 and 10 of 20 for TabPFN-V3.
+
+Calibration takes half of the cap's benefit to TabPFN-V3 and removes none of the cap's
+cost to the segment. GBM's factor raises its loss as often as it lowers it.
+```
+
+## `experiments/h3_repair/unit_error_confirm.py` with CATEGORICAL=native, outcome, 13.10.2026
+
+```
+600 cells, none failed; same subsamples, corrupted rows and sd shifts as the coded run.
+
+N1  HOLDS. Under the visible error the cap lowers TabPFN-V3's pinball at 0.99 in 5 of 5
+    tables (-0.2% to -4.0%), against 4 of 5 with codes; freMTPL2sev moves from +0.07% to
+    -0.18%.
+N2  HOLDS. The clean raw pinball at 0.99 moves by -0.5% to +0.4% against the coded run.
+    On beMTPL97 every cell is identical to the last digit, which suggests TabPFN's own
+    modality detection already treats those columns as categorical.
+
+The encoding does not carry the result of the confirmation.
 ```
