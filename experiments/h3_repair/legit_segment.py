@@ -104,15 +104,6 @@ KEY = ["model", "xi", "seg_scale", "seg_share", "sd_shift_target", "variant", "c
        "seed", "n_est", "n_train", "n_test"]
 
 
-def expected_pinball(q, sigma, xi, tau):
-    """E rho_tau(Y - q) per row for Y ~ GPD(0, sigma, xi), 0 < xi < 1."""
-    q, sigma = np.asarray(q, float), np.asarray(sigma, float)
-    m = sigma / (1.0 - xi)
-    above = m * (1.0 + xi * np.maximum(q, 0.0) / sigma) ** (1.0 - 1.0 / xi)
-    plus = np.where(q >= 0, above, m - q)
-    return plus - (1.0 - tau) * (m - q)
-
-
 def design(cell):
     """Context, test and the true scales, the same base draws for every M of a seed."""
     xi, seed, M = cell["xi"], cell["seed"], cell["seg_scale"]
@@ -148,7 +139,7 @@ def measure(cell):
              n_seg_context=int(g.sum()), n_seg_test=int(parts["seg"].sum()),
              n_clipped=n, n_clipped_seg=int(((y_fit < y) & (g > 0)).sum()))
     for i, (a, t) in enumerate(zip(LEVELS, TAGS)):
-        e = expected_pinball(q[:, i], sigma, xi, a)
+        e = metrics.gpd_expected_pinball(q[:, i], sigma, xi, a)
         for p, rows in parts.items():
             r[f"epb{t}_{p}"] = float(e[rows].mean())
             r[f"pb{t}_{p}"] = metrics.pinball(yte[rows], q[rows, i], a)

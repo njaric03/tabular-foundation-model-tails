@@ -16,3 +16,7 @@ MODELS=TabPFN-V3,TabICLv2,GBM REPEATS=20 N_FIT=2000 N_TEST=1000 N_EST=1 CLIP_C=2
 MODELS=TabPFN-V3,TabICLv2,GBM XI=0.7 SD_SHIFTS=1,20 CLIP_C=200 SEEDS=20 N_TRAIN=2000 \
   N_TEST=5000 N_EST=1 OUTPUT=legit_segment.csv \
   $PY -u experiments/h3_repair/legit_segment.py
+
+MODELS=TabPFN-V3,TabICLv2,GBM XI=0.7 SD_SHIFTS=1,20 CLIP_C=200 SEEDS=20 N_TRAIN=2000 \
+  N_CALIB=2000 N_TEST=5000 N_EST=1 OUTPUT=recalibration.csv \
+  $PY -u experiments/h3_repair/recalibration.py

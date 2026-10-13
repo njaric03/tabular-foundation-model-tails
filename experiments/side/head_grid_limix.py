@@ -6,7 +6,7 @@ LimiX-2 decodes its bar head with half-normal outer buckets, the design of TabPF
 and sd of the context (`common/adapters/limix.py`). How finely the grid resolves a value
 therefore depends on how many sds from the mean it lies, and one leverage row moves every
 value towards the centre in sd units. This counts the borders per band, the counterpart of
-the TabPFN grid in `findings/h1/head_tail_family.md`.
+the TabPFN grid in `head_tail_family.py`.
 
     venv-limix/Scripts/python.exe -u experiments/side/head_grid_limix.py
 """

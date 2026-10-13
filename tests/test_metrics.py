@@ -172,3 +172,34 @@ def test_rel_change_by_level_skips_zero_references():
     new = np.array([[5.0, 2.0], [2.0, -1.0], [4.0, 8.0]])
     assert metrics.rel_change_by_level(ref, new) == pytest.approx([1.0, 1.0])
     assert metrics.rel_change_by_level(ref, new, positive=True)[1] == pytest.approx(1.0)
+
+
+# ------------------------------------------------------ calibration and truth
+
+@pytest.mark.parametrize("q", [-1.0, 0.0, 3.0, 40.0, 300.0])
+@pytest.mark.parametrize("tau", [0.5, 0.99, 0.999])
+def test_gpd_expected_pinball_matches_quadrature(q, tau):
+    from scipy.integrate import quad
+    xi, sigma = 0.7, 2.0
+    dist = genpareto(xi, scale=sigma)
+
+    def rho(y):
+        d = y - q
+        return max(tau * d, (tau - 1) * d) * dist.pdf(y)
+    want = sum(quad(rho, a, b, limit=400)[0]
+               for a, b in [(0, max(q, 0) + 1e-12), (max(q, 0) + 1e-12, np.inf)])
+    got = float(metrics.gpd_expected_pinball(q, sigma, xi, tau))
+    assert got == pytest.approx(want, rel=1e-5)
+
+
+def test_calibration_factors_minimise_the_pinball():
+    rng = np.random.default_rng(0)
+    q = rng.uniform(1, 10, 500)
+    y = q * rng.lognormal(0.3, 0.5, 500)
+    tau = 0.9
+    c_mul = metrics.factor_for_pinball(y, q, tau)
+    c_add = metrics.shift_for_pinball(y, q, tau)
+    for c in (0.98, 1.02):
+        assert metrics.pinball(y, c_mul * q, tau) <= metrics.pinball(y, c * c_mul * q, tau)
+    for d in (-0.05, 0.05):
+        assert metrics.pinball(y, q + c_add, tau) <= metrics.pinball(y, q + c_add + d, tau)

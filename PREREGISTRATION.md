@@ -1,4 +1,4 @@
-# Predictions written before each run, and what happened
+# Predictions written before each run and what happened
 
 Extracted verbatim from the module docstrings of the scripts below at commit `578a2f3`,
 before a refactor shortened those docstrings. Nothing here was edited: the text is what
@@ -13,18 +13,25 @@ or a threshold was picked after a run, the block says so itself.
 Outcomes of runs after the refactor is merged are appended below the last section, in
 the same form.
 
+The first four sections were written in Serbian and are kept as written. References to
+`findings/` and `FINDINGS.md` point to working notes that are not published.
+
 ## Contents
 
-- `experiments/h1_shape_vs_scale/xi_residual.py`
-- `experiments/h2_leverage/architecture_tabdpt.py`
-- `experiments/h2_leverage/architecture_tabfm.py`
-- `experiments/h2_leverage/prevalence_models.py`
-- `experiments/h2_leverage/grid_occupancy.py`
-- `experiments/side/head_tail_tabicl.py`
-- `experiments/h3_repair/clip_context.py`
-- `experiments/h3_repair/clip_context_real.py`
-- `experiments/h3_repair/unit_error_real.py`
-- `experiments/h3_repair/tail_splice.py`
+Sections are in the order they were written, grouped here by part of the thesis.
+
+- Scale and tail shape: `xi_residual.py`.
+- Extreme context target: `prevalence_models.py`, `grid_occupancy.py`,
+  `head_tail_tabicl.py`.
+- Capping: `clip_context.py`, `clip_context_real.py`, `unit_error_real.py`,
+  `pinball_reference.py`; the confirmation of 1.10.2026, `unit_error_confirm.py` and
+  `legit_segment.py` with their outcomes; `recalibration.py`, 2.10.2026.
+- Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
+  and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
+- Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
+  `tail_splice.py`; pre-training of nanoTabPFN (`prior_pretraining_eval.py`,
+  `prior_pretraining_real.py`) and fine-tuning of TabICLv2 (`tabicl_prior_finetune.py`),
+  15 to 17.9.2026.
 
 ---
 
@@ -1997,4 +2004,38 @@ of 90 contexts (median -1.5%) and raises it for TabICLv2 (lower in 33 of 90, med
 +1.4%). The generator of `legit_segment.py` gives the same split: the cap repairs
 TabPFN-V3 and costs TabICLv2. A recommendation for clip_200 is a recommendation for
 TabPFN-V3, not for the family.
+```
+
+## `experiments/h3_repair/recalibration.py`, 2.10.2026
+
+```
+One global recalibration on 2000 clean held-out rows, beside the frozen cap, on the design
+of legit_segment.py (xi = 0.7, segment of 5% at scale M in {1, 20}, clean and at an sd
+shift of 20), TabPFN-V3, TabICLv2 and GBM, seeds 7700 to 26700. Primary: one factor c on
+the quantile, c the q-weighted tau-quantile of y / q. Secondary: one shift, the tau-quantile
+of y - q. Both are exact pinball minimisers on the calibration rows and share every fit.
+The calibration rows are new information; the result measures what is repairable when such
+a sample exists. Replaces the optional fine-tuning branch (decision of 2.10.2026).
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+Expected pinball at 0.99, multiplicative calibration unless said, paired over 20 seeds.
+Differences under 2% are calibration noise at this sample size and are not read as effects.
+
+K1. For TabPFN-V3 and TabICLv2, raw + mul is lower than raw over the whole test set in at
+    least 15 of 20 seeds in each of the four (M, shift) cells.
+K2. At M = 1 under the shift of 20, cap + mul is lower than raw + mul for TabPFN-V3 in at
+    least 14 of 20 seeds, and the median relative gap between them is smaller than the gap
+    between cap and raw without calibration.
+K3. At M = 20 on a clean context, after raw + mul the segment's excess over the oracle is
+    larger than the excess outside the segment in at least 15 of 20 seeds for TabICLv2.
+K4. At M = 20 on a clean context, cap + mul gives TabICLv2's segment a higher expected
+    pinball than raw + mul in at least 14 of 20 seeds.
+K5. At M = 20 on a clean context the segment's excess over the oracle after raw + add is
+    larger than after raw + mul in at least 15 of 20 seeds for each foundation model.
+
+GBM, TabPFN-V3 in K3 and K4 and the 0.999 level carry no prediction. After the predictions
+were written a smoke test ran GBM on one seed into a scratch directory; at M = 20 its
+multiplicative factor fell to 0.46 and raised the loss over the whole test set. The
+predictions were not changed.
 ```

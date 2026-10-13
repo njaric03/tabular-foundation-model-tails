@@ -159,6 +159,39 @@ def pinball(y, q, level) -> float:
     return float(np.mean(np.maximum(level * d, (level - 1) * d)))
 
 
+def gpd_expected_pinball(q, sigma, xi, tau):
+    """E rho_tau(Y - q) per row for Y ~ GPD(0, sigma, xi), 0 < xi < 1, in closed form.
+
+    E(Y - q)+ = m (1 + xi q / sigma)^(1 - 1/xi) for q >= 0 and m - q below, with
+    m = sigma / (1 - xi), and E rho = E(Y - q)+ - (1 - tau)(m - q).
+    """
+    q, sigma = np.asarray(q, float), np.asarray(sigma, float)
+    m = sigma / (1.0 - xi)
+    above = m * (1.0 + xi * np.maximum(q, 0.0) / sigma) ** (1.0 - 1.0 / xi)
+    plus = np.where(q >= 0, above, m - q)
+    return plus - (1.0 - tau) * (m - q)
+
+
+def shift_for_pinball(y, q, tau) -> float:
+    """The c minimising the pinball loss of q + c: the tau-quantile of y - q."""
+    return float(np.quantile(np.asarray(y, float) - np.asarray(q, float), tau,
+                             method="inverted_cdf"))
+
+
+def factor_for_pinball(y, q, tau) -> float:
+    """The c minimising the pinball loss of c * q over the rows with q > 0.
+
+    rho_tau(y - c q) = q rho_tau(y / q - c) for q > 0, so c is the tau-quantile of y / q
+    weighted by q.
+    """
+    y, q = np.asarray(y, float), np.asarray(q, float)
+    ok = q > 0
+    r, w = y[ok] / q[ok], q[ok]
+    order = np.argsort(r)
+    cw = np.cumsum(w[order])
+    return float(r[order][np.searchsorted(cw, tau * cw[-1])])
+
+
 def pinball_all(q, y, levels=LEVELS):
     """Per-row, per-level pinball loss, shape (n, len(levels))."""
     q = np.asarray(q, dtype=float)
