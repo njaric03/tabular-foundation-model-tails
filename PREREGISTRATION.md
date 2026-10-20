@@ -26,7 +26,8 @@ Sections are in the order they were written, grouped here by part of the thesis.
 - Capping: `clip_context.py`, `clip_context_real.py`, `unit_error_real.py`,
   `pinball_reference.py`; the confirmation of 1.10.2026, `unit_error_confirm.py` and
   `legit_segment.py` with their outcomes; `recalibration.py`, 2.10.2026;
-  `unit_error_confirm.py` with native categories, 13.10.2026.
+  `unit_error_confirm.py` with native categories, 13.10.2026; both scripts with
+  TabPFN-V3's default ensemble and a log arm, 20.10.2026.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2099,4 +2100,81 @@ N2  HOLDS. The clean raw pinball at 0.99 moves by -0.5% to +0.4% against the cod
     modality detection already treats those columns as categorical.
 
 The encoding does not carry the result of the confirmation.
+```
+
+## `unit_error_confirm.py` and `legit_segment.py` with the default ensemble and a log arm, 20.10.2026
+
+```
+Two gaps in the confirmation of 1.10.2026, both raised by a review of the thesis plan.
+Every H2 and H3 run fits TabPFN-V3 with one ensemble member. The package default is
+eight: in tabpfn 8.4 with this checkpoint four of the eight members fit a Yeo-Johnson
+("safepower") transform of the target before standardising it, while one member fits
+none. That was checked on 20.10.2026 by fitting both settings on random data and reading
+the members' target transforms. The vendor's insurance cookbook fits claim amounts on
+log(1 + y) and caps them at 200 000 before the split, so the plain rival of clip_200 is a
+log of the target, which no confirmation has measured.
+
+Same draws as 1.10.2026: draw seed 20261001 on the five insurance tables, seeds 7500 to
+26500 on the segment generator, categorical columns as codes. Arms raw, clip_200 and log
+(fit on log y, exp of the quantiles), selected with ARMS=raw,clip,log. TabPFN-V3 runs on
+CPU at 6 threads, as before. Four outputs:
+
+    unit_error_confirm_log.csv      TabPFN-V3, TabICLv2, GBM    one member
+    unit_error_confirm_nest8.csv    TabPFN-V3                   eight members
+    legit_segment_log.csv           TabPFN-V3, TabICLv2, GBM    one member
+    legit_segment_nest8.csv         TabPFN-V3                   eight members
+
+The one-member files repeat raw and clip_200, which should match the stored rows of
+1.10.2026 bit for bit (R0, a check rather than a prediction). If they do not, every
+comparison below stays within the new files. The cap's one-member rows on these draws
+were seen on 1.10.2026; what is new is the log arm and the ensemble.
+
+Read before the predictions were written, from development runs at one member.
+clip_context.csv (TabPFN-V3, xi = 0.7, 20 seeds, drawn test targets): log against raw at
+0.99 is -4.0% on a clean context (lower in 19 of 20 seeds) and -13.6% at a shift of 20
+(20 of 20); clip_200 gives -0.1% and -10.4%. clip_context_real.csv (freMTPL2sev, natural
+extremes, 5 subsamples per bin): at a shift of 4 or more log gives -3.7% for TabPFN-V3
+and -5.3% for TabICLv2, clip_200 -2.5% and -6.0%; below a shift of 1.2 log gives -0.9%
+and -2.5%, clip_200 0.0% and -0.5%. No run has measured log under the unit error or on
+the segment, nor eight members under contamination.
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+Units as on 1.10.2026. Unit error: a (table, model) pair, its value the median over 20
+repeats of the paired relative change in pinball at 0.99. Segment: expected pinball at
+0.99 over the whole test set unless said, paired over 20 seeds. The verdicts come from
+analysis/confirm_ensemble_log.py, written with these predictions.
+
+The default ensemble, TabPFN-V3 at eight members.
+
+E1, the sensitivity survives. Segment, M = 1: raw's expected pinball under the shift of
+    20 is above raw's on the clean context in at least 15 of 20 seeds, with a median rise
+    of at least 2% (+10.0% at one member).
+E2, the ensemble damps it. That rise is smaller at eight members than at one on the same
+    seed in at least 14 of 20 seeds: the four transformed members see a compressed row,
+    the other four see it as one member does.
+E3, the cap still repairs TabPFN-V3. (a) Segment, M = 1, shift 20: clip_200 is below raw
+    in at least 18 of 20 seeds. (b) Unit error, visible row: clip_200 is below raw in at
+    least 4 of 5 tables.
+
+The log arm, one member.
+
+L1, log helps on a clean context. Segment, M = 1, clean: log is below raw in at least 15
+    of 20 seeds for each foundation model.
+L2, log repairs the error for TabPFN-V3. Segment, M = 1, shift 20: log is below raw in at
+    least 18 of 20 seeds.
+L3, log repairs TabICLv2 where the cap did not. Unit error, visible row: log is below raw
+    for TabICLv2 in at least 3 of 5 tables (clip_200: 1 of 5).
+L4, log beats the cap. (a) Unit error, visible row: log is below clip_200 in at least 3
+    of 5 tables for each foundation model. (b) Segment, M = 20, clean: the segment's
+    expected pinball is lower under log than under clip_200 in at least 14 of 20 seeds
+    for each foundation model, since log truncates no segment row.
+
+Reported without a prediction: GBM, the 0.999 level, M = 5, the random row, log at eight
+members, log against raw on the unit error's clean context and D0 and D1 for log.
+
+No model was run on the data of this experiment before these were written. The changed
+reports of both scripts were rerun on the stored files of 1.10.2026 and reproduce the
+counts of C1 to C3. The verdict script was run once on stand-ins built from those files,
+with log rows copied from clip rows, which tests the code and nothing else.
 ```

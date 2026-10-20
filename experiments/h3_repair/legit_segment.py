@@ -56,6 +56,11 @@ it hurts TabPFN-V3 (+10% at 0.99), which the cap repairs at a small cost to the 
 it lifts TabICLv2's too-low clean Q(0.999), and the cap takes the lift away (+54% at 0.999
 at M = 20 under the error). Full outcome in PREREGISTRATION.md.
 
+A log arm and TabPFN-V3's default ensemble, 20.10.2026: the same seeds with
+ARMS=raw,clip,log, one member for all three models and eight for TabPFN-V3
+(`run/confirm_ensemble_log.sh`). Predictions E1 to E3 and L1 to L4 are in
+PREREGISTRATION.md, their verdicts come from `analysis/confirm_ensemble_log.py`.
+
     MODELS=GBM SEEDS=2 python -u experiments/h3_repair/legit_segment.py
 """
 import numpy as np
@@ -84,6 +89,8 @@ SEEDS = [s + 500 for s in env.seeds(env.integer("SEEDS", 20))]
 N_TRAIN = env.integer("N_TRAIN", 2000)
 N_TEST = env.integer("N_TEST", 5000)
 N_EST = env.integer("N_EST", 1)
+# raw, clip (one arm per CLIP_C) and log, which the generator's positive target allows.
+ARM_NAMES = env.names("ARMS", "raw,clip")
 OUTPUT = env.text("OUTPUT", "legit_segment.csv")
 # Not knobs: the design of the segment. Both are columns.
 SCALES = (1.0, 5.0, 20.0)
@@ -91,7 +98,9 @@ SHARE = 0.05
 LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ["50", "90", "99", "999"]
 PARTS = ("all", "seg", "out")
-ARMS = [("raw", 0.0)] + [("clip", c) for c in CLIP_C]
+if "raw" not in ARM_NAMES or set(ARM_NAMES) - {"raw", "clip", "log"}:
+    raise ValueError(f"ARMS takes raw and any of clip and log, not {ARM_NAMES}")
+ARMS = [(a, c) for a in ARM_NAMES for c in (CLIP_C if a == "clip" else [0.0])]
 
 COLUMNS = (["model", "xi", "seg_scale", "seg_share", "sd_shift_target", "variant", "clip_c",
             "seed", "n_est", "n_train", "n_test", "sd_shift", "natural_shift", "n_seg_context",
@@ -168,20 +177,23 @@ def report():
     d = tables.ok_rows(pd.read_csv(paths.result(OUTPUT)))
     if d.empty:
         return
-    key = ["model", "xi", "seg_scale", "sd_shift_target", "seed"]
-    raw = d[d.variant == "raw"].set_index(key)
-    cap = d[d.variant == "clip"].set_index(key)
+    key = ["model", "n_est", "xi", "seg_scale", "sd_shift_target", "seed"]
+    arm = {v: d[d.variant == v].set_index(key) for v in d.variant.unique()}
     cols = ["epb99_all", "epb99_seg", "epb999_all", "epb999_seg", "epb99_out"]
-    rel = (cap[cols] / raw[cols] - 1).dropna()
-    by = ["model", "seg_scale", "sd_shift_target"]
-    print("\n=== clip_200 against raw, expected pinball, median over seeds ===")
-    print(rel.groupby(level=by).median().round(4).to_string())
-    print("\n=== seeds where clip_200 is lower than raw ===")
-    print((rel < 0).groupby(level=by).sum().to_string())
-    clipped = cap[["n_clipped", "n_clipped_seg"]].groupby(level=by).median()
-    print("\n=== clipped context rows, median ===")
-    print(clipped.to_string())
-    ratio = d.groupby(["model", "seg_scale", "sd_shift_target", "variant"])[
+    by = ["model", "n_est", "seg_scale", "sd_shift_target"]
+    for a, b in (("clip", "raw"), ("log", "raw"), ("log", "clip")):
+        if a not in arm or b not in arm:
+            continue
+        rel = (arm[a][cols] / arm[b][cols] - 1).dropna()
+        print(f"\n=== {a} against {b}, expected pinball, median over seeds ===")
+        print(rel.groupby(level=by).median().round(4).to_string())
+        print(f"\n=== seeds where {a} is lower than {b} ===")
+        print((rel < 0).groupby(level=by).sum().to_string())
+    if "clip" in arm:
+        clipped = arm["clip"][["n_clipped", "n_clipped_seg"]].groupby(level=by).median()
+        print("\n=== clipped context rows, median ===")
+        print(clipped.to_string())
+    ratio = d.groupby(["model", "n_est", "seg_scale", "sd_shift_target", "variant"])[
         ["qratio99_seg", "qratio999_seg", "qratio99_out", "qratio999_out"]].median()
     print("\n=== predicted over true quantile, median ===")
     print(ratio.round(3).to_string())

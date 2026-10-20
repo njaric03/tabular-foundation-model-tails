@@ -58,6 +58,11 @@ pinball at 0.99 moves by less than 3% against the coded run in every table.
 Outcome: N1 holds, 5 of 5; N2 holds, -0.5% to +0.4%. Run with MODELS=TabPFN-V3
 CATEGORICAL=native OUTPUT=unit_error_confirm_native.csv.
 
+A log arm and TabPFN-V3's default ensemble, 20.10.2026: the same draws with
+ARMS=raw,clip,log, one member for all three models and eight for TabPFN-V3
+(`run/confirm_ensemble_log.sh`). Predictions E1 to E3 and L1 to L4 are in
+PREREGISTRATION.md, their verdicts come from `analysis/confirm_ensemble_log.py`.
+
     DATASETS=AutoClaims MODELS=GBM REPEATS=2 python -u experiments/h3_repair/unit_error_confirm.py
 """
 import time
@@ -87,13 +92,17 @@ N_FIT = env.integer("N_FIT", 2000)
 N_TEST = env.integer("N_TEST", 1000)
 N_EST = env.integer("N_EST", 1)
 CLIP_C = env.floats("CLIP_C", [200])
+# raw, clip (one arm per CLIP_C) and log, the vendor's advice for claim amounts.
+ARM_NAMES = env.names("ARMS", "raw,clip")
 OUTPUT = env.text("OUTPUT", "unit_error_confirm.csv")
 # Not a knob: a draw seed no earlier run used. The earlier runs drew from 31337.
 DRAW_SEED = 20261001
 FACTOR = 100.0
 LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ("50", "90", "99", "999")
-ARMS = [("raw", 0.0)] + [("clip", c) for c in CLIP_C]
+if "raw" not in ARM_NAMES or set(ARM_NAMES) - {"raw", "clip", "log"}:
+    raise ValueError(f"ARMS takes raw and any of clip and log, not {ARM_NAMES}")
+ARMS = [(a, c) for a in ARM_NAMES for c in (CLIP_C if a == "clip" else [0.0])]
 CONTEXTS = ("clean", "visible", "random")
 
 COLUMNS = (["dataset", "model", "repeat", "context", "arm", "clip_c", "n_est", "n_fit",
@@ -178,7 +187,9 @@ def main():
                             reused = False
                             if k["arm"] == "raw" and k["context"] == "clean":
                                 qa = q_ref
-                            elif k["arm"] != "raw" and n == 0 and k["context"] in raw:
+                            # Only a cap that touched nothing fits raw's target; log
+                            # counts no touched row but changes every one.
+                            elif k["arm"] == "clip" and n == 0 and k["context"] in raw:
                                 qa, reused = raw[k["context"]], True
                             else:
                                 qa = back(predict(y_fit))
@@ -206,14 +217,31 @@ def report():
     if d.empty:
         return
     d["arm_c"] = np.where(d.arm == "clip", "clip_" + d.clip_c.map("{:g}".format), d.arm)
-    unit = ["dataset", "model"]
+    unit = ["dataset", "model", "n_est"]
     w = d.pivot_table(index=unit + ["repeat"], columns=["context", "arm_c"],
                       values=["pb99", "pb999"])
-    cap = [c for c in d.arm_c.unique() if c != "raw"][0]
+    arms = list(d.arm_c.unique())
+    cap = next((a for a in arms if a.startswith("clip")), None)
 
     def rel(level, cx, a, b, cx_b=None):
         return w[(level, cx, a)] / w[(level, cx_b or cx, b)] - 1
 
+    if "log" in arms:
+        lg = pd.DataFrame({
+            "vis log/raw 99": rel("pb99", "visible", "log", "raw"),
+            "clean log/raw 99": rel("pb99", "clean", "log", "raw"),
+            "rnd log/raw 99": rel("pb99", "random", "log", "raw"),
+            "vis log/raw 999": rel("pb999", "visible", "log", "raw"),
+            "clean log/raw 999": rel("pb999", "clean", "log", "raw"),
+        } | ({"vis log/cap 99": rel("pb99", "visible", "log", cap),
+              "clean log/cap 99": rel("pb99", "clean", "log", cap)} if cap else {})
+        ).groupby(level=unit).median()
+        print("\n=== log against raw and the cap, medians over repeats, per unit ===")
+        print(lg.round(4).to_string())
+        print("\ntables where log is lower, by model:")
+        print((lg < 0).groupby(level=["model", "n_est"]).sum().to_string())
+    if cap is None:
+        return
     med = pd.DataFrame({
         "C1 vis cap/raw 99": rel("pb99", "visible", cap, "raw"),
         "C2 clean cap/raw 99": rel("pb99", "clean", cap, "raw"),
@@ -232,6 +260,7 @@ def report():
     print(two.to_string())
     fm = med.index.get_level_values("model") != "GBM"
     print(f"\nC1 {int((med['C1 vis cap/raw 99'] < 0).sum())} of {len(med)} units (>= 10)")
+    print((med["C1 vis cap/raw 99"] < 0).groupby(level=["model", "n_est"]).sum().to_string())
     print(f"C2 0.99 {int((med['C2 clean cap/raw 99'].abs() <= 0.02).sum())} of {len(med)}, "
           f"0.999 {int((med['C2 clean cap/raw 999'] <= 0.10).sum())} of {len(med)} (all)")
     c3 = med[fm]

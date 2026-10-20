@@ -49,7 +49,8 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              # nanoTabPFN runs on the GPU when there is one; kernels differ in the last bits.
              "TFMP_DEVICE",
              # LimiX-2 runs on the GPU when there is one, for the same reason.
-             "LIMIX_DEVICE"]
+             "LIMIX_DEVICE",
+             "ARMS"]
 
 COLUMNS = (["utc", "output", "script", "git_sha", "git_dirty", "python",
             "platform", "venv"]
