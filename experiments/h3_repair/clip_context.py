@@ -44,6 +44,11 @@ Outcomes on TabPFN-V3, xi 0.7 and 0.9, 20 seeds, paired against raw:
 The recommendation depends on the level: a rank-transformed context at 0.99, the derived
 cap at 0.999.
 
+The dose curve at the default ensemble, 22.10.2026: raw, clip_200 and log (ARMS=raw,clip,log)
+at one and eight members for TabPFN-V3 on CPU and TabPFN-3.5 on the GPU, with the
+expected pinball under the true GPD (`epb*`) beside the drawn one (`run/dose_ensemble.sh`).
+Predictions D1 to D5 in PREREGISTRATION.md, verdicts from `analysis/dose_ensemble.py`.
+
     XI=0.7 SEEDS=3 SD_SHIFTS=1,20 CLIP_C=50 python -u experiments/h3_repair/clip_context.py
 """
 import numpy as np
@@ -76,11 +81,14 @@ LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ["50", "90", "99", "999"]
 OUTPUT = env.text("OUTPUT", "clip_context.csv")
 
+# epb: the expected pinball under the true conditional GPD in closed form, beside the
+# pinball on the drawn test targets; added 22.10.2026, blank in earlier rows.
 COLUMNS = ["model", "xi", "variant", "clip_c", "sd_shift_target", "sd_shift",
            "seed", "n_est", "n_train", "n_test", "n_clipped",
            "borders_in_data", "same_bar_90_99", "xi_implied", "xi_ratio",
            "q50", "q90", "q99", "q999",
-           "pb50", "pb90", "pb99", "pb999", "seconds", "reason"]
+           "pb50", "pb90", "pb99", "pb999", "seconds", "reason",
+           "epb50", "epb90", "epb99", "epb999"]
 KEY = ["model", "xi", "variant", "clip_c", "sd_shift_target", "seed", "n_est",
        "n_train", "n_test"]
 
@@ -89,6 +97,11 @@ ARMS = ([("raw", 0.0), ("robust", 0.0)] + [("clip", c) for c in CLIP_C]
         + [("log", 0.0), ("tail_log", transforms.TAIL_LOG_C), ("evt_trim", 0.0),
            ("sd_cap", transforms.TAU), ("rank_emp", 0.0), ("rank_gpd", 0.0),
            ("rank_gpd_trim", 0.0), ("rank_exp", 0.0)])
+# ARMS=raw,clip,log keeps those variants, every CLIP_C for clip; unset keeps them all.
+ARM_NAMES = env.names("ARMS", ",".join(dict.fromkeys(v for v, _ in ARMS)))
+if set(ARM_NAMES) - {v for v, _ in ARMS}:
+    raise ValueError(f"unknown arm in ARMS: {ARM_NAMES}")
+ARMS = [(v, c) for v, c in ARMS if v in ARM_NAMES]
 
 
 def fit_predict(X, y, Xte, seed, n_est):
@@ -96,7 +109,7 @@ def fit_predict(X, y, Xte, seed, n_est):
     m = models.tabpfn_regressor(MODEL, seed, n_est)
     m.fit(X, y)
     return (models.tabpfn_quantiles(m, Xte, LEVELS),
-            m.raw_space_bardist_.borders.detach().double().numpy())
+            m.raw_space_bardist_.borders.detach().cpu().double().numpy())
 
 
 def measure(cell):
@@ -139,6 +152,7 @@ def measure(cell):
     for i, (a, t) in enumerate(zip(LEVELS, TAGS)):
         r[f"q{t}"] = float(np.median(q[:, i]))
         r[f"pb{t}"] = metrics.pinball(test.y, q[:, i], a)
+        r[f"epb{t}"] = float(metrics.gpd_expected_pinball(q[:, i], test.s, xi, a).mean())
     return r
 
 

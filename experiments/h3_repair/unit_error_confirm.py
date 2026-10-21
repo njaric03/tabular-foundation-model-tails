@@ -69,7 +69,9 @@ ausprivauto0405 and beMTPL97. Full outcome in PREREGISTRATION.md.
 
 TabPFN-3.5 on the same draws, 21.10.2026: MODELS=TabPFN-v3.5 on the GPU at one and eight
 members (`run/confirm_tabpfn35.sh`); predictions F1 to F5 in PREREGISTRATION.md, verdicts
-from `analysis/confirm_tabpfn35.py`.
+from `analysis/confirm_tabpfn35.py`. Outcome: the visible row costs 3.5 +0.2% to +3.7% at
+0.99 at either size; at eight members the cap is below raw in 5 of 5 tables and log
+below the cap in 4 of 5, all by small margins.
 
     DATASETS=AutoClaims MODELS=GBM REPEATS=2 python -u experiments/h3_repair/unit_error_confirm.py
 """

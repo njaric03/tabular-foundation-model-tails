@@ -69,7 +69,9 @@ PREREGISTRATION.md.
 
 TabPFN-3.5 on the same seeds, 21.10.2026: MODELS=TabPFN-v3.5 on the GPU at one and eight
 members (`run/confirm_tabpfn35.sh`); predictions F1 to F5 in PREREGISTRATION.md, verdicts
-from `analysis/confirm_tabpfn35.py`.
+from `analysis/confirm_tabpfn35.py`. Outcome: F1 and F3a fail. The added row costs 3.5
++2.1% at 0.99 and +49% at 0.999 at one member, nothing at eight, where the cap only
+costs; under log Q(0.999) in the segment is 1.92 times the truth.
 
     MODELS=GBM SEEDS=2 python -u experiments/h3_repair/legit_segment.py
 """

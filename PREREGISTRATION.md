@@ -28,7 +28,8 @@ Sections are in the order they were written, grouped here by part of the thesis.
   `legit_segment.py` with their outcomes; `recalibration.py`, 2.10.2026;
   `unit_error_confirm.py` with native categories, 13.10.2026; both scripts with
   TabPFN-V3's default ensemble and a log arm, 20.10.2026, with the outcome of 21.10.2026;
-  both on TabPFN-3.5, 21.10.2026.
+  both on TabPFN-3.5, 21.10.2026, with its outcome; `clip_context.py` at the default
+  ensemble for V3 and 3.5, 22.10.2026.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2315,4 +2316,112 @@ run once on stand-ins, V3's rows of 21.10.2026 renamed, where it returns the bra
 values; that tests the code and nothing else. The
 run script first fits 3.5 at eight members on random data of the run's size on the GPU,
 a check of memory and nothing else, and stops if it fails.
+```
+
+## `unit_error_confirm.py` and `legit_segment.py` on TabPFN-3.5, outcome, 21.10.2026
+
+```
+2520 cells, none failed, 8220 s on the RTX 2060 in one stream; the memory check took 14 s
+and 2040 MB at eight members and 5000 test rows.
+
+F1  FAILS. At one member the shift of 20 raises 3.5's expected pinball at 0.99 in 18 of
+    20 seeds, but by +2.1% on the median, not 5% (V3: +10.0%).
+F2  HOLDS. The rise is smaller at eight members in 19 of 20 seeds; at eight it is gone,
+    -0.7% on the median.
+F3  HALF. (a) FAILS: at eight members clip_200 is below raw in 6 of 20 seeds (+0.4%),
+    since the row no longer costs anything there. (b) HOLDS: under the visible unit error
+    it is below raw in 5 of 5 tables, by -0.05% to -1.85%.
+F4  HOLDS. (a) Log is below clip_200 in 4 of 5 tables (ausprivauto0405 +0.4%). (b) On a
+    clean context log is below raw in 19 of 20 seeds, -2.5%.
+F5  HOLDS. Under log 3.5 puts Q(0.999) in the segment at 1.92 times the truth (V3: 1.96).
+
+Not predicted, read after the verdicts.
+
+At one member 3.5 places its clean tail far closer to the truth than V3: Q(0.999) outside
+the segment at M = 1 is 0.85 of the truth, against 0.52 for V3. The added row then costs
+little at 0.99 and a lot at 0.999: +49% over the whole test set and +153% on the segment
+at M = 1. clip_200 takes it back, -33% at 0.999 in 20 of 20 seeds and -2.0% at 0.99.
+
+At eight members the ensemble flattens the clean tail again (Q(0.999) outside the segment
+0.55 of the truth) and the added row costs nothing over the whole test set, -0.7% at 0.99
+and -1.6% at 0.999, though the segment's 0.999 loss still rises 15% at M = 1. With nothing
+to repair the cap only costs: at M = 20 on a clean context +5.4% at 0.99 and +13% at 0.999
+over the whole test set, +11% and +27% on the segment.
+
+Under the unit error the visible row raises raw's loss at 0.99 by +0.4% to +3.3% at one
+member and +0.2% to +3.7% at eight (largest on ausprivauto0405 and on beMTPL97), against
++0.2% to +8.1% for V3 at eight members. At one member clip_200 lowers it in 3 of 5
+tables (-0.5% to -2.1%), leaving AutoClaims and norauto unchanged on the median.
+
+Log costs 3.5 at 0.999 as it cost V3. On the segment at M = 20 its expected pinball at
+0.999 rises over raw by +29% (one member) and +20% (eight) on a clean context, +97% and
++164% under the shift. On beMTPL97 the clean loss at 0.999 rises by 31% and 35%. By mean
+loss at 0.99 log costs on a clean context on ausprivauto0405 and beMTPL97 at both sizes
+and on AutoClaims at eight, barely; on ausprivauto0405 at both sizes and AutoClaims at
+eight it costs under the random error too. At one member log is below clip_200 under the
+visible error in 4 of 5 tables (ausprivauto0405 +1.7%).
+
+What this says. The package default no longer shows the one-row sensitivity on the
+generator at 0.99 or 0.999; there the cap has nothing to repair and only costs. The
+sensitivity measured in this thesis is a property of a configuration: large for V3 at one
+member, smaller at eight, small at 0.99 but large at 0.999 for 3.5 at one member, absent
+over the whole test set for 3.5 at eight. Under a unit error on the insurance tables
+every configuration still loses up to a few percent and the cap recovers part of it.
+There log is below the cap at 0.99 in 4 or 5 of 5 tables for every TabPFN configuration
+measured, by small margins for 3.5; it overshoots a legitimate high-scale segment at
+0.999 in each. 3.5 ran on the GPU, so its rows are compared with V3's only through the
+verdicts and medians above, never row by row.
+```
+
+## `experiments/h3_repair/clip_context.py`, the dose curve at the default ensemble, 22.10.2026
+
+```
+The headline of part two, +83% in pinball at 0.999 under a shift of 50, is TabPFN-V3 at
+one member on 900 drawn test targets. The outcomes of 21.10.2026 show that the sensitivity
+depends on the configuration; the drawn loss at 0.999 rests on about one exceedance per
+task. This run repeats the dose curve of clip_context.py (xi 0.7 and 0.9, 20 seeds,
+shifts 1, 4, 20 and 50, 2000 context and 900 test rows) with raw, clip_200 and log only,
+for TabPFN-V3 on CPU in venv-tfm and TabPFN-3.5 on the GPU in venv-tfm9cu, each at one
+and eight members. clip_context.py now also writes the expected pinball under the true
+conditional GPD in closed form (epb, as in legit_segment.py); the predictions are on it.
+
+    clip_context_dose_v3_nest1.csv          clip_context_dose_tabpfn35_nest1.csv
+    clip_context_dose_v3_nest8.csv          clip_context_dose_tabpfn35_nest8.csv
+
+The stored clip_context.csv of 12.9.2026 does not reproduce exactly under the current
+code: a smoke test of one task (xi 0.7, seed 7000, shifts 1 and 50) differed from its
+stored drawn pinball by 0.1% to 4.6% at 0.99. The new one-member file is therefore the
+reference; no comparison crosses into the stored file.
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+A task is one (xi, seed) pair, 40 in all. Expected pinball, paired within a task.
+
+D1, the headline survives the expected loss. V3 at one member, shift 50: raw's expected
+    pinball at 0.999 is above raw's on the clean context in at least 32 of 40 tasks, with
+    a median rise of at least 20%.
+D2, the ensemble damps V3. At shifts 20 and 50 separately, raw's rise at 0.99 over the
+    clean context is smaller at eight members than at one in at least 30 of 40 tasks.
+D3, 3.5 at its default is flat at 0.99. At eight members the median rise of raw's
+    expected pinball at 0.99 over the clean context lies within 3% of zero at shifts 4 and
+    20, on each xi separately (four medians).
+D4, log beats the cap at the default. At shift 20 log's expected pinball at 0.99 is below
+    clip_200's in at least 28 of 40 tasks, for V3 at eight members and for 3.5 at eight.
+D5, the cap repairs V3's default where the row hurts. V3 at eight members, shift 50:
+    clip_200's expected pinball at 0.999 is below raw's in at least 30 of 40 tasks.
+
+Reported without a prediction: 3.5 at one member, the drawn pinball, borders over the
+data, implied xi and every cell not named above. After the dose curve the GPU part runs
+the measurements of run/new_models.sh for 3.5 at one member (natural extremes on
+freMTPL2sev, the one-row dose on the maximum and on the sd, shape and scale on the
+generator, the unit error on seven tables), descriptive as they were for LimiX-2 and
+Causilo.
+
+Seen before these were written: the smoke tests above, on one task. V3 at one member
+gave an expected-pinball rise at shift 50 of +25% at 0.99 and +34% at 0.999. V3 at eight
+members was timed on one cell, raw at shift 50, without reading its loss. 3.5 at eight
+members ran raw, clip_200 and log at shifts 1 and 50 for that task; its drawn pinball at
+0.999 was 0.13 clean and 0.33 at shift 50, the expected pinball was not read. The verdict
+script analysis/dose_ensemble.py was written with these predictions and run once on
+stand-ins built from the one-member smoke file, which tests the code and nothing else.
 ```

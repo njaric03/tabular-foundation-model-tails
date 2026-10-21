@@ -59,6 +59,17 @@ legitimate segment at 1.9 times the truth and raises its clean loss on two insur
 tables by 11 to 15%. For TabICLv2 it lifts a too-low extreme quantile and lowers that loss
 on every table.
 
+**TabPFN-3.5, the package default since September, barely needs the cap.** Run on the same
+draws on 21 October 2026, on a GPU. With one ensemble member its clean extreme quantile is
+far closer to the truth than TabPFN-3's. The added row costs it +2.1% at the 99th
+percentile but +49% at the 99.9th, which the cap takes back. At its default of eight
+members the row costs nothing over the synthetic test set at either level, so there the
+cap only costs: +5.4% at the 99th percentile on a clean context with a legitimate segment.
+On the insurance tables the unit error still costs it +0.2% to +3.7% at the 99th
+percentile; the cap lowers that on 5 of 5 tables, by less than 2%. Log stays below the cap
+on 4 of 5 tables and again places the segment's 99.9th percentile at 1.9 times the truth.
+The sensitivity is therefore a property of a configuration, not of the model family.
+
 ## Scope of the thesis
 
 Three questions, asked of two foundation models, TabPFN-3 (`TabPFN-V3` in the result
@@ -74,8 +85,8 @@ files) and TabICLv2, with gradient boosting (`GBM`) as the tree control:
 The 99th percentile is the main level; the 99.9th is secondary. The cap is `clip_200`:
 the context median plus 200 robust standard deviations (IQR / 1.349). Its main rival, a
 log of the context target, is measured beside it from 21 October 2026. TabPFN-3 runs with
-one ensemble member unless a result says eight, the package default. TabPFN v2.5 and
-v2.6, EXAONE-Tabular, TabDPT, LimiX-2 and Causilo, with CatBoost and XGBoost as further
+one ensemble member unless a result says eight, the package default. TabPFN v2.5, v2.6
+and 3.5, EXAONE-Tabular, TabDPT, LimiX-2 and Causilo, with CatBoost and XGBoost as further
 tree controls, are supplementary checks.
 
 Pre-training of small models under controlled priors and fine-tuning of TabICLv2 were
@@ -104,7 +115,8 @@ prior or from the architecture is left to later work.
   Neither is a recommendation for the model family.
 - The one-row results of part two use one ensemble member. Eight members were measured
   only in the confirmation, where they cut the added row's cost on the synthetic task to
-  about a quarter; the 50-fold figure above has not been rerun at eight.
+  about a quarter for TabPFN-3 and to nothing for TabPFN-3.5; the 50-fold figure above
+  has not been rerun at eight. TabPFN-3.5 ran on a GPU, every other TabPFN result on CPU.
 - `crps` and `twcrps` in `common/metrics.py` are twice the plain mean pinball loss over
   the chosen levels. On an uneven grid of levels this is a discrete quantile score, not a
   quadrature of the CRPS integral.
