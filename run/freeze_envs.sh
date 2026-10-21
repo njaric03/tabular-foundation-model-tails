@@ -22,4 +22,5 @@ freeze venv-tabfm       venv-tabfm/Scripts/python.exe
 freeze venv-tabdpt      venv-tabdpt/Scripts/python.exe
 freeze venv-data        venv-data/Scripts/python.exe
 freeze venv-tfm9        venv-tfm9/Scripts/python.exe
+freeze venv-tfm9cu      venv-tfm9cu/Scripts/python.exe
 freeze venv-limix       venv-limix/Scripts/python.exe

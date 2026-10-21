@@ -27,7 +27,8 @@ Sections are in the order they were written, grouped here by part of the thesis.
   `pinball_reference.py`; the confirmation of 1.10.2026, `unit_error_confirm.py` and
   `legit_segment.py` with their outcomes; `recalibration.py`, 2.10.2026;
   `unit_error_confirm.py` with native categories, 13.10.2026; both scripts with
-  TabPFN-V3's default ensemble and a log arm, 20.10.2026.
+  TabPFN-V3's default ensemble and a log arm, 20.10.2026, with the outcome of 21.10.2026;
+  both on TabPFN-3.5, 21.10.2026.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2177,4 +2178,141 @@ No model was run on the data of this experiment before these were written. The c
 reports of both scripts were rerun on the stored files of 1.10.2026 and reproduce the
 counts of C1 to C3. The verdict script was run once on stand-ins built from those files,
 with log rows copied from clip rows, which tests the code and nothing else.
+```
+
+## `unit_error_confirm.py` and `legit_segment.py` with the default ensemble and a log arm, outcome, 21.10.2026
+
+```
+5040 cells, none failed, on CPU at 6 threads in two parallel streams. Unit error 11196 s
+at one member and 47230 s at eight; segment 9288 s and 47463 s.
+
+R0  The raw and clip_200 rows at one member equal the stored rows of 1.10.2026 bit for bit
+    (1800 unit-error rows, 720 segment rows).
+
+E1  HOLDS, narrowly. At eight members the shift of 20 raises TabPFN-V3's expected pinball
+    at 0.99 in 19 of 20 seeds, by +2.3% on the median (+10.0% at one member).
+E2  HOLDS. The rise is smaller at eight members in 20 of 20 seeds.
+E3  HOLDS. (a) clip_200 is below raw in 20 of 20 seeds, by -2.6% on the median against
+    -9.6% at one member. (b) Under the visible unit error it is below raw in 5 of 5
+    tables (-0.5% to -5.1%), against 4 of 5 at one member.
+L1  HOLDS. On a clean context log is below raw in 20 of 20 seeds for TabPFN-V3 (-2.2%)
+    and in 18 of 20 for TabICLv2 (-2.1%).
+L2  HOLDS. 20 of 20 seeds, -11.3%.
+L3  HOLDS. Under the visible error log is below raw for TabICLv2 in 5 of 5 tables (-1.0%
+    to -7.3%), where clip_200 was below raw in 1 of 5.
+L4  HOLDS. (a) Log is below clip_200 in 5 of 5 tables for TabPFN-V3 and in 4 of 5 for
+    TabICLv2 (freMTPL2sev +0.3%). (b) On the segment at M = 20 log is lower in 15 of 20
+    seeds for TabPFN-V3 (-2.2%) and in 20 of 20 for TabICLv2 (-11.8%).
+
+Not predicted, read after the verdicts.
+
+The ensemble damps the added row on the generator, not the unit error on the insurance
+tables. Raw's rise at 0.99 under the visible x100 row against the clean context, TabPFN-V3
+at one member and at eight: ausprivauto0405 +3.2% and +8.1%, beMTPL97 +6.4% and +7.8%,
+AutoClaims +2.2% and +2.9%, norauto +1.7% and +1.5%, freMTPL2sev -0.3% and +0.2%. E2 was
+written for the segment design only and says nothing about these tables.
+
+Eight members lower TabPFN-V3's clean upper quantiles. On the segment design at M = 1 its
+predicted Q(0.999) outside the segment is 0.35 of the truth at eight members against 0.52
+at one, the flattening by ensemble averaging seen in H1. Log lifts it to 0.63 at either
+size.
+
+Log costs TabPFN-V3 the segment's extreme quantile. At M = 20 its predicted Q(0.999) in
+the segment is 1.9 times the truth under log at one member and 2.0 at eight, against 0.55
+and 0.35 under raw. The segment's expected pinball at 0.999 then rises over raw by +10% on
+a clean context and +59% under the shift of 20 at one member, by +0.2% and +43% at eight.
+TabICLv2 moves the other way: log lifts its too-low Q(0.999) outside the segment from 0.42
+to 0.69 of the truth at M = 1 and lowers its expected pinball at 0.999 in every clean cell,
+by 14% to 24% (20 of 20 seeds each). At M = 20 under the shift TabICLv2's loss at 0.99 is
+higher under log than under raw (+3.0%, lower in 5 of 20 seeds), though still 7.2% below
+clip_200.
+
+On the insurance tables log is not free at 0.999 for TabPFN-V3 either. On a clean context
+it costs +14.6% on ausprivauto0405 and +10.7% on beMTPL97 at one member; under the visible
+error ausprivauto0405 costs +40% at one member and +75% at eight. For TabICLv2 log is
+lower at 0.999 on every clean table (-9.5% to -16.2%).
+
+D0 and D1 for log, from mean pinball at 0.99 within each unit. Medians over repeats favour
+log on a clean context in all ten foundation-model units at one member, but means do not:
+D0 > 0 for TabPFN-V3 on freMTPL2sev (2.0) and norauto (0.8; 7.7 at eight members), for
+TabICLv2 on beMTPL97 (0.7) and for GBM on ausprivauto0405, beMTPL97 and norauto. Where
+D0 > 0 > D1 the break-even error rate p* is 0.33 for TabPFN-V3 on freMTPL2sev, 0.23 on
+norauto, 0.24 for TabICLv2 on beMTPL97, 0.23 and 0.99 for GBM on norauto and
+ausprivauto0405. On norauto at eight members and on beMTPL97 for GBM log costs under the
+random error too (D1 > 0).
+
+GBM moves little at 0.99. Log changes its expected pinball on the segment design by -0.5%
+to -1.8% and clip_200 by -0.6% to +2.5%; under the visible unit error log is below raw in
+5 of 5 tables (-0.1% to -4.5%).
+
+A caveat on one column. n_clipped_seg in legit_segment_log.csv and legit_segment_nest8.csv
+counts the segment's context rows whose fitted value is below the raw one. For clip_200
+those are the clipped rows; for log they are every segment row above 1, though log clips
+none. No verdict reads the column on log rows. The code was fixed on 21.10.2026 after both
+runs had finished, so the stored log rows still carry the old count.
+
+What this says. One member overstated how much TabPFN-V3 needs the cap: at the package
+default the added row costs it about a quarter as much on the generator and the cap's
+benefit shrinks with it, though on the insurance tables the visible unit error costs the
+ensemble at least as much as one member. A log of the target, the vendor's advice for
+claim amounts, beats clip_200 at 0.99 for both foundation models on these draws and helps
+TabICLv2 under a unit error where the cap did not. It is not free: it changes every clean
+prediction, its clean cost by mean loss is positive on several tables and it doubles
+TabPFN-V3's extreme quantile of a legitimate high-scale segment. These are the draws of
+1.10.2026 and log was picked after development runs, so this replicates those runs with
+predictions written first; it is not a test on a new domain.
+
+Corrected the same day, two phrases of the paragraph above. "At least as much as one
+member" holds on 4 of 5 tables: on norauto eight members rise by +1.5% against +1.7%.
+"Doubles" means that log puts TabPFN-V3's Q(0.999) in the segment at 1.9 to 2.0 times the
+truth, 3.4 and 5.7 times its raw value at one and eight members.
+```
+
+## `unit_error_confirm.py` and `legit_segment.py` on TabPFN-3.5, 21.10.2026
+
+```
+TabPFN-3.5 (`TabPFN-v3.5`, tabpfn 9.0.0) is the package default since 15.9.2026. It
+handles the target as V3 does: checked on 21.10.2026 in venv-tfm9 by fitting it on random
+data, REGRESSION_Y_PREPROCESS_TRANSFORMS is (None, "safepower"), eight members give four
+a Yeo-Johnson target and one member gives none. The runs use venv-tfm9cu, the packages of
+venv-tfm9 without causilo and with torch 2.9.1+cu126 in place of 2.14.0+cpu. The question is whether the outcome of
+21.10.2026 for V3 carries over to the model a user now gets by default.
+
+Same draws as 1.10.2026 and 21.10.2026, arms raw, clip_200 and log, one and eight
+members. No TabPFN-3.5 row exists on these draws or anywhere in results/. It runs on the
+RTX 2060 (TABPFN_DEVICE=cuda), every earlier TabPFN row on CPU, so its numbers are
+compared with V3's only through the verdicts below, never row by row. Four outputs:
+
+    unit_error_confirm_tabpfn35_nest1.csv    legit_segment_tabpfn35_nest1.csv
+    unit_error_confirm_tabpfn35_nest8.csv    legit_segment_tabpfn35_nest8.csv
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+Units and losses as in the section of 20.10.2026. Each prediction says that 3.5 behaves
+as V3 did; the V3 value is in brackets.
+
+F1, one member is sensitive. Segment, M = 1: raw's expected pinball at 0.99 under the
+    shift of 20 is above raw's on the clean context in at least 15 of 20 seeds at one
+    member, with a median rise of at least 5% (+10.0%).
+F2, the ensemble damps it. That rise is smaller at eight members than at one on the same
+    seed in at least 14 of 20 seeds (20 of 20).
+F3, the cap still helps at eight members. (a) Segment, M = 1, shift 20: clip_200 is below
+    raw in at least 15 of 20 seeds (20 of 20, -2.6%). (b) Unit error, visible row:
+    clip_200 is below raw in at least 4 of 5 tables (5 of 5).
+F4, log beats the cap at eight members. (a) Unit error, visible row: log is below
+    clip_200 in at least 4 of 5 tables (5 of 5). (b) Segment, M = 1, clean: log is below
+    raw in at least 15 of 20 seeds (20 of 20, -5.8%).
+F5, log overshoots the segment. Segment, M = 20, clean, eight members: under log the
+    median over seeds of the predicted over the true Q(0.999) in the segment is above
+    1.25 (1.96).
+
+Reported without a prediction: the unit error at one member, the 0.999 level, M = 5, the
+random row and the time per cell on the GPU.
+
+Before these were written TabPFN-3.5 was fitted only on random data, to read its
+configuration. The verdict script analysis/confirm_tabpfn35.py was written with them and
+run once on stand-ins, V3's rows of 21.10.2026 renamed, where it returns the bracketed
+values; that tests the code and nothing else. The
+run script first fits 3.5 at eight members on random data of the run's size on the GPU,
+a check of memory and nothing else, and stops if it fails.
 ```

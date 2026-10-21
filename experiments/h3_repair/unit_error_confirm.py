@@ -62,6 +62,14 @@ A log arm and TabPFN-V3's default ensemble, 20.10.2026: the same draws with
 ARMS=raw,clip,log, one member for all three models and eight for TabPFN-V3
 (`run/confirm_ensemble_log.sh`). Predictions E1 to E3 and L1 to L4 are in
 PREREGISTRATION.md, their verdicts come from `analysis/confirm_ensemble_log.py`.
+Outcome, 21.10.2026: all seven hold. At eight members the cap is below raw for TabPFN-V3
+in 5 of 5 tables; log is below clip_200 in 5 of 5 for TabPFN-V3 and in 4 of 5 for
+TabICLv2, and below raw for TabICLv2 in 5 of 5. Log costs TabPFN-V3 at 0.999 on
+ausprivauto0405 and beMTPL97. Full outcome in PREREGISTRATION.md.
+
+TabPFN-3.5 on the same draws, 21.10.2026: MODELS=TabPFN-v3.5 on the GPU at one and eight
+members (`run/confirm_tabpfn35.sh`); predictions F1 to F5 in PREREGISTRATION.md, verdicts
+from `analysis/confirm_tabpfn35.py`.
 
     DATASETS=AutoClaims MODELS=GBM REPEATS=2 python -u experiments/h3_repair/unit_error_confirm.py
 """

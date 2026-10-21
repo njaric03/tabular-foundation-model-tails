@@ -50,7 +50,9 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              "TFMP_DEVICE",
              # LimiX-2 runs on the GPU when there is one, for the same reason.
              "LIMIX_DEVICE",
-             "ARMS"]
+             "ARMS",
+             # TabPFN on the GPU from 3.5 on; CPU when unset, as every earlier TabPFN row.
+             "TABPFN_DEVICE"]
 
 COLUMNS = (["utc", "output", "script", "git_sha", "git_dirty", "python",
             "platform", "venv"]

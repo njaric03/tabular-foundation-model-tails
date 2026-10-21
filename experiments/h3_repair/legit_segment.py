@@ -60,6 +60,16 @@ A log arm and TabPFN-V3's default ensemble, 20.10.2026: the same seeds with
 ARMS=raw,clip,log, one member for all three models and eight for TabPFN-V3
 (`run/confirm_ensemble_log.sh`). Predictions E1 to E3 and L1 to L4 are in
 PREREGISTRATION.md, their verdicts come from `analysis/confirm_ensemble_log.py`.
+Outcome, 21.10.2026: all seven hold. Eight members cut the row's cost to TabPFN-V3 from
++10.0% to +2.3% at 0.99 and the cap's gain from -9.6% to -2.6%. Log beats clip_200 for
+both models at 0.99 but puts TabPFN-V3's Q(0.999) in the segment at M = 20 at about twice
+the truth. Its log
+rows count n_clipped_seg wrongly (the guard in `measure`). Full outcome in
+PREREGISTRATION.md.
+
+TabPFN-3.5 on the same seeds, 21.10.2026: MODELS=TabPFN-v3.5 on the GPU at one and eight
+members (`run/confirm_tabpfn35.sh`); predictions F1 to F5 in PREREGISTRATION.md, verdicts
+from `analysis/confirm_tabpfn35.py`.
 
     MODELS=GBM SEEDS=2 python -u experiments/h3_repair/legit_segment.py
 """
@@ -144,9 +154,12 @@ def measure(cell):
                               levels=LEVELS, n_est=cell["n_est"]))
     xi = cell["xi"]
     parts = {"all": np.ones(len(yte), bool), "seg": g_te > 0, "out": g_te == 0}
+    # Only a cap clips. log lowers every value above 1, which is no clipped row; the
+    # log rows of 20.10.2026 were written before this guard and count them.
+    clipped = (y_fit < y) & (g > 0) if cell["variant"] == "clip" else np.zeros(len(y), bool)
     r = dict(sd_shift=float(metrics.sd_shift(y)), natural_shift=natural,
              n_seg_context=int(g.sum()), n_seg_test=int(parts["seg"].sum()),
-             n_clipped=n, n_clipped_seg=int(((y_fit < y) & (g > 0)).sum()))
+             n_clipped=n, n_clipped_seg=int(clipped.sum()))
     for i, (a, t) in enumerate(zip(LEVELS, TAGS)):
         e = metrics.gpd_expected_pinball(q[:, i], sigma, xi, a)
         for p, rows in parts.items():

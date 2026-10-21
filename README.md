@@ -14,9 +14,10 @@ extreme-value oracle on the same 2000 rows recovers 99% of the shape. Gradient b
 has the same gap (87% and 45%), so it is not specific to foundation models.
 
 **One extreme context target.** On 40 synthetic tasks, one added extreme target made the
-context standard deviation 50 times larger. TabPFN-3's median increase in pinball loss
-was **83% at the 99.9th percentile**, compared with **10% at the median**. Capping brought
-median losses back close to the clean-context baseline at all four percentiles.
+context standard deviation 50 times larger. With one ensemble member, TabPFN-3's median
+increase in pinball loss was **83% at the 99.9th percentile**, compared with **10% at the
+median**. Capping brought median losses back close to the clean-context baseline at all
+four percentiles.
 
 ![Effect of one extreme context target on TabPFN-3 prediction loss](figures/synthetic_error.png)
 
@@ -40,6 +41,24 @@ shifts the sd by 2 or more, the cap lowered the 99th-percentile loss of TabPFN-3
 the 4 capped context rows came from the segment, which paid for the cap on a clean
 context: +0.45% at the 99th percentile for TabPFN-3, +10% for TabICLv2.
 
+**With its default ensemble TabPFN-3 needs the cap less.** The results above fit TabPFN-3
+with one ensemble member. Its default is eight, half of which fit a power transform of the
+target. Rerun on the same draws on 21 October 2026, eight members cut the cost of the added
+row on the synthetic task from +10% to +2.3% at the 99th percentile and the cap's gain from
+-9.6% to -2.6%. On the insurance tables they do not help: the visible unit error cost eight
+members more than one on 4 of 5 tables, while the cap lowered the loss on 5 of 5.
+
+**A log of the target beats the cap at the 99th percentile, at a price further out.** The
+vendor's insurance example fits claim amounts on log(1 + y), so a log of the context target
+was measured beside the cap on the same draws. Under the unit error it lowered the
+99th-percentile loss below the cap's on 5 of 5 insurance tables for TabPFN-3 and 4 of 5 for
+TabICLv2. For TabICLv2 it was below raw on 5 of 5, where the cap had managed 1. It is not
+free. It changes every clean prediction and by mean loss costs on a clean context in 3 of
+the 10 table-and-model pairs. At the 99.9th percentile it puts TabPFN-3's quantile for the
+legitimate segment at 1.9 times the truth and raises its clean loss on two insurance
+tables by 11 to 15%. For TabICLv2 it lifts a too-low extreme quantile and lowers that loss
+on every table.
+
 ## Scope of the thesis
 
 Three questions, asked of two foundation models, TabPFN-3 (`TabPFN-V3` in the result
@@ -53,7 +72,9 @@ files) and TabICLv2, with gradient boosting (`GBM`) as the tree control:
    large values?
 
 The 99th percentile is the main level; the 99.9th is secondary. The cap is `clip_200`:
-the context median plus 200 robust standard deviations (IQR / 1.349). TabPFN v2.5 and
+the context median plus 200 robust standard deviations (IQR / 1.349). Its main rival, a
+log of the context target, is measured beside it from 21 October 2026. TabPFN-3 runs with
+one ensemble member unless a result says eight, the package default. TabPFN v2.5 and
 v2.6, EXAONE-Tabular, TabDPT, LimiX-2 and Causilo, with CatBoost and XGBoost as further
 tree controls, are supplementary checks.
 
@@ -77,8 +98,13 @@ prior or from the architecture is left to later work.
 - TabPFN rescales its output grid by the context sd
   (`borders * y_train_std_ + y_train_mean_`), so one extreme row leaves few borders over
   the data. How much of the loss this causes has not been isolated.
-- `clip_200` was chosen after development results. It helps TabPFN-3 and costs TabICLv2;
-  it is not a recommendation for the model family.
+- `clip_200` and the log arm were both chosen after development results and confirmed on
+  draws already used. The cap helps TabPFN-3 and costs TabICLv2. Log helps both at the
+  99th percentile in most tested cells but overshoots a legitimate segment at the 99.9th.
+  Neither is a recommendation for the model family.
+- The one-row results of part two use one ensemble member. Eight members were measured
+  only in the confirmation, where they cut the added row's cost on the synthetic task to
+  about a quarter; the 50-fold figure above has not been rerun at eight.
 - `crps` and `twcrps` in `common/metrics.py` are twice the plain mean pinball loss over
   the chosen levels. On an uneven grid of levels this is a discrete quantile score, not a
   quadrature of the CRPS integral.
@@ -89,7 +115,7 @@ prior or from the architecture is left to later work.
 |---|---|---|
 | Scale and tail shape | `h1_shape_vs_scale/`: `shape_of_x`, `scale_of_x`, `oracle_xi_of_x`, `sample_complexity`; checks `tail_families`, `vincentization`, `xi_residual`, `reference_instrument`, `instrument_ceiling`, `dissociation_real_slope` | [h1_shape_vs_scale](analysis/h1_shape_vs_scale.ipynb) |
 | Extreme context target | `h2_leverage/`: `influence`, `influence_real`, `grid_occupancy`, `prevalence_data`, `prevalence_models`; coverage in `h1_shape_vs_scale/empirical_coverage`; output heads in `side/head_tail_family`, `side/head_tail_tabicl` | [h2_leverage](analysis/h2_leverage.ipynb) |
-| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration` | [h3_repair](analysis/h3_repair.ipynb); the confirmation in [PREREGISTRATION.md](PREREGISTRATION.md) |
+| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration` | [h3_repair](analysis/h3_repair.ipynb); the confirmation in [PREREGISTRATION.md](PREREGISTRATION.md), the verdicts of 21.10.2026 from `analysis/confirm_ensemble_log.py` |
 
 Explored and left outside the thesis: pre-training and fine-tuning
 (`h3_repair/prior_pretraining_*`, `h3_repair/tabicl_prior_finetune`), other repairs
@@ -108,7 +134,8 @@ the conditional mean (`mean_attainability`, `truncated_support`, `architecture_*
 - `data/`: dataset selections and sources.
 - `requirements/`: one frozen environment per group of models, whose torch versions
   conflict: `venv-tfm` (TabPFN 8.4, TabICL 2.1), `venv-tfm9` (TabPFN 9.0, Causilo),
-  `venv-limix`, `venv-tabdpt`, `venv-tabfm`.
+  `venv-tfm9cu` (TabPFN 9.0 with CUDA torch, for TabPFN-3.5 on the GPU), `venv-limix`,
+  `venv-tabdpt`, `venv-tabfm`.
 
 ## Reproduce the figures
 

@@ -82,8 +82,10 @@ def tabpfn_regressor(name: str, seed: int, n_est: int):
     from importlib.metadata import version
 
     from tabpfn import TabPFNRegressor
-    kw = dict(n_estimators=n_est, device="cpu", random_state=seed,
-              ignore_pretraining_limits=True)
+    # CPU unless TABPFN_DEVICE says otherwise: every TabPFN row before 21.10.2026 ran on
+    # CPU, and GPU kernels differ in the last bits.
+    kw = dict(n_estimators=n_est, device=env.text("TABPFN_DEVICE", "cpu"),
+              random_state=seed, ignore_pretraining_limits=True)
     if int(version("tabpfn").split(".")[0]) >= 9:
         kw["model_path"] = TABPFN_PATHS_9.get(name) or TABPFN_PATHS[name]
     elif name in TABPFN_PATHS_9 and name != "TabPFN-V3":
