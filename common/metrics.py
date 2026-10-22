@@ -172,6 +172,16 @@ def gpd_expected_pinball(q, sigma, xi, tau):
     return plus - (1.0 - tau) * (m - q)
 
 
+def gpd_cap_offset(sigma, xi, p=1e-9):
+    """E(Y - u)+ for Y ~ GPD(0, sigma, xi) and u its (1 - p)-quantile, in closed form.
+
+    The generator caps the uniform at 1 - p, so its law puts this mass on u. For any q < u
+    the ideal expected pinball exceeds the generator's by tau times this offset: 0.66% of
+    sigma at xi = 0.7, 1.26 sigma at xi = 0.9 (correction of 22.10.2026).
+    """
+    return np.asarray(sigma, float) * p ** (1.0 - xi) / (1.0 - xi)
+
+
 def shift_for_pinball(y, q, tau) -> float:
     """The c minimising the pinball loss of q + c: the tau-quantile of y - q."""
     return float(np.quantile(np.asarray(y, float) - np.asarray(q, float), tau,

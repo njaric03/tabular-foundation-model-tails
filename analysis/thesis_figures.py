@@ -17,7 +17,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import NullLocator, PercentFormatter
 
-from analysis.supplement_figures import INK, GREY
+from analysis.dose_ensemble import generator_law
+from analysis.supplement_figures import GREY, INK, LABELS, ORDER, TFM, load_natural
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / 'results/h3_repair'
@@ -181,7 +182,8 @@ def dose(lang='sr'):
         if d is None:
             print(f'dose: {name} is missing, figure skipped')
             return
-        d = d[d.variant == 'raw']
+        # The expected loss under the generator's capped law, the reference from 22.10.
+        d = generator_law(d[d.variant == 'raw'])
         for tag, level in (('99', .99), ('999', .999)):
             w = d.pivot_table(index=['xi', 'seed'], columns='sd_shift_target',
                               values=f'epb{tag}')
@@ -228,8 +230,53 @@ def dose(lang='sr'):
         print(f'wrote {ROOT / "figures/dose_by_configuration.png"}')
 
 
+def natural():
+    """freMTPL2sev: the predicted Q(0.99) with the largest claim against without it, and
+    the change in 0.99 loss after capping, one row per model, one dot per subsample."""
+    d = load_natural()
+    ratio = d[(d.arm_c == 'raw') & (d.bin == '4.0-inf')].assign(value=lambda x: 1 + x.d_q99)
+    idx = ['dataset', 'model', 'bin', 'repeat', 'n_est', 'n_fit', 'n_test']
+    raw = d[d.arm_c == 'raw'].set_index(idx).pb99
+    cap = d[(d.arm_c == 'clip_200') & d.bin.isin(['2.0-4.0', '4.0-inf'])].set_index(idx)
+    cap = cap.assign(value=cap.pb99 / raw.reindex(cap.index) - 1).reset_index()
+    data = pd.concat([ratio.assign(panel='ratio'), cap.assign(panel='cap')])[
+        ['panel', 'model', 'bin', 'repeat', 'value']]
+    models = [m for m in ORDER if m in set(data.model)]
+    labels = [LABELS[m] + ('' if m in TFM else ' (kontrola)') for m in models]
+    fig, axes = plt.subplots(1, 2, figsize=(6.8, 3.9), sharey=True, layout='constrained')
+    for ax, panel, colour, title in zip(axes, ('ratio', 'cap'), (INK, CAP),
+                                        ('najveća šteta zadržana prema uklonjenoj',
+                                         'odsecanje prema bez izmene')):
+        for i, m in enumerate(models):
+            v = data[(data.panel == panel) & (data.model == m)].value.to_numpy()
+            c = colour if m in TFM else GREY
+            ax.scatter(v, i + np.linspace(-.15, .15, len(v)), s=16, color=c, alpha=.5,
+                       linewidths=0, zorder=3)
+            ax.scatter([np.median(v)], [i], s=44, marker='D', color=c, edgecolors='white',
+                       linewidths=.6, zorder=4)
+        ax.set_yticks(range(len(models)), labels)
+        ax.set_ylim(len(models) - .5, -.5)
+        ax.tick_params(axis='y', length=0)
+        ax.spines['left'].set_visible(False)
+        ax.grid(axis='x', color='#E8E8E8', linewidth=.5, zorder=0)
+        ax.axhline(len([m for m in models if m in TFM]) - .5, color='#DDDDDD', lw=.65)
+        ax.set_title(title, fontsize=10.5, loc='left', color=INK)
+    axes[0].axvline(1, color=INK, lw=.8, zorder=2)
+    axes[0].set_xscale('log')
+    axes[0].set_xlim(.3, 3.3)
+    axes[0].set_xticks([.5, 1, 2, 3], ['0,5×', '1×', '2×', '3×'])
+    axes[0].xaxis.set_minor_locator(NullLocator())
+    axes[0].set_xlabel('Q(0,99), pomeraj ≥4\n5 poduzoraka', fontsize=10)
+    axes[1].axvline(0, color=INK, lw=.8, zorder=2)
+    axes[1].set_xlim(-1, .3)
+    axes[1].xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    axes[1].set_xlabel('gubitak na 0,99, pomeraj ≥2\n10 poduzoraka', fontsize=10)
+    save(fig, 'prirodni_ekstremi', data)
+
+
 if __name__ == '__main__':
     unit_error()
     segment_tail()
+    natural()
     dose()
     dose('en')

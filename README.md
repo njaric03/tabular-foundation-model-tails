@@ -14,19 +14,19 @@ extreme-value oracle on the same 2000 rows recovers 99% of the shape. Gradient b
 has the same gap (87% and 45%), so it is not specific to foundation models.
 
 **One extreme context target.** On 40 synthetic tasks, one added extreme target made the
-context standard deviation 50 times larger. Measured by the expected loss under the true
-distribution, TabPFN-3 with one ensemble member lost **19% more at the 99.9th percentile**
-and **7% more at the 99th** than on the clean context. An earlier README gave +83% at the
-99.9th percentile. That figure came from the drawn test targets, where a task holds about
-one exceedance at that level. The rerun of 22 October 2026 reproduces it on the drawn
-targets (+83%), so most of it came from the few exceedances, not from the model.
+context standard deviation 50 times larger. Measured by the expected loss under the
+generator's distribution, TabPFN-3 with one ensemble member lost **23% more at the 99.9th
+percentile** and **8% more at the 99th** than on the clean context. An earlier README gave
++83% at the 99.9th percentile. That figure came from the drawn test targets, where a task
+holds about one exceedance at that level. The rerun of 22 October 2026 reproduces it on
+the drawn targets (+83%), so most of it came from the few exceedances, not from the model.
 
 **How much one row costs depends on the configuration.** The same dose at the package
-default of eight members costs TabPFN-3 under 1% at the 99th percentile and 6% at the
-99.9th. TabPFN-3.5 with one member loses 2% at the 99th but 132% at the 99.9th; at its
-default of eight members it loses nothing at the 99th and 8% at the 99.9th. Where the row
-costs, capping takes most of the loss back (-6.4% at the 99th percentile for TabPFN-3 with
-one member); where it costs nothing, capping costs a little (+1.0% for TabPFN-3.5 at
+default of eight members costs TabPFN-3 under 1% at the 99th percentile and 7% at the
+99.9th. TabPFN-3.5 with one member loses 2% at the 99th but 154% at the 99.9th; at its
+default of eight members it loses nothing at the 99th and 9% at the 99.9th. Where the row
+costs, capping takes most of the loss back (-7.7% at the 99th percentile for TabPFN-3 with
+one member); where it costs nothing, capping costs a little (+1.1% for TabPFN-3.5 at
 eight).
 
 ![Effect of one extreme context target by model and ensemble size](figures/dose_by_configuration.png)
@@ -64,7 +64,9 @@ was measured beside the cap on the same draws. Under the unit error it lowered t
 99th-percentile loss below the cap's on 5 of 5 insurance tables for TabPFN-3 and 4 of 5 for
 TabICLv2. For TabICLv2 it was below raw on 5 of 5, where the cap had managed 1. It is not
 free. It changes every clean prediction and by mean loss costs on a clean context in 3 of
-the 10 table-and-model pairs. At the 99.9th percentile it puts TabPFN-3's quantile for the
+the 10 table-and-model pairs. Its worst clean context raises the 99th-percentile loss by
+115% (TabPFN-3 on freMTPL2sev), against 2.9% at worst for the cap, which touches nothing
+on most clean contexts. At the 99.9th percentile it puts TabPFN-3's quantile for the
 legitimate segment at 1.9 times the truth and raises its clean loss on two insurance
 tables by 11 to 15%. For TabICLv2 it lifts a too-low extreme quantile and lowers that loss
 on every table.
@@ -129,19 +131,22 @@ prior or from the architecture is left to later work.
   result on CPU.
 - The pinball loss on drawn test targets at the 99.9th percentile rests on about one
   exceedance per task. The synthetic results from 21 October 2026 on report the expected
-  loss under the true distribution as well; earlier synthetic numbers at that level are
-  noisy.
+  loss as well; earlier synthetic numbers at that level are noisy. The expected loss is
+  taken under the generator's law, which caps the uniform draw at 1 - 1e-9; the ideal
+  GPD would add mass no test set can show, 12.6% of the mean at a tail index of 0.9.
 - `crps` and `twcrps` in `common/metrics.py` are twice the plain mean pinball loss over
-  the chosen levels. On an uneven grid of levels this is a discrete quantile score, not a
-  quadrature of the CRPS integral.
+  the chosen levels, which on an uneven grid is not a quadrature of the CRPS integral. On
+  a GPD with known CRPS they miss it by up to 2.5% on the 102 levels where they were used,
+  and a difference between two forecasts by up to a factor of two. No thesis result uses
+  them; `crps_weighted` weights each level by its cell and is within 0.1%.
 
 ## Code
 
 | Part | Main scripts in `experiments/` | Notebook |
 |---|---|---|
-| Scale and tail shape | `h1_shape_vs_scale/`: `shape_of_x`, `scale_of_x`, `oracle_xi_of_x`, `sample_complexity`; checks `tail_families`, `vincentization`, `xi_residual`, `reference_instrument`, `instrument_ceiling`, `dissociation_real_slope` | [h1_shape_vs_scale](analysis/h1_shape_vs_scale.ipynb) |
-| Extreme context target | `h2_leverage/`: `influence`, `influence_real`, `grid_occupancy`, `prevalence_data`, `prevalence_models`; coverage in `h1_shape_vs_scale/empirical_coverage`; output heads in `side/head_tail_family`, `side/head_tail_tabicl` | [h2_leverage](analysis/h2_leverage.ipynb) |
-| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration` | [h3_repair](analysis/h3_repair.ipynb); the confirmation in [PREREGISTRATION.md](PREREGISTRATION.md), the verdicts of 21 and 22.10.2026 from `analysis/confirm_ensemble_log.py`, `confirm_tabpfn35.py` and `dose_ensemble.py` |
+| Scale and tail shape | `h1_shape_vs_scale/`: `shape_of_x`, `scale_of_x`, `oracle_xi_of_x`, `sample_complexity`; checks `tail_families`, `vincentization`, `xi_residual`, `reference_instrument`, `instrument_ceiling`, `dissociation_real_slope` (with `K_SHARES`) | [h1_shape_vs_scale](analysis/h1_shape_vs_scale.ipynb) |
+| Extreme context target | `h2_leverage/`: `influence`, `influence_real`, `grid_occupancy`, `prevalence_data`, `prevalence_models`; coverage in `h1_shape_vs_scale/empirical_coverage`; output heads in `side/head_tail_family`, `side/head_tail_tabicl` | [h2_leverage](analysis/h2_leverage.ipynb), which calls `analysis/dose_ensemble.py` |
+| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration` | [h3_repair](analysis/h3_repair.ipynb), which calls `analysis/confirm_ensemble_log.py`, `confirm_tabpfn35.py`, `h3_table.py` and `sample_selection.py`; predictions and outcomes in [PREREGISTRATION.md](PREREGISTRATION.md) |
 
 Explored and left outside the thesis: pre-training and fine-tuning
 (`h3_repair/prior_pretraining_*`, `h3_repair/tabicl_prior_finetune`), other repairs
@@ -149,6 +154,7 @@ Explored and left outside the thesis: pre-training and fine-tuning
 the conditional mean (`mean_attainability`, `truncated_support`, `architecture_*`,
 `mean_exaone`) and `side/coherence`, `side/credibility`.
 
+- `analysis/thesis_numbers.py` recomputes every number the thesis quotes into one ledger.
 - `common/`: data loading, the generator, model adapters and metrics. Models are built
   only in `common/models.py`.
 - `run/`: the batch commands behind the result files.

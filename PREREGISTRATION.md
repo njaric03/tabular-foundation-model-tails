@@ -32,7 +32,7 @@ Sections are in the order they were written, grouped here by part of the thesis.
   ensemble for V3 and 3.5, 22.10.2026, with its outcome; the correction to the expected
   pinball of the generator, 22.10.2026.
 - Scale and tail shape, added: `dissociation_real_slope.py` across the Hill share,
-  22.10.2026.
+  22.10.2026, with its outcome.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2534,4 +2534,35 @@ GBM carries no prediction. Seen before these were written: a smoke test of GBM o
 datasets at seed 7000, where its corrected shape slope moved from +1.73 to +0.80 on houses
 and from +4.32 to -1.85 on house_16H across k, and the k = 0.10 rows equal the stored ones
 to 1e-12. No foundation model was run.
+```
+
+## `dissociation_real_slope.py` across the Hill share, outcome, 22.10.2026
+
+```
+270 cells on CPU in two streams (3272 s and 5147 s); 27 failed, all CPS1988, which keeps
+only two usable features as before. At k = 0.10 the TabICLv2 and GBM rows equal the stored
+ones to 1e-4. The TabPFN-V3 rows of the stored file come from the remeasure of 13.9.2026
+in another environment (Python 3.12.8); 23 of 27 differ, by up to 0.18 in the corrected
+shape slope; the median moves from 0.415 to 0.404. The comparison across k stays inside
+the new files.
+
+Median corrected slopes, shape / scale:
+
+                 k = 0.05        k = 0.10        k = 0.20
+    TabPFN-V3    0.404 / 1.004   0.404 / 1.004   0.253 / 1.004
+    TabICLv2     0.537 / 1.023   0.528 / 1.023   0.304 / 1.023
+    GBM          1.813 / 0.954   1.778 / 0.954   0.798 / 0.954
+
+K1  HOLDS. The shape slope is below the scale slope for both foundation models at every
+    k. Scale is closer to 1 than shape on 8 of 8 target vectors at every k for TabICLv2,
+    on 7 of 8 at 0.05 and 8 of 8 at 0.10 and 0.20 for TabPFN-V3.
+K2  HALF. TabPFN-V3 stays within 0.20 of its k = 0.10 value (0.000 and 0.151). TabICLv2
+    does at 0.05 (0.009) but not at 0.20, where it falls by 0.224.
+
+What this says. The real-data dissociation does not depend on the Hill share: scale is
+followed, shape much less, at every k. Its size does: the shape share ranges from 0.25 to
+0.54 across k; a larger k lowers it for every model, GBM included. The real-data
+shape share is therefore not a number to set beside the synthetic 42 to 44%; the claim
+that carries over is the direction. The scale slope uses no Hill estimate and does not
+move with k.
 ```

@@ -145,6 +145,15 @@ def test_twcrps_ignores_everything_below_the_threshold():
     assert metrics.twcrps(q, y, threshold=0.0) == pytest.approx(metrics.crps(q, y))
 
 
+@pytest.mark.parametrize("xi", [0.3, 0.7, 0.9])
+def test_gpd_cap_offset_is_the_tail_beyond_the_cap(xi):
+    # E(Y - u)+ above the (1 - p)-quantile, against the closed form E(Y - q)+ at q = u.
+    p = 1e-6
+    u = genpareto.ppf(1 - p, xi)
+    plus = metrics.gpd_expected_pinball(u, 1.0, xi, 1.0)
+    assert metrics.gpd_cap_offset(1.0, xi, p) == pytest.approx(plus, rel=1e-6)
+
+
 def test_level_weights_cover_the_unit_interval():
     w = metrics.level_weights([0.5, 0.9, 0.99, 0.999])
     assert w.sum() == pytest.approx(1.0)

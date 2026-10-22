@@ -8,10 +8,31 @@ A task is one (xi, seed) pair, 40 in all.
 
     python -m analysis.dose_ensemble
 """
+import numpy as np
 import pandas as pd
 
 from analysis.confirm_ensemble_log import verdict
-from common import paths, tables
+from common import generator, metrics, paths, tables
+
+TAGS = {"epb50": .5, "epb90": .9, "epb99": .99, "epb999": .999}
+
+
+def generator_law(d):
+    """`d` with its expected pinball under the generator's capped law instead of the
+    ideal GPD: tau times the mean offset of the test rows less (correction of 22.10.2026).
+    The test scales are redrawn from the generator seeds; no model is refitted."""
+    offset = {}
+    for xi, seed, n_train, n_test in d[["xi", "seed", "n_train", "n_test"]].drop_duplicates(
+            ).itertuples(index=False):
+        rng = np.random.default_rng(seed)
+        generator.gpd(n_train, rng, xi=xi, clip=True)
+        test = generator.gpd(n_test, rng, xi=xi, clip=True)
+        offset[(xi, seed)] = float(metrics.gpd_cap_offset(test.s, xi).mean())
+    d = d.copy()
+    delta = np.array([offset[(x, s)] for x, s in zip(d.xi, d.seed)])
+    for col, tau in TAGS.items():
+        d[col] = d[col] - tau * delta
+    return d
 
 FILES = {("V3", 1): "clip_context_dose_v3_nest1.csv",
          ("V3", 8): "clip_context_dose_v3_nest8.csv",
@@ -74,6 +95,22 @@ def main():
         r = arm(w999[("V3", 8)], 50.0, "clip", "raw")
         verdict("D5", (r < 0).sum() >= 30,
                 f"{(r < 0).sum()} of {len(r)} tasks, median {r.median():+.1%}")
+
+    # The verdicts above are on the ideal GPD, as predicted. The generator's own law is
+    # the reference from 22.10.2026; raw's median rise over the clean context under it:
+    print("\nunder the generator's law, raw against clean, median of 40 tasks, shift 4/20/50")
+    for k, v in d.items():
+        if v is None:
+            continue
+        g = generator_law(v)
+        cells = []
+        for col in ("epb99", "epb999"):
+            w = wide(g, col)
+            cells.append(f"{col} " + " / ".join(f"{rise(w, s).median():+.1%}"
+                                                for s in (4.0, 20.0, 50.0)))
+        r = arm(wide(g, "epb99"), 50.0, "clip", "raw")
+        print(f"  {k[0]:4s} x{k[1]}  " + "   ".join(cells)
+              + f"   clip_200 at 0.99, shift 50: {r.median():+.1%}")
 
 
 if __name__ == "__main__":
