@@ -34,12 +34,20 @@ SEEDS = env.seeds(env.integer("SEEDS", 3))
 DATASETS = env.names("DATASETS", datasets.DISSOCIATION)
 MODELS = env.models("TabICLv2,TabPFN-V3,GBM")
 OUTPUT = env.text("OUTPUT", "dissociation_real_slope.csv")
+# The Hill share of the shape reference. Unset, the script writes the columns of the
+# default file, measured at 0.10 before k was a knob; with K_SHARES every k is a row and
+# the model is fitted once for all of them (22.10.2026).
+K_SHARES = env.floats("K_SHARES", [])
 
 COLUMNS = ["dataset", "model", "seed", "n_est", "n_features",
            "slope_shape", "slope_shape_corrected", "r_shape",
            "slope_scale", "slope_scale_corrected", "r_scale",
            "var_share_shape", "var_share_scale", "seconds", "reason"]
 KEY = ["dataset", "model", "seed", "n_est"]
+if K_SHARES:
+    COLUMNS.insert(4, "k_share")
+    KEY.append("k_share")
+_fitted: dict = {}
 
 
 def slopes(g) -> dict:
@@ -62,14 +70,22 @@ def measure(cell):
     Xf, yf, Xte, yte = X[idx[:N_FIT]], y[idx[:N_FIT]], X[idx[N_FIT:]], y[idx[N_FIT:]]
     s_te = gradients.log_linear_scale(Xf, yf)(Xte)
     # One fit; the terciles regroup the same predictions, so the cost does not grow
-    # with the number of features.
-    q = models.quantiles(cell["model"], Xf, yf, Xte, seed=cell["seed"], levels=LEVELS,
-                         n_est=cell["n_est"])
-    return slopes(gradients.feature_gradients(Xf, Xte, yte, s_te, q, rng, N_BOOT))
+    # with the number of features. k only moves the reference, so its cells share the fit,
+    # and each k bootstraps from the same stream as the default run.
+    fit = tuple(cell[k] for k in ("dataset", "model", "seed", "n_est"))
+    if fit not in _fitted:
+        _fitted.clear()
+        _fitted[fit] = models.quantiles(cell["model"], Xf, yf, Xte, seed=cell["seed"],
+                                        levels=LEVELS, n_est=cell["n_est"])
+    return slopes(gradients.feature_gradients(Xf, Xte, yte, s_te, _fitted[fit], rng, N_BOOT,
+                                               k_share=cell.get("k_share", 0.10)))
 
 
 def main():
-    cells = runner.grid(dataset=DATASETS, model=MODELS, seed=SEEDS, n_est=[N_EST])
+    axes = dict(dataset=DATASETS, model=MODELS, seed=SEEDS, n_est=[N_EST])
+    if K_SHARES:
+        axes["k_share"] = K_SHARES
+    cells = runner.grid(**axes)
     seconds = runner.run(OUTPUT, COLUMNS, KEY, cells, measure,
                          show=lambda r: f"shape {r['slope_shape']:+.2f} "
                                         f"(corrected {r['slope_shape_corrected']:+.2f}) | "
@@ -84,9 +100,17 @@ def report():
     d = tables.ok_rows(pd.read_csv(paths.result(OUTPUT)))
     if d.empty:
         return
+    by = ["model", "k_share"] if "k_share" in d else ["model"]
     print("\n=== slope by model, median over datasets and seeds ===")
-    print(d.groupby("model")[["slope_scale", "slope_scale_corrected", "slope_shape",
-                              "slope_shape_corrected"]].median().round(3).to_string())
+    print(d.groupby(by)[["slope_scale", "slope_scale_corrected", "slope_shape",
+                         "slope_shape_corrected"]].median().round(3).to_string())
+    if "k_share" in d:
+        for k, part in d.groupby("k_share"):
+            r = stats.paired_by_target(part, "slope_scale_corrected", "slope_shape_corrected")
+            if r["clusters"]:
+                print(f"k = {k:g}: scale closer to 1 than shape: "
+                      f"{stats.describe(r, unit='target vectors')}")
+        return
     print("\n=== share of the reference variance that is measurement error ===")
     print(d.groupby("model")[["var_share_scale", "var_share_shape"]]
           .median().round(3).to_string())

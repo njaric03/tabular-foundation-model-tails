@@ -29,7 +29,10 @@ Sections are in the order they were written, grouped here by part of the thesis.
   `unit_error_confirm.py` with native categories, 13.10.2026; both scripts with
   TabPFN-V3's default ensemble and a log arm, 20.10.2026, with the outcome of 21.10.2026;
   both on TabPFN-3.5, 21.10.2026, with its outcome; `clip_context.py` at the default
-  ensemble for V3 and 3.5, 22.10.2026.
+  ensemble for V3 and 3.5, 22.10.2026, with its outcome; the correction to the expected
+  pinball of the generator, 22.10.2026.
+- Scale and tail shape, added: `dissociation_real_slope.py` across the Hill share,
+  22.10.2026.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2424,4 +2427,111 @@ members ran raw, clip_200 and log at shifts 1 and 50 for that task; its drawn pi
 0.999 was 0.13 clean and 0.33 at shift 50, the expected pinball was not read. The verdict
 script analysis/dose_ensemble.py was written with these predictions and run once on
 stand-ins built from the one-member smoke file, which tests the code and nothing else.
+```
+
+## `experiments/h3_repair/clip_context.py`, the dose curve at the default ensemble, outcome, 22.10.2026
+
+```
+1920 cells, none failed. V3 on CPU: 2448 s at one member and 15243 s at eight; 3.5 on
+the GPU: 1979 s and 2824 s. The one-member V3 rows of the smoke task equal the run's to
+the last digit.
+
+D1  FAILS, narrowly. At one member and a shift of 50 raw's expected pinball at 0.999
+    rises in 36 of 40 tasks, by +18.7% on the median, not 20%. On the drawn test targets
+    of the same run the rise is +83.4%, the headline of part two reproduced; the expected
+    loss puts it at about a fifth of that.
+D2  HOLDS. The rise at 0.99 is smaller at eight members in 40 of 40 tasks at a shift of
+    20 (+6.0% against +0.6%) and of 50 (+6.8% against +0.7%).
+D3  HOLDS. 3.5 at eight members moves raw's expected pinball at 0.99 by +1.0% and -0.1%
+    at a shift of 4 and by -0.7% and -1.0% at 20 (xi 0.7 and 0.9).
+D4  HOLDS. At a shift of 20 log is below clip_200 at 0.99 in 40 of 40 tasks for V3 at
+    eight members (-4.2%) and in 33 of 40 for 3.5 at eight (-1.3%).
+D5  HOLDS. For V3 at eight members and a shift of 50 clip_200 is below raw at 0.999 in
+    35 of 40 tasks, -6.3%.
+
+Not predicted, read after the verdicts.
+
+Raw's median rise over the clean context in %, expected pinball, shift 4 / 20 / 50:
+
+               V3, 1 member     V3, 8          3.5, 1          3.5, 8
+    0.99       1.5/ 6.0/ 6.8    0.6/0.6/0.7    0.2/ 1.4/ 1.8   0.2/-0.9/-1.2
+    0.999      1.4/ 5.5/18.7    2.4/3.9/6.0    4.6/45 /132     -0.3/3.6/8.2
+
+3.5 at one member is the most sensitive configuration at 0.999 and among the least at
+0.99; at eight members it is the least sensitive at both. The median level moves by at
+most +7.6% (V3, one member, shift 50).
+
+The cap at 0.99 under a shift of 50: -6.4% for V3 at one member (40 of 40), -1.1% at
+eight (27 of 40), -1.8% for 3.5 at one (39 of 40) and +1.0% at eight (3 of 40 lower):
+where the row costs nothing the cap costs a little. At 0.999 the cap gains in every
+configuration at a shift of 50, from -6.3% (V3, eight) to -59% (3.5, one).
+
+Log at 0.99 is below raw in every configuration and shift, by -0.3% to -7.5% on the
+median; on a clean context by -0.3% (3.5, one) to -4.2% (V3, eight). At 0.999 under
+a shift log is below clip_200 for V3 (-2.9% to -7.0%) but above it for 3.5 (+3.3% to
++7.6%, lower in 9 to 17 of 40 tasks).
+
+The measurements of run/new_models.sh for 3.5 at one member, read in a copy of
+analysis/models_2026_09.ipynb (descriptive, as for LimiX-2 and Causilo): keeping the
+largest claim of freMTPL2sev puts Q(0.99) at 0.92 of its value without it (V3: 0.92);
+clip_200 lowers the 0.99 loss in 9 of 10 subsamples (-4.3%) and the 0.999 loss in 7 of
+10 (-25%); dosed on the sd, its local Q(0.99) moves by at most 11% and its implied xi at
+a true 0.3 stays between 0.31 and 0.38 (V3 falls to -0.17); shape against scale gives
+93% and 47%, 20 of 20 seeds; the unit error on seven tables costs +2.1% at 0.99, +1.9%
+capped.
+
+What this says. The headline of +83% is mostly the noise of one exceedance per task at
+0.999: on the expected loss one added row costs V3 at one member +19% at 0.999 and +7% at
+0.99. The default ensemble takes most of that away. The sensitivity is real but its
+size depends on the configuration, from +132% at 0.999 for 3.5 at one member to nothing
+at 0.99 for 3.5 at eight. Log is the better repair at 0.99 everywhere measured here; at
+0.999 the cap does better for 3.5.
+```
+
+## Correction to the expected pinball of the generator, 22.10.2026
+
+```
+The expected pinball (epb*) of clip_context.py, legit_segment.py and recalibration.py is
+computed under the ideal GPD. The generator caps the uniform draw at 1 - 1e-9, so its
+law puts the mass above the cap point u = Q(1 - 1e-9) on u itself. For q < u, which holds
+for every quantile measured, the two laws differ by a constant: the ideal expected
+pinball is larger by tau * delta, delta = s * 1e-9^(1 - xi) / (1 - xi). At xi = 0.7
+delta is 0.66% of s and moves no reported number by more than 0.6 points. At xi = 0.9 it
+is 1.26 s, an unobservable 12.6% of the mean, and it shrinks every relative change on
+those tasks.
+
+Recomputed under the generator's own law (no model rerun, scales from the generator
+seeds): D1 becomes +23.0% (36 of 40 tasks) instead of +18.7%, so D1 holds under the law
+the tasks were drawn from and fails, as recorded, under the ideal law it was written for.
+V3 at one member, shift 50: +8.2% at 0.99 and +23.0% at 0.999 (ideal +6.8% and +18.7%);
+at eight members +0.8% and +6.9% (ideal +0.7% and +6.0%); 3.5 at one member +154% at
+0.999 (ideal +132%). D2 to D5 do not change verdict. The verdicts above stay as written.
+From here on the generator's law is the reference for these files.
+```
+
+## `experiments/h1_shape_vs_scale/dissociation_real_slope.py` across the Hill share, 22.10.2026
+
+```
+The real-data slope of part one (shape share 0.415 for TabPFN-V3 and 0.528 for TabICLv2,
+scale near 1) uses a Hill reference at k_share = 0.10, never varied. TODO P1a asks for
+0.05, 0.10 and 0.20 before the number is read as more than exploratory. K_SHARES=0.05,
+0.1,0.2 refits nothing extra: k only moves the reference, so each (dataset, model, seed)
+is fitted once and bootstrapped from the same stream as the default run. Same nine
+datasets, three seeds, four members, 100 bootstraps, into
+dissociation_real_slope_kshare_tabicl.csv and _tabpfn.csv (two streams).
+
+PREDICTIONS WRITTEN BEFORE THE RUN
+----------------------------------
+Medians over datasets and seeds of the corrected slopes, per model and k.
+
+K1, the dissociation survives the threshold. For TabPFN-V3 and for TabICLv2, at k_share
+    0.05 and at 0.20, the median corrected shape slope is below the median corrected
+    scale slope.
+K2, the number survives it. For TabPFN-V3 and for TabICLv2 the median corrected shape
+    slope at 0.05 and at 0.20 lies within 0.20 of its value at 0.10.
+
+GBM carries no prediction. Seen before these were written: a smoke test of GBM on three
+datasets at seed 7000, where its corrected shape slope moved from +1.73 to +0.80 on houses
+and from +4.32 to -1.85 on house_16H across k, and the k = 0.10 rows equal the stored ones
+to 1e-12. No foundation model was run.
 ```

@@ -208,13 +208,43 @@ def pinball_at(q, y, level, levels=LEVELS):
 
 
 def crps(q, y, levels=LEVELS):
-    """CRPS approximated on a quantile grid: twice the mean pinball loss."""
+    """Twice the plain mean pinball loss over `levels`.
+
+    Not a quadrature of CRPS = 2 * int_0^1 rho_tau dtau: every level gets the same weight
+    whatever the gap to its neighbours. On the three default levels it misses the CRPS of a
+    GPD by -8% to +48%, on the uneven 102 levels of `common.evt` by up to 2.5% and a
+    difference between two forecasts by up to a factor of two (audit of 22.10.2026). Kept
+    because the stored scores of evt_graft and graft_gate used it; use `crps_weighted`.
+    """
     return float(2.0 * pinball_all(q, y, levels).mean())
 
 
 def twcrps(q, y, threshold, levels=LEVELS):
-    """Threshold-weighted CRPS with the chaining function v(y) = max(y, threshold)."""
+    """`crps` after the chaining function v(y) = max(y, threshold), with its weights."""
     return crps(np.maximum(q, threshold), np.maximum(y, threshold), levels)
+
+
+def level_weights(levels):
+    """The width of each level's cell on (0, 1), split halfway to its neighbours."""
+    lv = np.asarray(levels, dtype=float)
+    edges = np.concatenate([[0.0], (lv[1:] + lv[:-1]) / 2, [1.0]])
+    return np.diff(edges)
+
+
+def crps_weighted(q, y, levels):
+    """CRPS as twice the pinball integral over tau, each level weighted by its cell width.
+
+    On a GPD with xi up to 0.9 it is within 0.1% of the integral on 99 equal cells and
+    on the 102 levels of `common.evt`. Coarse grids stay coarse: on three levels it is
+    off by about 25%.
+    """
+    w = level_weights(levels)
+    return float(2.0 * (pinball_all(q, y, levels).mean(axis=0) * w).sum())
+
+
+def twcrps_weighted(q, y, threshold, levels):
+    """Threshold-weighted CRPS, chaining v(y) = max(y, threshold), as `crps_weighted`."""
+    return crps_weighted(np.maximum(q, threshold), np.maximum(y, threshold), levels)
 
 
 def mean_from_quantiles(q, levels=LEVELS):

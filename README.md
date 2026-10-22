@@ -14,12 +14,22 @@ extreme-value oracle on the same 2000 rows recovers 99% of the shape. Gradient b
 has the same gap (87% and 45%), so it is not specific to foundation models.
 
 **One extreme context target.** On 40 synthetic tasks, one added extreme target made the
-context standard deviation 50 times larger. With one ensemble member, TabPFN-3's median
-increase in pinball loss was **83% at the 99.9th percentile**, compared with **10% at the
-median**. Capping brought median losses back close to the clean-context baseline at all
-four percentiles.
+context standard deviation 50 times larger. Measured by the expected loss under the true
+distribution, TabPFN-3 with one ensemble member lost **19% more at the 99.9th percentile**
+and **7% more at the 99th** than on the clean context. An earlier README gave +83% at the
+99.9th percentile. That figure came from the drawn test targets, where a task holds about
+one exceedance at that level. The rerun of 22 October 2026 reproduces it on the drawn
+targets (+83%), so most of it came from the few exceedances, not from the model.
 
-![Effect of one extreme context target on TabPFN-3 prediction loss](figures/synthetic_error.png)
+**How much one row costs depends on the configuration.** The same dose at the package
+default of eight members costs TabPFN-3 under 1% at the 99th percentile and 6% at the
+99.9th. TabPFN-3.5 with one member loses 2% at the 99th but 132% at the 99.9th; at its
+default of eight members it loses nothing at the 99th and 8% at the 99.9th. Where the row
+costs, capping takes most of the loss back (-6.4% at the 99th percentile for TabPFN-3 with
+one member); where it costs nothing, capping costs a little (+1.0% for TabPFN-3.5 at
+eight).
+
+![Effect of one extreme context target by model and ensemble size](figures/dose_by_configuration.png)
 
 On ten samples of the freMTPL2sev insurance claims, each with one dominant claim,
 capping lowered the 99th-percentile loss in most samples for every model. TabDPT
@@ -113,10 +123,14 @@ prior or from the architecture is left to later work.
   draws already used. The cap helps TabPFN-3 and costs TabICLv2. Log helps both at the
   99th percentile in most tested cells but overshoots a legitimate segment at the 99.9th.
   Neither is a recommendation for the model family.
-- The one-row results of part two use one ensemble member. Eight members were measured
-  only in the confirmation, where they cut the added row's cost on the synthetic task to
-  about a quarter for TabPFN-3 and to nothing for TabPFN-3.5; the 50-fold figure above
-  has not been rerun at eight. TabPFN-3.5 ran on a GPU, every other TabPFN result on CPU.
+- Eight ensemble members were measured in the confirmation and in the dose curve of
+  22 October 2026. The other results of part two, the natural extremes and the dose on
+  the maximum among them, use one member. TabPFN-3.5 ran on a GPU, every other TabPFN
+  result on CPU.
+- The pinball loss on drawn test targets at the 99.9th percentile rests on about one
+  exceedance per task. The synthetic results from 21 October 2026 on report the expected
+  loss under the true distribution as well; earlier synthetic numbers at that level are
+  noisy.
 - `crps` and `twcrps` in `common/metrics.py` are twice the plain mean pinball loss over
   the chosen levels. On an uneven grid of levels this is a discrete quantile score, not a
   quadrature of the CRPS integral.
@@ -127,7 +141,7 @@ prior or from the architecture is left to later work.
 |---|---|---|
 | Scale and tail shape | `h1_shape_vs_scale/`: `shape_of_x`, `scale_of_x`, `oracle_xi_of_x`, `sample_complexity`; checks `tail_families`, `vincentization`, `xi_residual`, `reference_instrument`, `instrument_ceiling`, `dissociation_real_slope` | [h1_shape_vs_scale](analysis/h1_shape_vs_scale.ipynb) |
 | Extreme context target | `h2_leverage/`: `influence`, `influence_real`, `grid_occupancy`, `prevalence_data`, `prevalence_models`; coverage in `h1_shape_vs_scale/empirical_coverage`; output heads in `side/head_tail_family`, `side/head_tail_tabicl` | [h2_leverage](analysis/h2_leverage.ipynb) |
-| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration` | [h3_repair](analysis/h3_repair.ipynb); the confirmation in [PREREGISTRATION.md](PREREGISTRATION.md), the verdicts of 21.10.2026 from `analysis/confirm_ensemble_log.py` |
+| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration` | [h3_repair](analysis/h3_repair.ipynb); the confirmation in [PREREGISTRATION.md](PREREGISTRATION.md), the verdicts of 21 and 22.10.2026 from `analysis/confirm_ensemble_log.py`, `confirm_tabpfn35.py` and `dose_ensemble.py` |
 
 Explored and left outside the thesis: pre-training and fine-tuning
 (`h3_repair/prior_pretraining_*`, `h3_repair/tabicl_prior_finetune`), other repairs
@@ -156,10 +170,11 @@ From the repository root:
 ```bash
 python -m pip install -e ".[analysis]"
 python -m analysis.supplement_figures
+python -m analysis.thesis_figures
 ```
 
 This uses stored results and needs no model weights, data download or GPU.
-Plotted values are written to `supplement/`, which is not tracked; README images go
-to `figures/`.
+Plotted values are written to `supplement/` and `thesis/figures/`, which are not
+tracked; README images go to `figures/`.
 
 [Measurement rules](RULES.md) · [Predictions and outcomes](PREREGISTRATION.md)

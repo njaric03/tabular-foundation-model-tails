@@ -145,6 +145,34 @@ def test_twcrps_ignores_everything_below_the_threshold():
     assert metrics.twcrps(q, y, threshold=0.0) == pytest.approx(metrics.crps(q, y))
 
 
+def test_level_weights_cover_the_unit_interval():
+    w = metrics.level_weights([0.5, 0.9, 0.99, 0.999])
+    assert w.sum() == pytest.approx(1.0)
+    assert np.allclose(w, [0.7, 0.245, 0.0495, 0.0055])
+
+
+def test_crps_weighted_equals_the_plain_mean_on_equal_cells():
+    rng = np.random.default_rng(0)
+    levels = (np.arange(50) + 0.5) / 50
+    q = np.sort(rng.normal(size=(30, 50)), axis=1)
+    y = rng.normal(size=30)
+    assert metrics.crps_weighted(q, y, levels) == pytest.approx(metrics.crps(q, y, levels))
+
+
+@pytest.mark.parametrize("xi", [0.3, 0.7])
+def test_crps_weighted_recovers_the_gpd_crps(xi):
+    # For a correct forecast the expected CRPS is E|Y - Y'| / 2 = 1 / ((1 - xi)(2 - xi)).
+    # An uneven grid, weighted, lands on it; the plain mean on three levels does not.
+    levels = np.unique(np.r_[(np.arange(99) + 0.5) / 100, 0.995, 0.999, 0.9995])
+    y = genpareto.rvs(xi, size=400_000, random_state=np.random.default_rng(1))
+    q = np.broadcast_to(genpareto.ppf(levels, xi), (len(y), len(levels)))
+    want = 1.0 / ((1.0 - xi) * (2.0 - xi))
+    assert metrics.crps_weighted(q, y, levels) == pytest.approx(want, rel=0.02)
+    three = [0.5, 0.9, 0.99]
+    q3 = np.broadcast_to(genpareto.ppf(three, xi), (len(y), 3))
+    assert abs(metrics.crps(q3, y, three) / want - 1) > 0.05
+
+
 def test_mean_from_quantiles_recovers_the_mean_of_a_uniform():
     levels = list(np.linspace(0.01, 0.99, 99))
     q = np.array([levels])                      # quantile function of U(0, 1)
