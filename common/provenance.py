@@ -53,7 +53,9 @@ ENV_KNOBS = ["MODELS", "MODEL", "SEEDS", "N_EST", "XI", "DOSES", "DOSE_MODE",
              "ARMS",
              # TabPFN on the GPU from 3.5 on; CPU when unset, as every earlier TabPFN row.
              "TABPFN_DEVICE",
-             "K_SHARES"]
+             "K_SHARES",
+             # every TabPFN member on the untransformed target when `none`, 28.10.2026
+             "TABPFN_Y"]
 
 COLUMNS = (["utc", "output", "script", "git_sha", "git_dirty", "python",
             "platform", "venv"]

@@ -35,7 +35,8 @@ Sections are in the order they were written, grouped here by part of the thesis.
   22.10.2026, with its outcome.
 - Robustness of the leverage result, 27.10.2026: the position of the row, the context
   size, the default ensemble with two more tables and the repairs' loss at 10 000 rows,
-  each with its outcome; TabICLv2 at its default ensemble, 28.10.2026.
+  each with its outcome; TabICLv2 at its default ensemble, 28.10.2026, with its
+  outcome; TabPFN-V3 without its target transform, 28.10.2026, with its outcome.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2832,3 +2833,167 @@ T5. The log is worth recommending: the same two conditions for log. On the gener
 Reported without a rule: the same at 0.999; the sum over seeds and the worst seed next
 to every sign count (outcome of 28.10); on freMTPL2sev the pinball at 0.99 of clip_200
 and log against raw at 2 sd and above with its sum and worst cell; the run times.
+
+## TabICLv2 at its default ensemble, outcome, 28.10.2026
+
+`influence_sd_tabicl8.csv` and `influence_sd_tabicl8_n10k.csv` (five seeds each),
+`clip_context_real_tabicl8.csv` (five subsamples per bin) and
+`clip_context_tabicl_n{2k,10k}_nest{1,8}.csv` (ten seeds, 60 rows each),
+`python -m analysis.tabicl8`. Both parts were stopped once from outside at 12:02 and
+resumed by their keys; no finished cell was run twice.
+
+T1 holds at both sizes. At a dose of 20 the eight-member median global change of Q(0.99)
+is -15.9% at 2000 rows (from -39.9% to -10.3%) against -15.1% at one member; -37.3% at
+10 000 rows (from -50.4% to -28.8%) against -38.7%; every seed falls. At a dose of 4 it
+is +3.2% and -17.2%. The ensemble leaves TabICLv2's effect whole where TabPFN-V3's nearly
+vanishes. As the rule says, the way each model handles the target is a candidate
+explanation of the difference, not a tested one.
+
+T2 holds. On freMTPL2sev at 4 sd and above the eight-member raw `d_q99` has a median of
+-18.3% against -15.4% at one member; all five subsamples fall (-17.1% to -27.7%). At 2 to
+4 sd it is -8.5% against -5.2%. The script's control against `prevalence_models_wide.csv`
+prints FAILS (largest gap 0.08 on 20 cells): that file is at one member, so the gap is the
+ensemble's, not the instrument's. clip_200 brings `d_q99` at 4 sd and above to +2.1%.
+log moves Q(0.99) by -16.3% already below 1.2 sd, where no row carries leverage, so its
+`d_q99` is no measure of repair. Pinball at 0.99 at 2 sd and above: clip_200 below raw in
+9 of 10 cells (median -3.8%, sum -3.0%, worst cell +12.8%), log in 8 of 10 (median -5.0%,
+sum -3.4%, worst cell +11.1%).
+
+T3 fails at 2000 rows and holds at 10 000. Raw's expected pinball at 0.99 at a shift of
+20 rises over the clean context by a median of +1.97% at 2000 rows, 0.03 points short of
+the bar (+1.85% at one member). At 10 000 rows it rises by +2.31% (+2.48% at one member).
+The rise is small at every size: 8 or 9 of 10 seeds rise, single seeds by up to +48%
+at 2000 rows and +28% at 10 000. TabPFN-V3 at one member and 10 000 rows rises by
++14.2%. At 0.999 the row lowers raw's expected loss, by 8.4% and 8.6% at 2000 rows
+(one and eight members) and by 6.6% and 6.5% at 10 000.
+
+T4 holds at every size and ensemble size. clip_200 below raw at a shift of 20:
+
+    rows    members  below   median   sum     worst seed   clean context
+    2000    1        8/10    -1.0%    -5.9%   +1.9%        -0.30%
+    2000    8        8/10    -1.3%    -6.5%   +1.9%        -0.31%
+    10 000  1        9/10    -2.5%    -5.8%   +0.7%        -0.00%
+    10 000  8        10/10   -2.3%    -5.7%   -0.1%        -0.12%
+
+The gain is about the size of the row's cost, so the cap takes back what little there is.
+At 0.999 it is worse than raw: below it in 1, 1, 0 and 0 of 10 seeds, medians +6.7%,
++6.8%, +11.2% and +12.0%, since there it undoes the row's gain.
+
+T5 holds at every size and ensemble size: log below raw at a shift of 20 in 10 of 10
+everywhere, medians -5.0%, -5.5%, -4.6% and -4.1% (worst seed -1.3% to -2.0%). On a clean
+context it is already -3.3%, -3.2%, -2.4% and -2.5%, so about two points of the gain come
+from the row and the rest from fitting on log(y). At 0.999 it is below raw in 10, 10, 9
+and 9 of 10. On the generator's law only, as for TabPFN-V3 at 10 000 rows.
+
+Run times: a median fit of 4 s and 24 s at 2000 rows (one and eight members), 22 s and
+117 s at 10 000; the leverage sweep 487 s at 2000 rows and 3863 s at 10 000; about 34 s
+per arm on freMTPL2sev at eight members.
+
+What follows. For TabICLv2 the leverage result is not one of the single member: it holds
+at the default ensemble on the generator at both sizes and on freMTPL2sev, at full size.
+For TabPFN-V3 it shrinks at the default ensemble. For TabICLv2 the row moves the quantile
+far more than the loss: Q(0.99) falls by 16% to 37% while the expected loss at 0.99 rises
+by about 2% and the loss at 0.999 falls. Both repairs pass their rules at 0.99, but they
+have little to repair there; the cap turns into a loss at 0.999. A test of the candidate
+explanation would change how the target is handled within one ensemble, not the ensemble.
+
+## TabPFN-V3 without its target transform, 28.10.2026
+
+The outcome above leaves a candidate explanation. TabICLv2's leverage survives its
+default ensemble because every member receives the same target, standardised once.
+TabPFN-V3's effect nearly vanishes at eight members because four of them fit a power
+transform of the target: REGRESSION_Y_PREPROCESS_TRANSFORMS = (None, "safepower")
+(`tabpfn/inference_config.py:181`), crossed with the feature preprocessings and cycled
+over the members (`regressor.py:899`, `preprocessing/ensemble.py:1133`). A single member
+always gets the first entry, no transform. The 22.10 dose files show the gap at a shift
+of 20 and xi 0.7: the median Q(0.99) falls by 22.8% at one member and by 2.2% at eight;
+the expected pinball at 0.99 rises by 8.2% and by 1.8%.
+
+The test keeps TabPFN-V3 at eight members and changes only the target. TABPFN_Y=none
+(`common/models.py`) sets REGRESSION_Y_PREPROCESS_TRANSFORMS to (None,). A smoke fit
+before this section confirmed that all eight members then carry no target transform; the
+feature preprocessings (four members each of squashing_scaler_default and quantile_uni)
+and the feature shifts stay as at the default. The knob is the column `y_transforms` and
+part of the resume key of `clip_context.py` and `influence.py`. The prediction, written
+before any row: without the transform the effect comes back.
+
+Runner `run/tabpfn_y_2810.sh`, two parts with their own outputs; verdicts from
+`python -m analysis.tabpfn_y`.
+
+1. `clip_context.py`, MODEL=TabPFN-V3, ARMS=raw, XI=0.7, SD_SHIFTS=1,20, twenty seeds,
+   N_TRAIN=2000, N_TEST=900, six threads, three arms in turn: one member
+   (`clip_context_ytf_nest1.csv`), eight at the default (`clip_context_ytf_nest8.csv`)
+   and eight with TABPFN_Y=none (`clip_context_ytf_nest8_none.csv`). The seeds and the
+   design are those of `clip_context_dose_v3_nest{1,8}.csv`. Those ran on another
+   machine, so the one-member and default arms are measured again here at the same
+   thread count.
+2. `influence.py`, MODELS=TabPFN-V3, N_EST=8, DOSE_MODE=sd, DOSES=4,20, XI=0.7,
+   POSITION=centre, five seeds, 2000 rows, four threads, at the default
+   (`influence_sd_tabpfn8.csv`) and with TABPFN_Y=none (`influence_sd_tabpfn8_none.csv`).
+   The one-member reference is `influence_sd_pos_centre.csv`, from this machine at four
+   threads: -17.8% at a dose of 20.
+
+Three measures, each the median over seeds of a paired change at a shift or dose of 20:
+Q, the median predicted Q(0.99) on the test rows with the row over the clean context,
+less one (`q99` of `clip_context.py`); R, raw's expected pinball at 0.99 under the
+generator's law with the row over the clean context, less one; G, the global change of
+Q(0.99) of `influence.py`. A suffix names the arm: 1 for one member, 8 for eight at the
+default, 8n for eight without the transform. For each measure the share of the gap the
+transform accounts for is s = (X8n - X8) / (X1 - X8).
+
+Y0. The gap reproduces here: Q8 lies above Q1 / 2, R8 below R1 / 2 and G8 above G1 / 2,
+    with Q1 and G1 negative and R1 positive. A measure that fails Y0 has no gap to
+    explain; it is reported without a verdict.
+Y1. Q: s >= 0.5.
+Y2. R: s >= 0.5.
+Y3. G: s >= 0.5.
+
+The explanation is supported if every measure with a verdict has s >= 0.5. It is
+rejected if every one has s <= 0.25: then the ensemble itself removes TabPFN-V3's effect
+and the difference from TabICLv2 stays unexplained. Otherwise the transform accounts for
+part of the gap and the thesis gives the shares.
+
+Reported without a rule: the same at 0.999; the sign counts with the worst seed; the
+dose of 4; the run times.
+
+## TabPFN-V3 without its target transform, outcome, 28.10.2026
+
+`clip_context_ytf_nest1.csv`, `clip_context_ytf_nest8.csv` and
+`clip_context_ytf_nest8_none.csv` (twenty seeds, 40 rows each), `influence_sd_tabpfn8.csv`
+and `influence_sd_tabpfn8_none.csv` (five seeds), `python -m analysis.tabpfn_y`. The
+one-member and default arms reproduce `clip_context_dose_v3_nest{1,8}.csv` to the last
+digit on all 40 shared rows (q99, pb99, epb99, q999); the remeasurement was not needed.
+
+Y0 holds for all three measures. At the default eight members Q is -2.2% against -22.8%
+at one member, R +1.8% against +8.2%, G -2.8% against -17.8%.
+
+Y1 holds: without the transform Q is -21.4%, s = 0.93. Seed by seed the eight members
+without the transform follow the single member, a correlation of 0.98 over the twenty
+seeds against 0.67 for the default. Q falls in 12 of 20 seeds in every arm. At one
+member the falling seeds fall by 13% to 62% while the others rise by 8% to 38%.
+
+Y2 holds: without the transform R is +6.8%, s = 0.78. Raw's expected loss at 0.99 rises
+in 20 of 20 seeds (the smallest rise +2.1%), against 17 of 20 at the default (one seed
+-5.8%) and 20 of 20 at one member.
+
+Y3 holds: without the transform G is -15.3%, s = 0.83, a fall in 5 of 5 seeds. At the
+default 3 of 5 fall and one seed rises by 14.7%. At a dose of 4 G is -6.1% at one
+member, -2.6% at the default and -7.2% without the transform.
+
+The explanation is supported, with shares of 0.93, 0.78 and 0.83.
+
+Without a rule: at 0.999 raw's expected loss rises by about the same in every arm (+5.3%
+at one member, +4.8% at the default, +4.9% without the transform), so the transform
+shields the level of 0.99 but not that of 0.999. A median fit takes 9 s at one member,
+51 s at eight at the default and 32 s without the transform; the leverage sweeps took
+1060 s and 1047 s.
+
+What follows. The power transform that half of TabPFN-V3's default members fit to the
+target accounts for most of the gap between one member and eight. Averaging over views
+of the features does not remove the effect: eight members on the untransformed target
+behave like one. The candidate explanation of the TabICLv2 outcome is thereby supported
+on the side of TabPFN-V3: the two ensembles differ in how they treat the target. Whether
+TabICLv2 would lose its effect under a power transform of the target is not tested here.
+The test covers the generator at 2000 rows, xi 0.7 and a shift of 20, not real tables.
+TabPFN-V3's default thus carries a partial repair of its own, a non-linear transform of
+the target fitted before the model, of the same kind as the log arm.

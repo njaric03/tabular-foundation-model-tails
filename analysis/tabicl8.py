@@ -46,7 +46,10 @@ def leverage():
     d = d[(d.arm != "clip") | (d.clip_c == 200)].copy()
     d.loc[d.arm == "clip", "arm"] = "clip_200"
     m = d[d.arm == "raw"].groupby("bin").d_q99.median()
-    verdict("T2", m.get("4.0-inf", 0.0) <= -0.05,
+    if "4.0-inf" not in m.index:
+        print("clip_context_real_tabicl8.csv: the bin of 4 sd and above is not there yet")
+        return
+    verdict("T2", m["4.0-inf"] <= -0.05,
             "raw d_q99 by bin " + ", ".join(f"{b} {v:+.1%}" for b, v in m.items()))
     print("     d_q99 by bin and arm, median")
     print(d.pivot_table(index="bin", columns="arm", values="d_q99", aggfunc="median")

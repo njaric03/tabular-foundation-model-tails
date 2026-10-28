@@ -88,9 +88,11 @@ COLUMNS = ["model", "xi", "variant", "clip_c", "sd_shift_target", "sd_shift",
            "borders_in_data", "same_bar_90_99", "xi_implied", "xi_ratio",
            "q50", "q90", "q99", "q999",
            "pb50", "pb90", "pb99", "pb999", "seconds", "reason",
-           "epb50", "epb90", "epb99", "epb999"]
+           "epb50", "epb90", "epb99", "epb999", "y_transforms"]
+# y_transforms is models.TABPFN_Y, added 28.10.2026; it acts on TabPFN only and is blank
+# in earlier files, all of which ran at the default.
 KEY = ["model", "xi", "variant", "clip_c", "sd_shift_target", "seed", "n_est",
-       "n_train", "n_test"]
+       "n_train", "n_test", "y_transforms"]
 
 # (variant, c) per cell: the cap for clip and tail_log, tau for sd_cap, else 0.
 ARMS = ([("raw", 0.0), ("robust", 0.0)] + [("clip", c) for c in CLIP_C]
@@ -165,7 +167,7 @@ def measure(cell):
 
 def main():
     cells = [dict(model=MODEL, xi=xi, variant=v, clip_c=c, sd_shift_target=target, seed=seed,
-                  n_est=N_EST, n_train=N_TRAIN, n_test=N_TEST)
+                  n_est=N_EST, n_train=N_TRAIN, n_test=N_TEST, y_transforms=models.TABPFN_Y)
              for xi in XI for target in SD_SHIFTS for seed in SEEDS for v, c in ARMS]
     seconds = runner.run(OUTPUT, COLUMNS, KEY, cells, measure,
                          show=lambda r: f"borders {r['borders_in_data']:>4}  xi "

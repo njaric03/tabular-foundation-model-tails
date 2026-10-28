@@ -64,6 +64,14 @@ SUPPORTED = ["GBM", "XGB", "CB", "TabICLv2", "TabPFN-V3", "TabPFN-v2.5",
 CATEGORICAL = env.text("CATEGORICAL", "") == "native"
 CATEGORICAL_INDICES: list = []
 
+# TABPFN_Y=none fits every TabPFN member on the untransformed target. The default ensemble
+# cycles REGRESSION_Y_PREPROCESS_TRANSFORMS = (None, "safepower"), so four of eight members
+# fit a power transform of y; a single member gets the first, None. Added 28.10.2026 to
+# test why TabICLv2's leverage survives its ensemble; `default` is every earlier row.
+TABPFN_Y = env.text("TABPFN_Y", "default")
+if TABPFN_Y not in ("default", "none"):
+    raise ValueError(f"TABPFN_Y={TABPFN_Y!r}: expected default or none")
+
 
 def parse_list(value: str) -> list[str]:
     """Split a `MODELS=` value and return every name under its canonical spelling (rule 7)."""
@@ -94,6 +102,8 @@ def tabpfn_regressor(name: str, seed: int, n_est: int):
         kw["model_path"] = TABPFN_PATHS[name]
     if CATEGORICAL and CATEGORICAL_INDICES:
         kw["categorical_features_indices"] = list(CATEGORICAL_INDICES)
+    if TABPFN_Y == "none":
+        kw["inference_config"] = {"REGRESSION_Y_PREPROCESS_TRANSFORMS": (None,)}
     return TabPFNRegressor(**kw)
 
 

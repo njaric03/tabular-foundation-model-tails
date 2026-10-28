@@ -47,8 +47,11 @@ if POSITION not in ("centre", "edge", "random"):
 COLUMNS = ["xi", "model", "dose", "dose_mode", "seed", "position", "n_train", "n_est",
            "sd_shift", "y0_over_max",
            "local_q50", "local_q90", "local_q99", "global_q50", "global_q90", "global_q99",
-           "xi_without", "xi_with", "seconds", "reason"]
-KEY = ["xi", "model", "dose", "dose_mode", "seed", "position", "n_train", "n_est"]
+           "xi_without", "xi_with", "seconds", "reason", "y_transforms"]
+# y_transforms is models.TABPFN_Y, added 28.10.2026; it acts on TabPFN only and is blank
+# in earlier files, all of which ran at the default.
+KEY = ["xi", "model", "dose", "dose_mode", "seed", "position", "n_train", "n_est",
+       "y_transforms"]
 
 # The clean fit of the last (xi, model, seed); every dose of that triple reuses it.
 _clean: dict = {}
@@ -95,7 +98,8 @@ def measure(cell):
 
 def main():
     cells = runner.grid(xi=XI, model=MODELS, seed=SEEDS, dose=DOSES, dose_mode=[DOSE_MODE],
-                        position=[POSITION], n_train=[N_TRAIN], n_est=[N_EST])
+                        position=[POSITION], n_train=[N_TRAIN], n_est=[N_EST],
+                        y_transforms=[models.TABPFN_Y])
     seconds = runner.run(OUTPUT, COLUMNS, KEY, cells, measure,
                          show=lambda r: f"local q50 {r['local_q50']:+.1%} q99 "
                                         f"{r['local_q99']:+.1%} | global q99 "
