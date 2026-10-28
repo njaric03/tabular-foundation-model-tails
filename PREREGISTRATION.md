@@ -33,6 +33,9 @@ Sections are in the order they were written, grouped here by part of the thesis.
   pinball of the generator, 22.10.2026.
 - Scale and tail shape, added: `dissociation_real_slope.py` across the Hill share,
   22.10.2026, with its outcome.
+- Robustness of the leverage result, 27.10.2026: the position of the row, the context
+  size, the default ensemble with two more tables and the repairs' loss at 10 000 rows,
+  each with its outcome; TabICLv2 at its default ensemble, 28.10.2026.
 - Corrections of 1.10.2026: the sd shift quoted for freMTPL2sev, the fine-tuning protocol
   and MEPS_2016_TOTEXP. Thread count, 15.9.2026.
 - Outside the thesis: `architecture_tabdpt.py`, `architecture_tabfm.py`,
@@ -2566,3 +2569,266 @@ shape share is therefore not a number to set beside the synthetic 42 to 44%; the
 that carries over is the direction. The scale slope uses no Hill estimate and does not
 move with k.
 ```
+
+## Robustness checks of the leverage result, 27.10.2026
+
+Three checks of whether part two holds outside the conditions it was measured under. They
+run after the results they check, so they carry no predictions and confirm nothing; what
+each could change is fixed here before the run. Runner: `run/robustness_2710.sh`, four
+threads per part.
+
+1. **Position of the leverage row.** Every earlier row sits at the centre of x.
+   `influence.py` with DOSE_MODE=sd, DOSES=2,4,10,20,50, XI=0.3,0.7, five seeds, TabICLv2,
+   TabPFN-V3 and GBM, at POSITION=centre, edge and random (`influence_sd_pos_*.csv`). The
+   centre is measured again at the same thread count, since TabPFN's CPU output depends on
+   it. If the global change at edge or random differs from the centre by more than half its
+   size, the account through the target's standardisation, which is global, needs a local
+   term.
+2. **Context size.** The same at N_TRAIN=10000, XI=0.7, DOSES=4,20, POSITION=centre
+   (`influence_sd_n10k.csv`). If the global change at 10 000 rows is less than half the
+   2000-row value at the same dose, the effect is one of small contexts and the thesis says
+   so.
+3. **Default ensemble and more tables.** `clip_context_real.py` with
+   VARIANTS=without_max,raw,clip_200: freMTPL2sev for TabPFN-V3 at N_EST=8
+   (`clip_context_real_nest8.csv`); Brazilian_houses and OnlineNewsPopularity, the two
+   tables after freMTPL2sev with the largest natural sd shift in `prevalence_data.csv`, for
+   TabPFN-V3, TabICLv2 and GBM at one member (`clip_context_real_wide.csv`) and for
+   TabPFN-V3 at eight (`clip_context_real_wide_nest8.csv`). The tables are chosen by where
+   leverage occurs, not by how a repair does on them. If the eight-member Q(0.99) ratio on
+   freMTPL2sev at 4 sd and above lies within 0.05 of 1, the real-data leverage claim for
+   TabPFN-V3 is one of the single member only.
+
+## Context size, outcome, 27.10.2026
+
+`influence_sd_n10k.csv` against `influence_sd_pos_centre.csv` (same threads), XI=0.7, five
+seeds, one member, global change of Q(0.99), median (median absolute):
+
+                 dose   2000 rows         10 000 rows
+    TabICLv2        4   -1.3% (1.5%)      -18.9% (18.9%)
+                   20  -15.1% (15.1%)     -38.7% (38.7%)
+    TabPFN-V3       4   -6.1% (10.5%)      +0.1% (50.8%)
+                   20  -17.8% (17.8%)     +14.9% (49.1%)
+    GBM          4, 20  +1.5% (3.2%)       +0.6% (0.8%)
+
+The rule fires for TabPFN-V3 on its signed median: the fall of Q(0.99) seen at 2000 rows
+does not carry to 10 000. It does not fire in the sense it was written for: the row's
+influence is larger at 10 000 rows, not smaller, with seeds from -57% to +1454%. The
+shape TabPFN-V3 reads off a clean context is itself unstable there (xi_without from -0.12
+to 0.56 across five seeds, against 0.48 to 0.69 at 2000), so the leverage cannot be told
+apart from the model's own variability at this size with five seeds. For TabICLv2 the
+effect grows with the context, the opposite of a small-context effect. GBM stays near
+zero at both sizes. What carries: the row moves the foundation models' upper quantile at
+both sizes and the trees' at neither; the direction for TabPFN-V3 does not.
+
+Two limits on reading this, added the same day. The run measures the change of the
+predicted quantile, not its accuracy, so it says nothing yet about whether a repair helps
+or costs at 10 000 rows; that needs raw against the repaired arms on a loss. And the
+doses are equal sd shifts, not equal errors: one row reaching a shift of 20 is 28 times
+the context's maximum at 2000 rows and 21 times at 10 000 (median `y0_over_max`), so the
+two sizes are compared at the same leverage, not at the same error in the target's units.
+
+## Position of the leverage row, outcome, 27.10.2026
+
+`influence_sd_pos_{centre,edge,random}.csv`, five seeds, one member, global change of
+Q(0.99), median, at the doses where the centre effect is clear (10, 20 and 50 sd):
+
+                       xi   dose   centre    edge   random
+    TabPFN-V3         0.3     10   -15.4%  -16.1%   -15.4%
+                              20   -11.6%  -10.7%   -10.9%
+                              50   -34.3%  -33.9%   -28.3%
+                      0.7     10   -14.7%  -14.8%   -15.1%
+                              20   -17.8%  -17.1%   -18.0%
+                              50   -29.7%  -29.2%   -28.1%
+    TabICLv2          0.3     10    -8.6%   -4.9%    -8.9%
+                              20    -7.2%   -5.2%    -8.4%
+                              50   -12.8%  -10.3%   -10.3%
+                      0.7     10   -14.8%   -3.4%   -16.2%
+                              20   -15.1%   -8.1%   -17.6%
+                              50   -30.2%  -27.3%   -29.9%
+
+GBM stays within -6% to +5% everywhere. The rule does not fire for TabPFN-V3: the global
+change is the same wherever the row sits, within 6 points. That is consistent with an
+account through the target's standardisation, which is global, but does not single it
+out: the output grid and the joint processing of the context would also act globally,
+and this run does not separate them. It fires for TabICLv2 in one cell of twelve (edge,
+xi 0.7, dose 10: -3.4% against -14.8%) and comes within half a point of it in another
+(dose 20). With five seeds that is evidence of position dependence in some conditions,
+weaker at the edge for moderate doses and gone by a shift of 50, not an established
+local mechanism; a random position matches the centre for both models.
+
+## The repairs' loss at 10 000 rows, 27.10.2026
+
+The context-size check measured how far one row moves the predicted quantile, not whether
+a repair helps. This run asks the second question at 10 000 rows. `clip_context.py`,
+TabPFN-V3, XI=0.7, SD_SHIFTS=1,20, ten seeds, N_TEST=900, ARMS=raw,clip,log with
+CLIP_C=200, at one member (`clip_context_n10k_nest1.csv`) and eight
+(`clip_context_n10k_nest8.csv`), six threads (`run/robustness_2710.sh loss10k`). The
+measure is the expected pinball under the generator's law (`analysis.dose_ensemble.
+generator_law`), paired against raw within a seed. A shift of 20 is the same leverage as
+at 2000 rows, not the same error in the target's units.
+
+The 2000-row reference, same law, XI=0.7, from `clip_context_dose_v3_nest{1,8}.csv` (20
+seeds), at 0.99: clip_200 below raw at a shift of 20 in 20 and 19 of 20 seeds (median
+-7.7% and -2.2%), on a clean context -0.1% and -0.5%; log below raw at a shift of 20 in
+20 of 20 at both sizes, on a clean context -2.4% and -7.1%.
+
+Rules, at each ensemble size separately:
+
+P1. The cap's benefit carries: at a shift of 20, clip_200's expected pinball at 0.99 is
+    below raw's in at least 8 of 10 seeds. If it fails, the cap is recommended for
+    TabPFN-V3 only at contexts of about 2000 rows.
+P2. The cap stays cheap: on a clean context the median of clip_200 over raw, less one, at
+    0.99 lies within 2%.
+P3. The log carries: at a shift of 20 log is below raw at 0.99 in at least 8 of 10 seeds,
+    and on a clean context its median over raw, less one, is at most +2%. This is the
+    generator's law; it does not lift the costs log showed on real tables.
+
+Reported without a rule: the same at 0.999, the spread over seeds, and raw's change of
+Q(0.99) between shifts 1 and 20.
+
+## Default ensemble and more tables, outcome, 28.10.2026
+
+`clip_context_real_nest8.csv`, `clip_context_real_wide.csv` and
+`clip_context_real_wide_nest8.csv`, five subsamples per bin, 2000 context rows, 1000 test
+rows. The raw arm reproduces `prevalence_models_wide.csv` on both added tables: GBM
+exactly, TabICLv2 to 1e-5, TabPFN-V3 to 0.006 per cell, the environment gap of 11.9.2026.
+
+The rule does not fire. On freMTPL2sev at 4 sd and above the eight-member raw `d_q99` has
+a median of -6.1%, a ratio of 0.939, outside the band by 1.1 points; at one member it is
+-7.8%. The margin is thin: four of five subsamples fall (-1.4% to -15.9%) while one rises
+(+5.3%). At 2 to 4 sd the eight-member fall is -3.3% against -6.8%, inside the band.
+The real-data claim for TabPFN-V3 holds at the default ensemble but is smaller there.
+clip_200 at eight members: pinball at 0.99 below raw in 9 of 10 subsamples at 2 sd and
+above (p = 0.021, median -1.8% against -2.4% at one member), -0.1% to -1.0% in the bins
+below.
+
+Brazilian_houses (top bins at a median shift of 3.9 and 5.6 sd) reverses the direction:
+the largest row raises Q(0.99) for TabPFN-V3 (+6.5% and +7.6% at one member, +5.9% and
++6.5% at eight) and moves TabICLv2's by about +1%. The fall on freMTPL2sev is not a
+property of every table with leverage. The cap wins on the sign count at 2 sd and above
+(8 of 10 for TabPFN-V3 at one member and for TabICLv2, 9 of 10 for TabPFN-V3 at eight;
+medians -14.7%, -16.5% and -21.4%). The sum over the ten cells disagrees at one member:
++19% for TabPFN-V3 and +52% for TabICLv2, each from one cell where the capped pinball is
+14 and 8 times raw's. In both cells the context without its largest row is worse still
+(206 and 278 against raw's 13 and 10), so the row carried information the test set
+needed. At eight members the sum falls by 11% and no cell rises by more than 4%. The ten
+cells hold only four distinct largest rows, so they are not ten independent tests.
+
+OnlineNewsPopularity has no subsample at 4 sd (the top bin's median shift is 2.2). Raw
+`d_q99` lies within about 5% for every model; the cap lowers pinball at 0.99 in 3 or 4 of
+5 subsamples at 2 sd and above by a median of 1% to 4%, the sum by 0.6% to 3.3%. Too
+small to read either way.
+
+What follows. The default ensemble keeps the freMTPL2sev result at a smaller size. The
+direction in which the largest row moves the quantile depends on the table. A median
+sign count can hide a large loss in the few cells where the largest row is genuine, so a
+recommendation of the cap reports the sum or the worst cell next to the sign count and
+names the ensemble size.
+
+## The repairs' loss at 10 000 rows, outcome at one member, 28.10.2026
+
+`clip_context_n10k_nest1.csv`, ten seeds, `python -m analysis.loss10k`.
+
+P1 holds: clip_200 below raw at a shift of 20 in 10 of 10 seeds, median -12.8% against
+-7.7% at 2000 rows. P2 fails as written, on the side of a gain: on a clean context the
+cap lowers the loss by a median of 2.05%, 0.05 points outside the band. The cap costs
+nothing there, but it no longer leaves a clean context alone: it binds on 3 to 9 of the
+10 000 values (median 7) against 0 to 3 of 2000 (median 1), since the largest of 10 000
+draws at xi 0.7 lies further out. That these genuine values cost raw 2% of expected loss
+fits the unstable shape TabPFN-V3 reads off a clean context of this size (context-size
+outcome). P3 holds: log below raw at a shift of 20 in 10 of 10, median -14.6%; on a
+clean context -3.7%.
+
+Without a rule: at a shift of 20 the gains at 0.99 span -2.4% to -41.4% for the cap and
+-4.8% to -42.5% for log; both beat raw at 0.999 in 10 of 10 (medians -24.8% and
+-28.4%). Raw's expected loss rises between shifts 1 and 20 by 14.2% at 0.99 and by 28.5%
+at 0.999. Its Q(0.99) moves by a median of -17.0%, from -59.7% to +1428%, the spread
+of the context-size check.
+
+At one member the benefit of both repairs carries to 10 000 rows and grows. The
+eight-member file is still running; its verdicts follow in their own section.
+
+## The repairs' loss at 10 000 rows, outcome at eight members, 28.10.2026
+
+`clip_context_n10k_nest8.csv`, ten seeds, all 60 rows, `python -m analysis.loss10k`.
+
+P1 fails: clip_200 is below raw at a shift of 20 in 7 of 10 seeds, median -1.4%, from
+-34.1% to +4.5%. By the rule the cap is recommended for TabPFN-V3 at the default ensemble
+only at contexts of about 2000 rows. The reason is not a cost of the cap: raw barely
+suffers, since its expected loss at 0.99 at a shift of 20 lies 0.4% below the clean
+context's (+1.8% at 2000 rows, +14.2% at one member here), so a repair has little to
+take back. P2 fails again on the side of a gain, -2.57% on a clean context, about the
+cap's whole gain at a shift of 20: at this size the cap acts on the context's own tail
+rather than on the added row. P3 holds: log below raw at a shift of 20 in 10 of 10,
+median -7.6%; on a clean context -9.2%, so its gain does not come from the row either.
+On the generator's law log is the better arm at this size, which says nothing about its
+costs on real tables.
+
+Without a rule: at 0.999 both arms beat raw at a shift of 20 in 10 of 10 (medians -6.5%
+for the cap, -20.0% for log); raw's expected loss there rises by 4.7%. Raw's Q(0.99)
+moves by a median of +11.2% between shifts 1 and 20, from -9.2% to +856%.
+
+What follows for the recommendation. At 10 000 rows one row at a shift of 20 hurts
+TabPFN-V3 at one member (+14.2% at 0.99) and both repairs take it back. At the default
+ensemble it barely hurts, at either size. The cap's gain there is small at both sizes
+(-2.2% at 2000 rows, -1.4% here); what changes at 10 000 rows is its consistency, 19 of
+20 seeds against 7 of 10. Judged by its use rather than its harm, the cap on the
+generator's law is a repair of the single member. At the default ensemble it costs
+little (worst seed +4.5%) but gains too little and too unevenly at 10 000 rows to be
+recommended there.
+
+## TabICLv2 at its default ensemble, 28.10.2026
+
+Every leverage and repair result for TabICLv2 was measured at one member; the package
+default is eight (`n_estimators=8`, tabicl 2.1.1). Its members differ in their views of
+the features only. The target is standardised once before the ensemble
+(`tabicl/_sklearn/regressor.py:412`) and every member receives that same target
+(`tabicl/_sklearn/preprocessing.py:1177`). TabPFN-V3's default ensemble instead fits a
+power transform of the target in four of its eight members; at eight members its
+one-row cost on the generator nearly vanishes (outcome above). The prediction that
+follows, written before any eight-member TabICLv2 row exists: the effect survives the
+ensemble for TabICLv2.
+
+Runner `run/tabicl8_2810.sh`, two parts with their own outputs.
+
+1. `influence.py`, TabICLv2 alone, N_EST=8, DOSE_MODE=sd, DOSES=4,20, XI=0.7, five seeds,
+   POSITION=centre, at N_TRAIN=2000 (`influence_sd_tabicl8.csv`) and 10 000
+   (`influence_sd_tabicl8_n10k.csv`), four threads. The one-member references are
+   `influence_sd_pos_centre.csv` and `influence_sd_n10k.csv`. Then `clip_context_real.py`
+   on freMTPL2sev, TabICLv2, N_EST=8, VARIANTS=without_max,raw,clip_200,log, CLIP_C=200
+   (`clip_context_real_tabicl8.csv`), against the one-member rows of
+   `clip_context_real.csv`.
+2. `clip_context.py` with MODEL=TabICLv2, XI=0.7, SD_SHIFTS=1,20, ten seeds, N_TEST=900,
+   ARMS=raw,clip,log, CLIP_C=200, at N_TRAIN=2000 and 10 000, at one member and eight
+   (`clip_context_tabicl_n{2k,10k}_nest{1,8}.csv`), six threads. The script gained the
+   same day a path for a model without a grid; its two border columns stay blank there
+   and TabPFN rows are computed as before. Expected pinball under the generator's law,
+   paired against raw within a seed. No one-member TabICLv2 row of this design exists, so
+   both ensemble sizes are new.
+
+Rules, each at each context size and ensemble size where it applies:
+
+T1. The leverage survives the ensemble on the generator: at a dose of 20 the
+    eight-member median global change of Q(0.99) is negative and at least half the
+    one-member value (-15.1% at 2000 rows, -38.7% at 10 000), so at most -7.6% and
+    -19.4%. If it fails at both sizes, the effect for TabICLv2 is one of the single
+    member and the thesis says so for both models. If it holds, the difference between
+    the two ensembles is a candidate explanation, not a tested one: this run changes the
+    ensemble, not how the target is handled within it.
+T2. The leverage survives the ensemble on real data: on freMTPL2sev at 4 sd and above the
+    eight-member raw `d_q99` lies at least 0.05 below 0 (the band of the TabPFN-V3 rule
+    of 27.10). If it lies within the band, the real-data claim for TabICLv2 is one of the
+    single member.
+T3. The row costs in loss at eight members: raw's expected pinball at 0.99 at a shift of
+    20 over the clean context, median, is at least +2% and at least half the one-member
+    rise at the same size.
+T4. The cap is worth recommending: at a shift of 20 clip_200's expected pinball at 0.99
+    is below raw's in at least 8 of 10 seeds while on a clean context its median over
+    raw, less one, is at most +2%. The second half bounds a cost only; P2 of 27.10 was written
+    as a band and failed on the side of a gain, which says nothing against the cap.
+T5. The log is worth recommending: the same two conditions for log. On the generator's
+    law only; it does not lift the costs log showed on real tables.
+
+Reported without a rule: the same at 0.999; the sum over seeds and the worst seed next
+to every sign count (outcome of 28.10); on freMTPL2sev the pinball at 0.99 of clip_200
+and log against raw at 2 sd and above with its sum and worst cell; the run times.

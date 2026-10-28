@@ -105,7 +105,10 @@ ARMS = [(v, c) for v, c in ARMS if v in ARM_NAMES]
 
 
 def fit_predict(X, y, Xte, seed, n_est):
-    """Quantiles in the fitted target's units, and the raw-space borders."""
+    """Quantiles in the fitted target's units, and the raw-space borders. A model without
+    a grid (TabICLv2, added 28.10.2026) has none; its two border columns stay blank."""
+    if not MODEL.startswith("TabPFN"):
+        return models.quantiles(MODEL, X, y, Xte, seed=seed, levels=LEVELS, n_est=n_est), None
     m = models.tabpfn_regressor(MODEL, seed, n_est)
     m.fit(X, y)
     return (models.tabpfn_quantiles(m, Xte, LEVELS),
@@ -132,20 +135,24 @@ def measure(cell):
     if variant == "robust":
         med, rsd = float(np.median(y)), transforms.robust_sd(y)
         q, borders = fit_predict(X, (y - med) / rsd, test.X, seed, cell["n_est"])
-        q, borders = q * rsd + med, borders * rsd + med
+        q = q * rsd + med
+        borders = None if borders is None else borders * rsd + med
     else:
         y_fit, back, n_clipped = transforms.transform(variant, c, y)
         q, borders = fit_predict(X, y_fit, test.X, seed, cell["n_est"])
         # exp and expm1 overflow on the outer borders; only the ones over the data count.
         with np.errstate(over="ignore", invalid="ignore"):
-            q, borders = back(q), back(borders)
+            q = back(q)
+            borders = None if borders is None else back(borders)
 
-    b90, b99 = (np.clip(np.searchsorted(borders, q[:, i]) - 1, 0, len(borders) - 2)
-                for i in (1, 2))
-    r = dict(sd_shift=shift, n_clipped=n_clipped,
-             borders_in_data=int(((borders >= train.y.min()) & (borders <= train.y.max())).sum()),
-             same_bar_90_99=float((b90 == b99).mean()),
-             xi_implied=metrics.implied_xi(q[:, 2], q[:, 1], q[:, 0]),
+    r = dict(sd_shift=shift, n_clipped=n_clipped, borders_in_data=np.nan, same_bar_90_99=np.nan)
+    if borders is not None:
+        b90, b99 = (np.clip(np.searchsorted(borders, q[:, i]) - 1, 0, len(borders) - 2)
+                    for i in (1, 2))
+        r.update(borders_in_data=int(((borders >= train.y.min())
+                                      & (borders <= train.y.max())).sum()),
+                 same_bar_90_99=float((b90 == b99).mean()))
+    r.update(xi_implied=metrics.implied_xi(q[:, 2], q[:, 1], q[:, 0]),
              # The raw ratio, biased low under a location component; the gap between the
              # two is how much of the negative xi belongs to the measure.
              xi_ratio=metrics.implied_xi(q[:, 2], q[:, 1]))
