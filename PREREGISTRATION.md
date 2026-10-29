@@ -33,6 +33,7 @@ Sections are in the order they were written, grouped here by part of the thesis.
   pinball of the generator, 22.10.2026.
 - Scale and tail shape, added: `dissociation_real_slope.py` across the Hill share,
   22.10.2026, with its outcome.
+- Capping, added: the conditional cap `cclip`, 29.10.2026.
 - Robustness of the leverage result, 27.10.2026: the position of the row, the context
   size, the default ensemble with two more tables and the repairs' loss at 10 000 rows,
   each with its outcome; TabICLv2 at its default ensemble, 28.10.2026, with its
@@ -2997,3 +2998,105 @@ TabICLv2 would lose its effect under a power transform of the target is not test
 The test covers the generator at 2000 rows, xi 0.7 and a shift of 20, not real tables.
 TabPFN-V3's default thus carries a partial repair of its own, a non-linear transform of
 the target fitted before the model, of the same kind as the log arm.
+
+## The conditional cap, 29.10.2026
+
+Every repair of the context so far reads the target alone. The confirmation of 1.10.2026
+shows what that costs: on the segment generator at M = 20, 3 of the 4 rows clip_200 lowers
+on a clean context are segment rows. The segment's expected pinball at 0.999 rises by
+5.3% for TabPFN-V3 and 15.9% for TabICLv2. P5 of `clip_context.py` shows that this is a
+limit of the target alone, not of a crude rule: a value 30 times the second largest is
+within what a tail of 0.7 produces at n = 2000, so the test of `evt_trim` does not fire.
+The features are the information no repair of the context has used. Part one says what
+the models can give: TabICLv2 and TabPFN-V3 reproduce 98% and 95% of a change in the
+conditional scale but under half of a change in the tail shape.
+
+The conditional cap `cclip` (`transforms.cclip`) takes the scale from the model and keeps
+the frozen rule for the tail. For every context row the model's median m(x) and 0.9
+quantile come from a two-fold cross-fit on the context: each half is predicted by the
+other, fitted on the context under clip_200. A row is thus never judged by a fit that saw
+it, nor can an extreme row inflate the spread it is judged by. The spread s(x) is the
+0.9 quantile less the median, floored at 1% of the median spread. clip_200 is then
+applied to r = (y - m) / s: the cap is the median of r plus 200 robust sd of r. A row
+above it is lowered to m + cap * s. The final fit is on the context with those rows
+lowered; nothing else changes. With a constant m and s the rule is clip_200 exactly, since
+the median and the IQR move with any increasing affine map (`tests/test_transforms.py`).
+The two levels, the two folds and the floor were fixed with this section and are not
+knobs. The cross-fit uses the model, seed and ensemble size of the cell: two more fits on
+half the context each.
+
+What the rule can do and what it cannot. It keeps a large value whose features predict a
+large scale, so a segment that the model learns from its other rows keeps its extremes.
+It cannot keep a genuine extreme whose features are ordinary: to it that row looks like
+an error, as it does to clip_200.
+
+Design. The draws and seeds of the confirmation at one member with ARMS=raw,clip,cclip,
+runner `run/conditional_cap.sh` in two parts with their own outputs:
+
+1. `legit_segment.py`: TabPFN-V3, TabICLv2 and GBM, xi = 0.7, M in {1, 5, 20}, clean and
+   a shift of 20, seeds 7500 to 26500 (`legit_segment_cclip.csv`).
+2. `unit_error_confirm.py`: the same models on the five insurance tables, draw seed
+   20261001, 20 repeats, clean with a visible and a random x100 row
+   (`unit_error_confirm_cclip.csv`).
+
+raw and clip_200 are measured again. They must equal the stored one-member rows of
+20.10.2026 (`legit_segment_log.csv`, `unit_error_confirm_log.csv`) bit for bit (R0, a
+check rather than a prediction); if they do not, every comparison stays within the new
+files and log is not compared. Log is read from those files. A new column `row_touched`
+says whether a cap lowered the added or the corrupted row.
+
+Read before the predictions were written: the outcomes of clip_200 and log on these draws,
+in the sections of 1.10.2026 and 21.10.2026. No model has been fitted with cclip. Units
+are those of 1.10.2026: on the generator a comparison of expected pinball paired over 20
+seeds, on the insurance tables the median over repeats per (table, model) pair. The
+verdicts come from `python -m analysis.conditional_cap`, written with these predictions.
+
+The segment generator.
+
+U0, the control. At M = 1 on a clean context cclip changes the expected pinball at 0.99
+    over the whole test set by less than 2% on the median for each foundation model.
+U1, the segment keeps its rows. At M = 20 on a clean context cclip lowers at most one
+    segment row on the median for each foundation model (clip_200: 3 of 4).
+U2, the segment's extremes are spared. At M = 20 on a clean context the segment's expected
+    pinball at 0.999 is lower under cclip than under clip_200 in at least 14 of 20 seeds
+    for each foundation model.
+U3, the error is still caught. Under the shift of 20 cclip lowers the added row in at
+    least 18 of 20 seeds at M = 1 and at M = 20 for each foundation model.
+U4, the benefit to TabPFN-V3 stays. Under the shift of 20 cclip's expected pinball at 0.99
+    over the whole test set is below raw's in at least 18 of 20 seeds at M = 1 and in at
+    least 15 of 20 at M = 20 (clip_200: 20 and 20).
+U5, the segment under the error. At M = 20 under the shift of 20 the segment's expected
+    pinball at 0.999 is lower under cclip than under clip_200 in at least 14 of 20 seeds
+    for each foundation model.
+
+The insurance tables.
+
+U6, the clean cost stays small. On the clean context cclip's pinball against raw's is
+    within 2% at 0.99 and at most 10% above it at 0.999 in every foundation-model unit
+    (C2 for clip_200).
+U7, the benefit to TabPFN-V3 stays. Under the visible error cclip's pinball at 0.99 is
+    below raw's in at least 4 of 5 tables (clip_200: 4 of 5).
+
+No rule for TabICLv2 under the error. The cap cost it because the error lifts its too-low
+clean Q(0.999) and the cap takes the lift away. cclip lowers the same row, so the same is
+expected; this run does not test it.
+
+How the outcome is read, fixed now. If U3 holds with U1, U2 and U5, conditioning on the
+model's scale removes the cap's cost to a segment the features reveal while it still
+catches the error: part three gains a rule that tells the two apart where the features
+allow it. If U3 holds but U1 or U2 fails, the models' conditional scale does not separate
+them even where one feature carries the whole segment. On the insurance tables the
+features may carry little of a claim's scale. If cclip there lowers the corrupted row in
+about as many contexts as clip_200 and touches about as many clean contexts of
+freMTPL2sev, within 10 points per unit, the reading is that those features do not
+separate an error from an extreme. That bounds the method on real tables; it does not
+refute it.
+
+Reported without a rule: GBM; M = 5; the random row; cclip against log; the 0.999 level
+outside the rules; the non-segment rows cclip lowers; the run times. Eight members are not
+part of this run.
+
+After this section was written and before any run, the model-free tests of
+`tests/test_transforms.py` passed and the verdict script ran once on stand-ins built from
+the stored files of 20.10.2026 with the clip rows copied as cclip, which tests the code
+and nothing else.

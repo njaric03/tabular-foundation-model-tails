@@ -4,7 +4,8 @@
 `transform(arm, c, y)` returns the target an arm fits on, the inverse map for the
 model's quantiles, and how many context values the arm changed. The arms are the
 repairs of part three: a hard cap, logarithms, an outlier test, a derived cap, and
-rank maps with and without a Pareto tail.
+rank maps with and without a Pareto tail. The conditional cap `cclip` needs the features
+and a model as well, so it has its own entry point.
 """
 from __future__ import annotations
 
@@ -30,6 +31,12 @@ RANK_U_SHARE = 0.9
 RANK_K_MIN = 30
 RANK_TRIM = 1
 RANK_XI_CAP = 0.95
+
+# The conditional cap's scale model, fixed before its first run on 29.10.2026: the model's
+# own median and 0.9 quantile, cross-fitted on two halves of the context. The floor of a
+# spread is a share of the median spread. Not knobs.
+CCLIP_LEVELS = (0.5, 0.9)
+CCLIP_FLOOR = 0.01
 
 
 def robust_sd(y) -> float:
@@ -156,6 +163,54 @@ def _identity(q):
     return q
 
 
+def conditional_scale(X, y, c, predict, seed):
+    """Location and spread of every context row, from the half of the context it is not in.
+
+    `predict(X_fit, y_fit, X_new)` returns quantiles at CCLIP_LEVELS. Both halves are fitted
+    on the context under `clip` at `c`, so an extreme row cannot inflate the spread it is
+    judged by, which is the effect of part two. A row is never in the half that predicts
+    it: a model that saw it could explain it away. The halves come from `seed`.
+    """
+    X, y = np.asarray(X, dtype=float), np.asarray(y, dtype=float)
+    capped = np.minimum(y, float(np.median(y)) + c * robust_sd(y))
+    order = np.random.default_rng([seed, 2]).permutation(len(y))
+    halves = (order[:len(y) // 2], order[len(y) // 2:])
+    q = np.empty((len(y), 2))
+    for fit, new in (halves, halves[::-1]):
+        q[new] = np.asarray(predict(X[fit], capped[fit], X[new]), dtype=float)
+    return q[:, 0], q[:, 1] - q[:, 0]
+
+
+def conditional_clip(y, loc, spread, c):
+    """`clip` on standardised residuals r = (y - loc) / spread, mapped back row by row.
+
+    The cap sits at the median plus `c` robust sd of r. With a constant loc and spread this
+    is `clip` exactly, since the median and the IQR move with any increasing affine map. A
+    row whose features predict a large scale gets a large spread and stays; a large value
+    where the features predict a small one is lowered to the cap of its own row. A spread
+    below CCLIP_FLOOR of the median spread is raised to it, so a pair of crossing or equal
+    quantiles cannot make a row look extreme. Returns the new target and how many values
+    changed.
+    """
+    y, loc, spread = (np.asarray(a, dtype=float) for a in (y, loc, spread))
+    positive = spread[spread > 0]
+    ref = float(np.median(positive)) if len(positive) else robust_sd(y)
+    s = np.maximum(spread, CCLIP_FLOOR * ref)
+    r = (y - loc) / s
+    cap = float(np.median(r)) + c * robust_sd(r)
+    over = r > cap
+    z = y.copy()
+    z[over] = loc[over] + cap * s[over]
+    return z, int(over.sum())
+
+
+def cclip(X, y, c, predict, seed):
+    """The arm `cclip`: `conditional_clip` with the scale of `conditional_scale`."""
+    loc, spread = conditional_scale(X, y, c, predict, seed)
+    z, n = conditional_clip(y, loc, spread, c)
+    return z, _identity, n
+
+
 def transform(arm, c, y):
     """The target `arm` fits on, the inverse for its quantiles, and how many values it
     changed. `c` is the cap in robust sd for clip and tail_log, and tau for sd_cap."""
@@ -194,4 +249,6 @@ def transform(arm, c, y):
         return rank_map(y, trim=RANK_TRIM, xi_cap=RANK_XI_CAP)
     if arm == "rank_exp":
         return rank_map(y, scores="exponential", trim=RANK_TRIM, xi_cap=RANK_XI_CAP)
+    if arm == "cclip":
+        raise ValueError("cclip needs the features and a model: call transforms.cclip")
     raise ValueError(arm)

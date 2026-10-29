@@ -73,6 +73,12 @@ from `analysis/confirm_tabpfn35.py`. Outcome: the visible row costs 3.5 +0.2% to
 0.99 at either size; at eight members the cap is below raw in 5 of 5 tables and log
 below the cap in 4 of 5, all by small margins.
 
+The conditional cap, 29.10.2026: ARMS=raw,cclip on the same draws at one member
+(`run/conditional_cap.sh unit`). cclip applies clip_200 to the residuals standardised by
+the model's own cross-fitted median and 0.9 quantile (`transforms.cclip`). `row_touched`
+says whether the corrupted row was lowered. Predictions U6 and U7 in PREREGISTRATION.md,
+verdicts from `analysis/conditional_cap.py`.
+
     DATASETS=AutoClaims MODELS=GBM REPEATS=2 python -u experiments/h3_repair/unit_error_confirm.py
 """
 import time
@@ -102,22 +108,23 @@ N_FIT = env.integer("N_FIT", 2000)
 N_TEST = env.integer("N_TEST", 1000)
 N_EST = env.integer("N_EST", 1)
 CLIP_C = env.floats("CLIP_C", [200])
-# raw, clip (one arm per CLIP_C) and log, the vendor's advice for claim amounts.
+# raw, clip and cclip (one arm per CLIP_C) and log, the vendor's advice for claim amounts.
 ARM_NAMES = env.names("ARMS", "raw,clip")
+CAPS = ("clip", "cclip")
 OUTPUT = env.text("OUTPUT", "unit_error_confirm.csv")
 # Not a knob: a draw seed no earlier run used. The earlier runs drew from 31337.
 DRAW_SEED = 20261001
 FACTOR = 100.0
 LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ("50", "90", "99", "999")
-if "raw" not in ARM_NAMES or set(ARM_NAMES) - {"raw", "clip", "log"}:
-    raise ValueError(f"ARMS takes raw and any of clip and log, not {ARM_NAMES}")
-ARMS = [(a, c) for a in ARM_NAMES for c in (CLIP_C if a == "clip" else [0.0])]
+if "raw" not in ARM_NAMES or set(ARM_NAMES) - {"raw", "clip", "log", "cclip"}:
+    raise ValueError(f"ARMS takes raw and any of clip, log and cclip, not {ARM_NAMES}")
+ARMS = [(a, c) for a in ARM_NAMES for c in (CLIP_C if a in CAPS else [0.0])]
 CONTEXTS = ("clean", "visible", "random")
 
 COLUMNS = (["dataset", "model", "repeat", "context", "arm", "clip_c", "n_est", "n_fit",
             "n_test", "draw_seed", "row", "sd_shift", "natural_shift", "share_visible",
-            "corrupt_rank", "n_touched", "reused"]
+            "corrupt_rank", "n_touched", "row_touched", "reused"]
            + [f"d_q{t}" for t in TAGS] + [f"pb{t}" for t in TAGS]
            + ["n_above99", "seconds", "reason"])
 KEY = ["dataset", "model", "repeat", "context", "arm", "clip_c", "n_est", "n_fit", "n_test",
@@ -172,6 +179,10 @@ def main():
                     return models.quantiles(model, Xf, yc, Xte, seed=seed, levels=LEVELS,
                                             n_est=N_EST)
 
+                def scale(Xa, ya, Xb):
+                    return models.quantiles(model, Xa, ya, Xb, seed=seed,
+                                            levels=transforms.CCLIP_LEVELS, n_est=N_EST)
+
                 t1, raw = time.time(), {}
                 try:
                     q_ref = predict(y_clean)
@@ -193,19 +204,27 @@ def main():
                         row["reason"] = err
                     else:
                         try:
-                            y_fit, back, n = transforms.transform(k["arm"], k["clip_c"], yc)
+                            if k["arm"] == "cclip":
+                                y_fit, back, n = transforms.cclip(Xf, yc, k["clip_c"], scale,
+                                                                  seed)
+                            else:
+                                y_fit, back, n = transforms.transform(k["arm"], k["clip_c"],
+                                                                      yc)
                             reused = False
                             if k["arm"] == "raw" and k["context"] == "clean":
                                 qa = q_ref
                             # Only a cap that touched nothing fits raw's target; log
                             # counts no touched row but changes every one.
-                            elif k["arm"] == "clip" and n == 0 and k["context"] in raw:
+                            elif k["arm"] in CAPS and n == 0 and k["context"] in raw:
                                 qa, reused = raw[k["context"]], True
                             else:
                                 qa = back(predict(y_fit))
                             if k["arm"] == "raw":
                                 raw[k["context"]] = qa
-                            row.update(n_touched=n, reused=reused, reason="")
+                            touched = (bool(k["arm"] in CAPS and y_fit[bad] < yc[bad])
+                                       if bad >= 0 else "")
+                            row.update(n_touched=n, row_touched=touched, reused=reused,
+                                       reason="")
                             row.update(zip([f"d_q{t}" for t in TAGS],
                                            metrics.rel_change_by_level(q_ref, qa)))
                             for i, (a, t) in enumerate(zip(LEVELS, TAGS)):
@@ -250,6 +269,20 @@ def report():
         print(lg.round(4).to_string())
         print("\ntables where log is lower, by model:")
         print((lg < 0).groupby(level=["model", "n_est"]).sum().to_string())
+    if "cclip" in arms:
+        cc = pd.DataFrame({
+            "vis cclip/raw 99": rel("pb99", "visible", "cclip", "raw"),
+            "clean cclip/raw 99": rel("pb99", "clean", "cclip", "raw"),
+            "clean cclip/raw 999": rel("pb999", "clean", "cclip", "raw"),
+            "rnd cclip/raw 99": rel("pb99", "random", "cclip", "raw"),
+        }).groupby(level=unit).median()
+        print("\n=== cclip against raw, medians over repeats, per unit ===")
+        print(cc.round(4).to_string())
+        c = d[(d.arm == "cclip") & (d.context != "clean")]
+        hit = (c.row_touched.astype(str) == "True").groupby(
+            [c.dataset, c.model, c.n_est, c.context]).mean().unstack("context")
+        print("\n=== share of contexts where cclip lowered the corrupted row ===")
+        print(hit.round(2).to_string())
     if cap is None:
         return
     med = pd.DataFrame({

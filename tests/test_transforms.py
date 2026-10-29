@@ -127,3 +127,61 @@ def test_an_unknown_score_scale_or_arm_is_refused():
         transforms.rank_map(y, scores="student")
     with pytest.raises(ValueError):
         transforms.transform("no_such_arm", 0.0, y)
+
+
+def test_cclip_with_a_constant_scale_is_clip():
+    """The median and the IQR move with an increasing affine map, so a scale model that
+    predicts the same location and spread everywhere gives clip back exactly."""
+    y = np.append(_pareto(2000, 0.7, 21), 1e6)
+    loc, spread = np.full(len(y), 3.0), np.full(len(y), 7.0)
+    z, n = transforms.conditional_clip(y, loc, spread, 200.0)
+    clipped, _, n_clip = transforms.transform("clip", 200.0, y)
+    assert n == n_clip and np.allclose(z, clipped, rtol=1e-12)
+
+
+def test_cclip_keeps_a_large_value_where_the_features_predict_one():
+    """The same value is lowered on a row of the body and kept on a row whose spread is
+    a thousand times larger."""
+    y = _pareto(2000, 0.7, 22)
+    loc, spread = np.ones(len(y)), np.ones(len(y))
+    y[:2] = 5e4
+    spread[1] = 1e3
+    z, n = transforms.conditional_clip(y, loc, spread, 200.0)
+    assert z[0] < y[0] and z[1] == y[1]
+    assert np.all(z <= y) and np.array_equal(z[z != y], z[z < y])
+
+
+def test_cclip_floors_a_degenerate_spread():
+    """Crossing quantiles give a negative spread; the floor keeps the row from looking
+    extreme on that account alone."""
+    y = _pareto(2000, 0.7, 23)
+    loc, spread = np.ones(len(y)), np.ones(len(y))
+    spread[0] = -1.0
+    y[0] = float(np.median(y))
+    z, _ = transforms.conditional_clip(y, loc, spread, 200.0)
+    assert z[0] == y[0]
+
+
+def test_conditional_scale_never_predicts_a_row_from_itself():
+    """Each half is predicted by the other, which is fitted on the capped target."""
+    rng = np.random.default_rng(24)
+    y = np.append(_pareto(999, 0.7, 24), 1e7)
+    X = np.column_stack([np.arange(len(y)), rng.normal(size=len(y))])
+    cap = np.median(y) + 200 * transforms.robust_sd(y)
+    calls = []
+
+    def predict(Xf, yf, Xn):
+        calls.append((set(Xf[:, 0].astype(int)), set(Xn[:, 0].astype(int)), yf.max()))
+        return np.column_stack([np.zeros(len(Xn)), np.ones(len(Xn))])
+
+    loc, spread = transforms.conditional_scale(X, y, 200.0, predict, seed=0)
+    assert len(calls) == 2
+    for fit, new, top in calls:
+        assert not fit & new and top <= cap
+    assert calls[0][0] == calls[1][1] and len(calls[0][0] | calls[0][1]) == len(y)
+    assert np.all(loc == 0.0) and np.all(spread == 1.0)
+
+
+def test_cclip_is_not_a_plain_transform():
+    with pytest.raises(ValueError, match="cclip"):
+        transforms.transform("cclip", 200.0, _pareto(200, 0.7, 25))

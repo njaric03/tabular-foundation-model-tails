@@ -73,6 +73,13 @@ from `analysis/confirm_tabpfn35.py`. Outcome: F1 and F3a fail. The added row cos
 +2.1% at 0.99 and +49% at 0.999 at one member, nothing at eight, where the cap only
 costs; under log Q(0.999) in the segment is 1.92 times the truth.
 
+The conditional cap, 29.10.2026: ARMS=raw,cclip on the same seeds at one member
+(`run/conditional_cap.sh segment`). cclip applies clip_200 to the residuals standardised
+by the model's own cross-fitted median and 0.9 quantile (`transforms.cclip`), so a
+segment row whose g predicts its scale is not capped. `row_touched` says whether the
+added row was lowered. Predictions U0 to U5 in PREREGISTRATION.md, verdicts from
+`analysis/conditional_cap.py`.
+
     MODELS=GBM SEEDS=2 python -u experiments/h3_repair/legit_segment.py
 """
 import numpy as np
@@ -101,8 +108,10 @@ SEEDS = [s + 500 for s in env.seeds(env.integer("SEEDS", 20))]
 N_TRAIN = env.integer("N_TRAIN", 2000)
 N_TEST = env.integer("N_TEST", 5000)
 N_EST = env.integer("N_EST", 1)
-# raw, clip (one arm per CLIP_C) and log, which the generator's positive target allows.
+# raw, clip and cclip (one arm per CLIP_C) and log, which the generator's positive
+# target allows.
 ARM_NAMES = env.names("ARMS", "raw,clip")
+CAPS = ("clip", "cclip")
 OUTPUT = env.text("OUTPUT", "legit_segment.csv")
 # Not knobs: the design of the segment. Both are columns.
 SCALES = (1.0, 5.0, 20.0)
@@ -110,13 +119,13 @@ SHARE = 0.05
 LEVELS = [0.5, 0.9, 0.99, 0.999]
 TAGS = ["50", "90", "99", "999"]
 PARTS = ("all", "seg", "out")
-if "raw" not in ARM_NAMES or set(ARM_NAMES) - {"raw", "clip", "log"}:
-    raise ValueError(f"ARMS takes raw and any of clip and log, not {ARM_NAMES}")
-ARMS = [(a, c) for a in ARM_NAMES for c in (CLIP_C if a == "clip" else [0.0])]
+if "raw" not in ARM_NAMES or set(ARM_NAMES) - {"raw", "clip", "log", "cclip"}:
+    raise ValueError(f"ARMS takes raw and any of clip, log and cclip, not {ARM_NAMES}")
+ARMS = [(a, c) for a in ARM_NAMES for c in (CLIP_C if a in CAPS else [0.0])]
 
 COLUMNS = (["model", "xi", "seg_scale", "seg_share", "sd_shift_target", "variant", "clip_c",
             "seed", "n_est", "n_train", "n_test", "sd_shift", "natural_shift", "n_seg_context",
-            "n_seg_test", "n_clipped", "n_clipped_seg"]
+            "n_seg_test", "n_clipped", "n_clipped_seg", "row_touched"]
            + [f"epb{t}_{p}" for p in PARTS for t in TAGS]
            + [f"pb{t}_{p}" for p in PARTS for t in TAGS]
            + [f"qratio{t}_{p}" for p in ("seg", "out") for t in ("99", "999")]
@@ -151,17 +160,27 @@ def measure(cell):
             raise RuntimeError(f"sd shift {cell['sd_shift_target']} unreachable on this seed")
         X, y = leverage.add_row(X, y, y0)
         g = np.append(g, 0.0)
-    y_fit, back, n = transforms.transform(cell["variant"], cell["clip_c"], y)
+    if cell["variant"] == "cclip":
+        def scale(Xa, ya, Xb):
+            return models.quantiles(cell["model"], Xa, ya, Xb, seed=cell["seed"],
+                                    levels=transforms.CCLIP_LEVELS, n_est=cell["n_est"])
+        y_fit, back, n = transforms.cclip(X, y, cell["clip_c"], scale, cell["seed"])
+    else:
+        y_fit, back, n = transforms.transform(cell["variant"], cell["clip_c"], y)
     q = back(models.quantiles(cell["model"], X, y_fit, Xte, seed=cell["seed"],
                               levels=LEVELS, n_est=cell["n_est"]))
     xi = cell["xi"]
     parts = {"all": np.ones(len(yte), bool), "seg": g_te > 0, "out": g_te == 0}
     # Only a cap clips. log lowers every value above 1, which is no clipped row; the
     # log rows of 20.10.2026 were written before this guard and count them.
-    clipped = (y_fit < y) & (g > 0) if cell["variant"] == "clip" else np.zeros(len(y), bool)
+    capped = cell["variant"] in CAPS
+    clipped = (y_fit < y) & (g > 0) if capped else np.zeros(len(y), bool)
+    # The added row is the last one; on a clean context there is none to touch.
+    added = cell["sd_shift_target"] > 1.0
     r = dict(sd_shift=float(metrics.sd_shift(y)), natural_shift=natural,
              n_seg_context=int(g.sum()), n_seg_test=int(parts["seg"].sum()),
-             n_clipped=n, n_clipped_seg=int(clipped.sum()))
+             n_clipped=n, n_clipped_seg=int(clipped.sum()),
+             row_touched=bool(capped and y_fit[-1] < y[-1]) if added else "")
     for i, (a, t) in enumerate(zip(LEVELS, TAGS)):
         e = metrics.gpd_expected_pinball(q[:, i], sigma, xi, a)
         for p, rows in parts.items():
@@ -196,7 +215,8 @@ def report():
     arm = {v: d[d.variant == v].set_index(key) for v in d.variant.unique()}
     cols = ["epb99_all", "epb99_seg", "epb999_all", "epb999_seg", "epb99_out"]
     by = ["model", "n_est", "seg_scale", "sd_shift_target"]
-    for a, b in (("clip", "raw"), ("log", "raw"), ("log", "clip")):
+    for a, b in (("clip", "raw"), ("log", "raw"), ("log", "clip"), ("cclip", "raw"),
+                 ("cclip", "clip"), ("cclip", "log")):
         if a not in arm or b not in arm:
             continue
         rel = (arm[a][cols] / arm[b][cols] - 1).dropna()
@@ -204,9 +224,11 @@ def report():
         print(rel.groupby(level=by).median().round(4).to_string())
         print(f"\n=== seeds where {a} is lower than {b} ===")
         print((rel < 0).groupby(level=by).sum().to_string())
-    if "clip" in arm:
-        clipped = arm["clip"][["n_clipped", "n_clipped_seg"]].groupby(level=by).median()
-        print("\n=== clipped context rows, median ===")
+    for a in CAPS:
+        if a not in arm:
+            continue
+        clipped = arm[a][["n_clipped", "n_clipped_seg"]].groupby(level=by).median()
+        print(f"\n=== context rows lowered by {a}, median ===")
         print(clipped.to_string())
     ratio = d.groupby(["model", "n_est", "seg_scale", "sd_shift_target", "variant"])[
         ["qratio99_seg", "qratio999_seg", "qratio99_out", "qratio999_out"]].median()
