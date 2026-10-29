@@ -82,6 +82,40 @@ percentile; the cap lowers that on 5 of 5 tables, by less than 2%. Log stays bel
 on 4 of 5 tables and again places the segment's 99.9th percentile at 1.9 times the truth.
 The sensitivity is therefore a property of a configuration, not of the model family.
 
+**The effect does not hinge on where the row sits or on a small context.** Checks of 27
+and 28 October 2026, run after the results they check. Wherever the added row sits in the
+features, it changes TabPFN-3's 99th percentile by the same amount within 6 points;
+TabICLv2's change is weaker at the edge in one cell of twelve. At 10 000 context rows the
+row moves both foundation models' quantile at least as much as at 2000, though TabPFN-3's
+direction varies between seeds. At one member the cap's gain grows there from -7.7% to
+-12.8%. At TabPFN-3's default ensemble the row barely costs at 10 000 rows, so the cap
+gains only 1.4% and in 7 of 10 seeds. On Brazilian_houses, one of two more tables with
+natural leverage, the largest row raises TabPFN-3's quantile instead of lowering it. The
+cap wins there in most cells but at one member loses on their sum, from one cell per model
+where the largest row was genuine.
+
+**TabICLv2 keeps the effect at its default ensemble; TabPFN-3 loses it through a transform
+of the target.** At eight members a dose of 20 lowers TabICLv2's 99th percentile by 16% at
+2000 rows and by 37% at 10 000, as at one member. On freMTPL2sev it falls by 18%. Its
+members see different views of the features but one standardised target. Four of
+TabPFN-3's eight default members fit a power transform of the target. With it switched
+off eight members behave like one: the transform accounts for 78% to 93% of the gap
+between one member and eight on the synthetic task. It shields the 99th percentile, not
+the 99.9th. For TabICLv2 the row moves the quantile more than the loss: about +2% at the
+99th percentile, while at the 99.9th the row lowers the loss.
+
+**A cap conditioned on the model's own scale spares a legitimate segment.** Every repair
+above reads the target alone, so a legitimate extreme looks to it like an error. The
+conditional cap of 29 October 2026 applies the rule of `clip_200` to residuals
+standardised by the model's own cross-fitted median and 90th percentile. On the synthetic
+task with a high-risk segment it lowers no segment row in 19 of 20 seeds for TabPFN-3 and
+in 17 of 20 for TabICLv2, where `clip_200` lowers at least one in every seed. The
+segment's extra loss at the 99.9th percentile falls from 5.3% and 15.9% to 0.05% and
+0.6%. The added error row is still lowered in every seed and TabPFN-3 keeps its -9.6% at
+the 99th. That segment is the easiest case, one binary feature that carries the whole
+scale. On the five insurance tables the conditional cap does what `clip_200` does. Log
+stays lower at the 99th percentile on both designs; a fit takes 1.6 to 2.2 times as long.
+
 ## Scope of the thesis
 
 Three questions, asked of two foundation models, TabPFN-3 (`TabPFN-V3` in the result
@@ -96,8 +130,9 @@ files) and TabICLv2, with gradient boosting (`GBM`) as the tree control:
 
 The 99th percentile is the main level; the 99.9th is secondary. The cap is `clip_200`:
 the context median plus 200 robust standard deviations (IQR / 1.349). Its main rival, a
-log of the context target, is measured beside it from 21 October 2026. TabPFN-3 runs with
-one ensemble member unless a result says eight, the package default. TabPFN v2.5, v2.6
+log of the context target, is measured beside it from 21 October 2026. TabPFN-3 and
+TabICLv2 run with one ensemble member unless a result says eight, the package default of
+both. TabPFN v2.5, v2.6
 and 3.5, EXAONE-Tabular, TabDPT, LimiX-2 and Causilo, with CatBoost and XGBoost as further
 tree controls, are supplementary checks.
 
@@ -124,11 +159,14 @@ prior or from the architecture is left to later work.
 - `clip_200` and the log arm were both chosen after development results and confirmed on
   draws already used. The cap helps TabPFN-3 and costs TabICLv2. Log helps both at the
   99th percentile in most tested cells but overshoots a legitimate segment at the 99.9th.
-  Neither is a recommendation for the model family.
-- Eight ensemble members were measured in the confirmation and in the dose curve of
-  22 October 2026. The other results of part two, the natural extremes and the dose on
-  the maximum among them, use one member. TabPFN-3.5 ran on a GPU, every other TabPFN
+  Neither is a recommendation for the model family. The conditional cap was designed
+  after both outcomes on those draws were known; its predictions were written first.
+- Eight ensemble members were measured in the confirmation, in the dose curve of
+  22 October 2026 and in the checks of 27 and 28 October. The other results of part two
+  and the conditional cap use one member. TabPFN-3.5 ran on a GPU, every other TabPFN
   result on CPU.
+- The target transform explains TabPFN-3's ensemble gap on the synthetic task at 2000
+  rows. Real tables and TabICLv2 under such a transform are untested.
 - The pinball loss on drawn test targets at the 99.9th percentile rests on about one
   exceedance per task. The synthetic results from 21 October 2026 on report the expected
   loss as well; earlier synthetic numbers at that level are noisy. The expected loss is
@@ -145,8 +183,8 @@ prior or from the architecture is left to later work.
 | Part | Main scripts in `experiments/` | Notebook |
 |---|---|---|
 | Scale and tail shape | `h1_shape_vs_scale/`: `shape_of_x`, `scale_of_x`, `oracle_xi_of_x`, `sample_complexity`; checks `tail_families`, `vincentization`, `xi_residual`, `reference_instrument`, `instrument_ceiling`, `dissociation_real_slope` (with `K_SHARES`) | [h1_shape_vs_scale](analysis/h1_shape_vs_scale.ipynb) |
-| Extreme context target | `h2_leverage/`: `influence`, `influence_real`, `grid_occupancy`, `prevalence_data`, `prevalence_models`; coverage in `h1_shape_vs_scale/empirical_coverage`; output heads in `side/head_tail_family`, `side/head_tail_tabicl` | [h2_leverage](analysis/h2_leverage.ipynb), which calls `analysis/dose_ensemble.py` |
-| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration` | [h3_repair](analysis/h3_repair.ipynb), which calls `analysis/confirm_ensemble_log.py`, `confirm_tabpfn35.py`, `h3_table.py` and `sample_selection.py`; predictions and outcomes in [PREREGISTRATION.md](PREREGISTRATION.md) |
+| Extreme context target | `h2_leverage/`: `influence` (with `POSITION`), `influence_real`, `grid_occupancy`, `prevalence_data`, `prevalence_models`; coverage in `h1_shape_vs_scale/empirical_coverage`; output heads in `side/head_tail_family`, `side/head_tail_tabicl` | [h2_leverage](analysis/h2_leverage.ipynb), which calls `analysis/dose_ensemble.py`; the ensemble checks in `analysis/tabicl8.py` and `tabpfn_y.py` |
+| Capping | `h3_repair/`: `clip_context`, `clip_context_real`, `unit_error_real`; confirmation `unit_error_confirm`, `legit_segment`, `recalibration`; the conditional cap `cclip` in `common/transforms.py` | [h3_repair](analysis/h3_repair.ipynb), which calls `analysis/confirm_ensemble_log.py`, `confirm_tabpfn35.py`, `h3_table.py` and `sample_selection.py`; `analysis/loss10k.py` and `conditional_cap.py`; predictions and outcomes in [PREREGISTRATION.md](PREREGISTRATION.md) |
 
 Explored and left outside the thesis: pre-training and fine-tuning
 (`h3_repair/prior_pretraining_*`, `h3_repair/tabicl_prior_finetune`), other repairs
