@@ -3100,3 +3100,93 @@ After this section was written and before any run, the model-free tests of
 `tests/test_transforms.py` passed and the verdict script ran once on stand-ins built from
 the stored files of 20.10.2026 with the clip rows copied as cclip, which tests the code
 and nothing else.
+
+## The conditional cap, outcome, 29.10.2026
+
+```
+3780 cells, none failed, on CPU at 6 threads in two parallel streams: segment 11959 s,
+unit error 13949 s.
+
+One departure from the section above, which says no model had been fitted with cclip.
+Before the runs cclip was fitted with GBM alone on two seeds of the segment design and two
+repeats of AutoClaims, written outside the repository, to check that the code ran and
+wrote `row_touched`. No foundation model was fitted and no rule reads GBM.
+
+R0  The raw and clip_200 rows equal the stored one-member rows of 20.10.2026 bit for bit
+    (720 segment rows, 1800 unit-error rows).
+
+U0  HOLDS. -0.12% for both foundation models, lower in 11 and 12 of 20 seeds.
+U1  HOLDS. At M = 20 on a clean context cclip lowers no segment row in 19 of 20 seeds for
+    TabPFN-V3 and in 17 of 20 for TabICLv2, at most two. clip_200 lowers at least one in
+    every seed, a median of 3 and up to 8. In all cclip lowers a median of 1 row against
+    4.
+U2  HOLDS. 16 of 20 seeds for TabPFN-V3 (median -4.8%), 19 of 20 for TabICLv2 (-13.7%).
+U3  HOLDS. The added row is lowered in 20 of 20 seeds at M = 1 and at M = 20 for both
+    foundation models.
+U4  HOLDS. 20 of 20 seeds at M = 1 and at M = 20, -9.6% on the median at both (clip_200
+    -9.6% and -9.4%).
+U5  HOLDS, at the bar for TabPFN-V3: 14 of 20 seeds (median -4.1%). TabICLv2 19 of 20
+    (-12.2%).
+U6  HOLDS. On four tables cclip touches no clean context of either foundation model, so
+    its loss equals raw's. On freMTPL2sev it is -0.24% and -0.31% at 0.99, +0.86% and
+    +0.08% at 0.999 (TabPFN-V3, TabICLv2; clip_200 -0.07% and -0.60%, +0.91% and +0.16%).
+U7  HOLDS. Below raw in 4 of 5 tables, -0.46% to -2.71%, freMTPL2sev +0.11% (clip_200
+    -0.83% to -3.97%, freMTPL2sev +0.07%).
+
+Not predicted, read after the verdicts.
+
+On the generator the segment's cost is gone, not only smaller. At M = 20 on a clean
+context the segment's expected pinball at 0.999 under cclip is +0.05% over raw for
+TabPFN-V3 and +0.6% for TabICLv2 on the median, against +5.3% and +15.9% under clip_200.
+The predicted Q(0.99) in the segment is 0.75 and 0.48 of the truth under cclip, 0.77 and
+0.49 under raw, 0.71 and 0.33 under clip_200. Where there is no segment to spare cclip
+behaves like clip_200: at M = 1 it lowers the same median number of rows (1 clean, 2
+under the shift) and at M = 1 and 5 its loss over the whole test set is within 0.5% of
+clip_200's at 0.99 and 0.999 in every foundation-model cell.
+
+TabICLv2 under the error pays as the section expected. At M = 20 under the shift cclip is
++5.5% over raw at 0.99 over the whole test set and +52.6% for the segment at 0.999,
+against +9.6% and +72.6% under clip_200. The added row lifts its too-low Q(0.999); both
+caps take the lift away.
+
+Against log. Log stays lower at 0.99. On the generator cclip is above it by +2.1% to
++3.3% for TabPFN-V3 and by +0.6% to +3.2% for TabICLv2 over the whole test set in every
+cell; on the insurance tables under the visible error by +0.3% to +6.3% and by +0.3% to
++12.7%. At 0.999 TabICLv2 is lower under log in every generator cell (cclip +15% to
++35%). TabPFN-V3 at M = 20 under the shift is far lower under cclip for the segment
+(-41%), where log puts Q(0.999) at about twice the truth.
+
+The reading fixed for the insurance tables. Under the visible error cclip lowers the
+corrupted row within 10 points of clip_200 in 7 of 10 foundation-model units. It does so
+more often on AutoClaims for TabICLv2 (95% against 75%) and less often on ausprivauto0405
+for both models (85% against 100%). Under the random error it is within 10 points in 8 of
+10, lowering the row less often on freMTPL2sev (50% and 60% against 80%). On freMTPL2sev
+it touches 100% and 95% of clean contexts against 85% (+15 and +10 points), lowering a
+median of 4.5 rows against 3 over the three models. The condition is thus not met as
+worded. No departure points to a separation, which would show as the error caught as
+often with fewer clean rows lowered: on freMTPL2sev cclip lowers more clean rows, not
+fewer, while in the ausprivauto0405 contexts it misses it lowers nothing at all. The
+missed row is the largest of its context, with an sd shift of 2.5 to 3.5. Under the
+visible error cclip's loss at 0.99 is within 0.6% of clip_200's in 9 of 10
+foundation-model units; on ausprivauto0405 TabICLv2 is 1.8% lower, from the contexts
+where cclip leaves the row that lifts its quantile. On these tables cclip does what
+clip_200 does. Whether that is because the features carry little of a claim's scale is
+not tested here.
+
+GBM. On the generator at M = 20 cclip lowers no segment row in 12 of 20 seeds (clip_200:
+0 of 20) and is 3.0% below clip_200 at 0.99 on a clean context, 3.8% under the shift. On
+the insurance tables it touches 20% to 60% of clean contexts outside freMTPL2sev, where
+clip_200 touches none, while its median loss at 0.99 moves by less than 0.01%.
+
+Run time. A cclip cell takes 1.57 times a raw one for TabPFN-V3 and 1.63 for TabICLv2 on
+the generator, about 2.2 times on the insurance tables, for the two fits on half the
+context.
+
+What this says. Conditioning the cap on the model's own scale removes its cost to a
+segment the features reveal while it still catches the error. By the reading fixed in the
+section, part three gains a rule that tells the two apart where the features allow it. On
+the generator one binary feature carries the whole segment, the easiest case. On the five
+insurance tables cclip neither gains nor loses against clip_200, so there the method adds
+nothing yet. It does not change the comparison with log, which stays lower at 0.99 on
+both designs. One member on the draws of 1.10.2026; eight members were not run.
+```

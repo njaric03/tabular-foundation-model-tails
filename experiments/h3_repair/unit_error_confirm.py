@@ -73,11 +73,16 @@ from `analysis/confirm_tabpfn35.py`. Outcome: the visible row costs 3.5 +0.2% to
 0.99 at either size; at eight members the cap is below raw in 5 of 5 tables and log
 below the cap in 4 of 5, all by small margins.
 
-The conditional cap, 29.10.2026: ARMS=raw,cclip on the same draws at one member
+The conditional cap, 29.10.2026: ARMS=raw,clip,cclip on the same draws at one member
 (`run/conditional_cap.sh unit`). cclip applies clip_200 to the residuals standardised by
 the model's own cross-fitted median and 0.9 quantile (`transforms.cclip`). `row_touched`
 says whether the corrupted row was lowered. Predictions U6 and U7 in PREREGISTRATION.md,
-verdicts from `analysis/conditional_cap.py`.
+verdicts from `analysis/conditional_cap.py`. Outcome: both hold, raw and clip_200 equal
+the rows of 20.10.2026 bit for bit. The foundation models touch no clean context outside
+freMTPL2sev. On these tables cclip does what clip_200 does: under the visible error its
+loss at 0.99 is within 0.6% of clip_200's in 9 of 10 foundation-model units, it lowers
+the corrupted row about as often and on freMTPL2sev it lowers more clean rows. Full
+outcome in PREREGISTRATION.md.
 
     DATASETS=AutoClaims MODELS=GBM REPEATS=2 python -u experiments/h3_repair/unit_error_confirm.py
 """

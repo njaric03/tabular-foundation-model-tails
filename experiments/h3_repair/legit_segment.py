@@ -73,12 +73,17 @@ from `analysis/confirm_tabpfn35.py`. Outcome: F1 and F3a fail. The added row cos
 +2.1% at 0.99 and +49% at 0.999 at one member, nothing at eight, where the cap only
 costs; under log Q(0.999) in the segment is 1.92 times the truth.
 
-The conditional cap, 29.10.2026: ARMS=raw,cclip on the same seeds at one member
+The conditional cap, 29.10.2026: ARMS=raw,clip,cclip on the same seeds at one member
 (`run/conditional_cap.sh segment`). cclip applies clip_200 to the residuals standardised
 by the model's own cross-fitted median and 0.9 quantile (`transforms.cclip`), so a
 segment row whose g predicts its scale is not capped. `row_touched` says whether the
 added row was lowered. Predictions U0 to U5 in PREREGISTRATION.md, verdicts from
-`analysis/conditional_cap.py`.
+`analysis/conditional_cap.py`. Outcome: all six hold, raw and clip_200 equal the rows of
+20.10.2026 bit for bit. At M = 20 on a clean context cclip lowers no segment row in 19
+and 17 of 20 seeds, where clip_200 lowers at least one in every seed; the segment's loss
+at 0.999 is +0.05% and +0.6% over raw against +5.3% and +15.9%. The added row is lowered
+in every seed and TabPFN-V3 keeps its -9.6% at 0.99. TabICLv2 under the error at M = 20
+still pays, less than under clip_200. Full outcome in PREREGISTRATION.md.
 
     MODELS=GBM SEEDS=2 python -u experiments/h3_repair/legit_segment.py
 """
