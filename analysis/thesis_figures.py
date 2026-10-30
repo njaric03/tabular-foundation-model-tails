@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.ticker import NullLocator, PercentFormatter
 
+from common import tables
 from analysis.dose_ensemble import generator_law
 from analysis.supplement_figures import GREY, INK, LABELS, ORDER, TFM, load_natural
 from analysis.tabpfn_y import leverage_measures, loss_measures
@@ -32,6 +33,10 @@ OUT = ROOT / 'thesis/figures'
 CAP, LOG, CCLIP, RAW = '#2a78d6', '#eb6834', '#199e70', '#555555'
 ARMS = {'raw': ('bez izmene', RAW), 'clip': ('odsecanje', CAP), 'log': ('logaritam', LOG),
         'cclip': ('uslovno odsecanje', CCLIP)}
+# The ensemble size where no repair is drawn: red for one member, the configuration that
+# moves, and grey for the default eight, which stays flat. The red is away from the three
+# repairs' hues; trees stay grey as controls.
+ONE, EIGHT = '#c92a2a', '#8a8a8a'
 # The conditional cap ran at one member only, on the seeds of the segment run.
 CCLIP_SEG = 'legit_segment_cclip.csv'
 # (label, file in the unit-error confirmation, file in the segment run, model name)
@@ -81,6 +86,67 @@ def rows(ax, labels):
     ax.grid(axis='x', color='#E8E8E8', linewidth=.5, zorder=0)
     # The tree control sits apart from the foundation models.
     ax.axhline(len(labels) - 1.5, color='#DDDDDD', lw=.65)
+
+
+# Part one: scale and shape pair only at the same member count. scale_of_x.csv ran at four
+# members, and at one member the scale exists for TabPFN-V3 only (the reseed file).
+H1 = ROOT / 'results/h1_shape_vs_scale'
+H1_ROWS = [  # label, scale file, shape file, model, colour
+    ('TabPFN-3, 1 član', 'scale_of_x_tabpfn_reseed_nest1.csv', 'shape_of_x_nest1.csv',
+     'TabPFN-V3', ONE),
+    ('TabPFN-3, 4 člana', 'scale_of_x.csv', 'shape_of_x_20.csv', 'TabPFN-V3', EIGHT),
+    ('TabPFN-3.5, 1 član', 'scale_of_x_tabpfn35.csv', 'shape_of_x_tabpfn35.csv',
+     'TabPFN-v3.5', ONE),
+    ('TabICLv2, 4 člana', 'scale_of_x.csv', 'shape_of_x_20.csv', 'TabICLv2', EIGHT),
+    ('GBM (kontrola)', 'scale_of_x.csv', 'shape_of_x_20.csv', 'GBM', GREY),
+]
+
+
+def scale_shape():
+    """Share of the true change in the conditional scale and in the tail shape that the
+    prediction follows: one dot per seed, the diamond pooled over seeds as in the claim
+    ledger. The EVT oracle on the same 2000 rows is noted under the shape panel."""
+    records = []
+    for label, sc_file, sh_file, model, _ in H1_ROWS:
+        sc = tables.ok_rows(pd.read_csv(H1 / sc_file))
+        sh = tables.ok_rows(pd.read_csv(H1 / sh_file))
+        sc, sh = sc[sc.model == model], sh[sh.model == model]
+        assert sc.n_est.nunique() == 1 and set(sc.n_est) == set(sh.n_est)
+        runs = tables.share_by_run(sh, sc)
+        pooled = dict(scale=tables.scale_share_by_model(sc).share[model],
+                      shape=tables.slope_by_model(sh).share[model])
+        for part in ('scale', 'shape'):
+            records += [dict(row=label, part=part, kind='seed', value=v)
+                        for v in runs[f'{part}_share']]
+            records.append(dict(row=label, part=part, kind='pooled', value=pooled[part]))
+    o = pd.read_csv(H1 / 'oracle_xi_of_x.csv')
+    g = o[o.n == 2000]
+    oracle = (g.oracle_r_2 - g.oracle_r_0).mean() / (g.true_2 - g.true_0).mean()
+    data = pd.DataFrame(records)
+    labels = [r[0] for r in H1_ROWS]
+    fig, axes = plt.subplots(1, 2, figsize=(6.5, 2.9), sharey=True, sharex=True,
+                             layout='constrained')
+    for ax, part, title in zip(axes, ('scale', 'shape'), ('skala', 'oblik repa')):
+        for i, (label, *_, colour) in enumerate(H1_ROWS):
+            d = data[(data.row == label) & (data.part == part)]
+            v = d[d.kind == 'seed'].value.to_numpy()
+            assert len(v) == 20 and np.isfinite(v).all()
+            ax.scatter(v, i + np.linspace(-.15, .15, len(v)), s=16, color=colour, alpha=.5,
+                       linewidths=0, zorder=3)
+            ax.scatter(d[d.kind == 'pooled'].value, [i], s=48, marker='D', color=colour,
+                       edgecolors='white', linewidths=.65, zorder=4)
+        ax.axvline(1, color=INK, lw=.8, zorder=2)
+        ax.axvline(0, color='#CCCCCC', lw=.6, zorder=1)
+        rows(ax, labels)
+        ax.set_title(title, fontsize=11, loc='left', color=INK)
+        ax.set_xlim(-.6, 1.2)
+        ax.set_xticks([-.5, 0, .5, 1])
+        ax.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    axes[1].text(1, -.2, f'EVT orakl na istih 2000 redova: {oracle:.0%}', ha='right',
+                 transform=axes[1].transAxes, fontsize=9.5, color=GREY)
+    fig.supxlabel('Udeo prave promene koji predviđanje prati (tačka po semenu, '
+                  'romb za sva semena zajedno)', fontsize=10.5)
+    save(fig, 'skala_oblik', data.assign(oracle=oracle))
 
 
 def unit_error():
@@ -190,14 +256,15 @@ def target_transform():
             records += [dict(arm=a, measure=m, value=x) for x in v.to_numpy()]
     data = pd.DataFrame(records)
     fig, axes = plt.subplots(1, 3, figsize=(6.8, 2.6), sharey=True, layout='constrained')
+    colours = {'1': ONE, '8': EIGHT, '8n': EIGHT}
     for ax, (m, title) in zip(axes, panels):
         for i, (a, _) in enumerate(arms):
             v = data[(data.arm == a) & (data.measure == m)].value.to_numpy()
             assert len(v) and np.isfinite(v).all()
-            ax.scatter(v, i + np.linspace(-.15, .15, len(v)), s=16, color=INK, alpha=.45,
-                       linewidths=0, zorder=3)
-            ax.scatter([np.median(v)], [i], s=44, marker='D', color=INK, edgecolors='white',
-                       linewidths=.6, zorder=4)
+            ax.scatter(v, i + np.linspace(-.15, .15, len(v)), s=16, color=colours[a],
+                       alpha=.5, linewidths=0, zorder=3)
+            ax.scatter([np.median(v)], [i], s=44, marker='D', color=colours[a],
+                       edgecolors='white', linewidths=.6, zorder=4)
         ax.axvline(0, color=INK, lw=.8, zorder=2)
         ax.set_yticks(range(len(arms)), [t for _, t in arms])
         ax.set_ylim(len(arms) - .5, -.5)
@@ -252,8 +319,8 @@ def dose(lang='sr'):
     data = pd.DataFrame(records)
     fig, axes = plt.subplots(2, 2, figsize=(6.5, 4.2), sharex=True, sharey='row',
                              layout='constrained')
-    styles = {1: dict(color=INK, ls='-', marker='o', label=text['one']),
-              8: dict(color=GREY, ls='--', marker='s', label=text['eight'])}
+    styles = {1: dict(color=ONE, ls='-', marker='o', label=text['one']),
+              8: dict(color=EIGHT, ls='--', marker='s', label=text['eight'])}
     for r, level in enumerate((.99, .999)):
         for c, model in enumerate(('TabPFN-3', 'TabPFN-3.5')):
             ax = axes[r, c]
@@ -299,7 +366,7 @@ def natural():
     models = [m for m in ORDER if m in set(data.model)]
     labels = [LABELS[m] + ('' if m in TFM else ' (kontrola)') for m in models]
     fig, axes = plt.subplots(1, 2, figsize=(6.8, 3.9), sharey=True, layout='constrained')
-    for ax, panel, colour, title in zip(axes, ('ratio', 'cap'), (INK, CAP),
+    for ax, panel, colour, title in zip(axes, ('ratio', 'cap'), (ONE, CAP),
                                         ('najveća šteta zadržana prema uklonjenoj',
                                          'odsecanje prema bez izmene')):
         for i, m in enumerate(models):
@@ -330,6 +397,7 @@ def natural():
 
 
 if __name__ == '__main__':
+    scale_shape()
     unit_error()
     segment_tail()
     target_transform()

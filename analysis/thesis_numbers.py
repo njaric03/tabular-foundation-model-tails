@@ -33,15 +33,23 @@ def pct(v, digits=1):
 
 
 def h1():
-    sc = tables.scale_share_by_model(R("scale_of_x.csv")).share
+    # scale_of_x.csv ran at four members, so its scale pairs with shape_of_x_20.csv and not
+    # with the one-member shape; at one member the scale exists for TabPFN-V3 only.
+    sc4 = tables.scale_share_by_model(R("scale_of_x.csv")).share
+    sh4 = tables.slope_by_model(R("shape_of_x_20.csv")).share
+    sc1 = tables.scale_share_by_model(R("scale_of_x_tabpfn_reseed_nest1.csv")).share
     sh1 = tables.slope_by_model(R("shape_of_x_nest1.csv")).share
-    sh8 = tables.slope_by_model(R("shape_of_x_20.csv")).share
+    claim("H1", "share of the true change tracked, TabPFN-V3, one member: scale / shape",
+          f"{sc1['TabPFN-V3']:.3f} / {sh1['TabPFN-V3']:.3f}",
+          "scale_of_x_tabpfn_reseed_nest1.csv, shape_of_x_nest1.csv")
     for m in ("TabPFN-V3", "TabICLv2", "GBM"):
-        claim("H1", f"share of the true change tracked, {m}, one member: scale / shape",
-              f"{sc[m]:.3f} / {sh1[m]:.3f}", "scale_of_x.csv, shape_of_x_nest1.csv",
-              "GBM is the control" if m == "GBM" else "")
-    claim("H1", "TabPFN-V3 shape share at four members", f"{sh8['TabPFN-V3']:.3f}",
-          "shape_of_x_20.csv", "N_EST=4 in this file, not the package default of 8")
+        claim("H1", f"share of the true change tracked, {m}, four members: scale / shape",
+              f"{sc4[m]:.3f} / {sh4[m]:.3f}", "scale_of_x.csv, shape_of_x_20.csv",
+              "GBM is the control" if m == "GBM" else
+              "N_EST=4 in both files, not the package default of 8")
+    for m in ("TabICLv2", "GBM"):
+        claim("H1", f"shape share at one member, {m}", f"{sh1[m]:.3f}", "shape_of_x_nest1.csv",
+              "the scale was not run at one member")
     s35 = tables.scale_share_by_model(R("scale_of_x_tabpfn35.csv")).share["TabPFN-v3.5"]
     h35 = tables.slope_by_model(R("shape_of_x_tabpfn35.csv")).share["TabPFN-v3.5"]
     claim("H1", "TabPFN-3.5, one member: scale / shape", f"{s35:.3f} / {h35:.3f}",

@@ -7,10 +7,11 @@ and whether capping that value improves accuracy.
 ## Main results
 
 **Scale and tail shape.** On a generator whose tail index rises with a feature that
-leaves the scale unchanged, TabICLv2 reproduces 98% of the true change in the
-conditional scale and 44% of the change in the tail shape. TabPFN-3 reproduces 95% and
-42% with one ensemble member; its default ensemble lowers the shape to 19%. An
-extreme-value oracle on the same 2000 rows recovers 99% of the shape. Gradient boosting
+leaves the scale unchanged, TabPFN-3 with one ensemble member reproduces 88% of the true
+change in the conditional scale and 42% of the change in the tail shape. With four members
+it reproduces 95% and 19%: the ensemble lowers the shape. TabICLv2 reproduces 98% and 43%
+with four members (44% of the shape with one). An extreme-value oracle on the same 2000
+rows recovers 99% of the shape. Gradient boosting
 has the same gap (87% and 45%), so it is not specific to foundation models.
 
 **One extreme context target.** On 40 synthetic tasks, one added extreme target made the
