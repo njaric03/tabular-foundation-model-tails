@@ -1,7 +1,8 @@
 """Table 6.4 of the thesis: what the cap and the log cost on a clean context and gain
 under a unit error, per insurance table and configuration, with the break-even rate.
 
-From the unit-error confirmations of 1, 21 and 22.10.2026 (same draws). Per unit, from
+From the unit-error confirmations of 1, 21 and 22.10.2026 (same draws), with the
+conditional cap of 29.10.2026 beside them where it ran, at one member. Per unit, from
 mean pinball at 0.99 over 20 repeats: D0 = arm - raw on the clean context, D1 the same
 under the random x100 row (the error a table would actually carry), and the visible row
 beside it. With p the share of contexts carrying such an error, the arm pays when
@@ -32,6 +33,7 @@ CONFIGS = [  # label, file, model
     ("TabICLv2, 1", "unit_error_confirm_log.csv", "TabICLv2"),
     ("GBM, 1", "unit_error_confirm_log.csv", "GBM"),
 ]
+CCLIP = "unit_error_confirm_cclip.csv"
 
 
 def regime(d0, d1):
@@ -47,25 +49,40 @@ def regime(d0, d1):
     return "below", -d0 / (d1 - d0)
 
 
+def wide(d):
+    return d.pivot_table(index=["dataset", "repeat"], columns=["context", "arm"], values="pb99")
+
+
+def units(label, arm, w):
+    out = []
+    for table, g in w.groupby(level="dataset"):
+        m = g.mean()
+        d0 = m[("clean", arm)] - m[("clean", "raw")]
+        d1 = m[("random", arm)] - m[("random", "raw")]
+        rel = lambda cx: g[(cx, arm)] / g[(cx, "raw")] - 1
+        kind, p = regime(d0, d1)
+        out.append(dict(config=label, arm=arm, table=table,
+                        clean_median=rel("clean").median(),
+                        clean_worst=rel("clean").max(),
+                        random_median=rel("random").median(),
+                        visible_median=rel("visible").median(),
+                        d0=d0, d1=d1, pays=kind, p_star=p))
+    return out
+
+
 def rows():
     out = []
+    cclip = tables.ok_rows(pd.read_csv(paths.result(f"h3_repair/{CCLIP}")))
     for label, name, model in CONFIGS:
         d = tables.ok_rows(pd.read_csv(paths.result(f"h3_repair/{name}")))
         d = d[d.model == model]
-        w = d.pivot_table(index=["dataset", "repeat"], columns=["context", "arm"], values="pb99")
+        w = wide(d)
         for arm in ("clip", "log"):
-            for table, g in w.groupby(level="dataset"):
-                m = g.mean()
-                d0 = m[("clean", arm)] - m[("clean", "raw")]
-                d1 = m[("random", arm)] - m[("random", "raw")]
-                rel = lambda cx: g[(cx, arm)] / g[(cx, "raw")] - 1
-                kind, p = regime(d0, d1)
-                out.append(dict(config=label, arm=arm, table=table,
-                                clean_median=rel("clean").median(),
-                                clean_worst=rel("clean").max(),
-                                random_median=rel("random").median(),
-                                visible_median=rel("visible").median(),
-                                d0=d0, d1=d1, pays=kind, p_star=p))
+            out += units(label, arm, w)
+        # Against the raw rows of its own file, which equal those of 20.10.2026 (R0).
+        c = cclip[cclip.model == model]
+        if (d.n_est == 1).all() and len(c):
+            out += units(label, "cclip", wide(c))
     return pd.DataFrame(out)
 
 
@@ -75,7 +92,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     t.to_csv(out / "tabela_6_4.csv", index=False)
     pct = lambda v: f"{v:+.1%}"
-    for arm, name in (("clip", "clip_200"), ("log", "log")):
+    for arm, name in (("clip", "clip_200"), ("log", "log"), ("cclip", "cclip")):
         print(f"\n=== {name} against raw at 0.99: clean median / clean worst / random / visible,"
               " and when it pays")
         part = t[t.arm == arm]

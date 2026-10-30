@@ -1,11 +1,12 @@
 """Main figures of parts two and three of the thesis, with Serbian labels.
 
 Run from the repository root: python -m analysis.thesis_figures
-Reads the confirmation outputs of 21 and 22 October 2026 and writes PDF, PNG and the
-plotted values to thesis/figures/, which is not tracked; the dose figure is also drawn
-with English labels into figures/ for the README. A figure whose files are not
-there yet is skipped. TabPFN-3.5 ran on a GPU and every other model on CPU, so a row of
-3.5 is compared with the others by its medians only.
+Reads the confirmation outputs of 21 and 22 October 2026, the target-transform test of
+28 October and the conditional cap of 29 October, and writes PDF, PNG and the plotted
+values to thesis/figures/, which is not tracked; the dose figure is also drawn with
+English labels into figures/ for the README. A figure whose files are not there yet is
+skipped. TabPFN-3.5 ran on a GPU and every other model on CPU, so a row of 3.5 is
+compared with the others by its medians only.
 """
 from pathlib import Path
 
@@ -19,14 +20,20 @@ from matplotlib.ticker import NullLocator, PercentFormatter
 
 from analysis.dose_ensemble import generator_law
 from analysis.supplement_figures import GREY, INK, LABELS, ORDER, TFM, load_natural
+from analysis.tabpfn_y import leverage_measures, loss_measures
 
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / 'results/h3_repair'
 OUT = ROOT / 'thesis/figures'
-# Two hues, validated together on white with the dataviz validator (all pairs): the cap
-# and the log are the two repairs and keep these colours in every figure. raw is ink.
-CAP, LOG, RAW = '#2a78d6', '#eb6834', '#555555'
-ARMS = {'raw': ('bez izmene', RAW), 'clip': ('odsecanje', CAP), 'log': ('logaritam', LOG)}
+# Three hues, validated together on white with the dataviz validator (all pairs): the
+# cap, the log and the conditional cap keep these colours in every figure. The aqua is
+# one step darker than the palette's light slot, which falls below 3:1 on white. raw is
+# ink.
+CAP, LOG, CCLIP, RAW = '#2a78d6', '#eb6834', '#199e70', '#555555'
+ARMS = {'raw': ('bez izmene', RAW), 'clip': ('odsecanje', CAP), 'log': ('logaritam', LOG),
+        'cclip': ('uslovno odsecanje', CCLIP)}
+# The conditional cap ran at one member only, on the seeds of the segment run.
+CCLIP_SEG = 'legit_segment_cclip.csv'
 # (label, file in the unit-error confirmation, file in the segment run, model name)
 CONFIGS = [
     ('TabPFN-3, 1 član', 'unit_error_confirm_log.csv', 'legit_segment_log.csv', 'TabPFN-V3'),
@@ -116,27 +123,37 @@ def unit_error():
 def segment_tail():
     """Predicted over true Q(0.999), outside and inside a legitimate high-scale segment."""
     records = []
+    cclip = load(CCLIP_SEG)
     for label, _, seg_file, model in CONFIGS:
         d = load(seg_file)
         if d is None:
             print(f'segment_tail: {seg_file} is missing, figure skipped')
             return
         d = d[(d.model == model) & (d.seg_scale == 20.0) & (d.sd_shift_target == 1.0)]
+        if cclip is not None and (d.n_est == 1).all():
+            c = cclip[(cclip.model == model) & (cclip.variant == 'cclip')
+                      & (cclip.seg_scale == 20.0) & (cclip.sd_shift_target == 1.0)]
+            assert c.empty or set(c.seed) == set(d.seed)
+            d = pd.concat([d, c])
         for arm in ARMS:
             for part in ('out', 'seg'):
                 v = d[d.variant == arm][f'qratio999_{part}'].to_numpy()
+                if arm == 'cclip' and len(v) == 0:
+                    continue
                 assert len(v) == 20
                 records.append(dict(config=label, arm=arm, part=part, median=np.median(v),
                                     q25=np.quantile(v, .25), q75=np.quantile(v, .75)))
     data = pd.DataFrame(records)
     labels = [c[0] for c in CONFIGS]
-    fig, axes = plt.subplots(1, 2, figsize=(6.5, 3.1), sharey=True, sharex=True,
+    fig, axes = plt.subplots(1, 2, figsize=(6.5, 3.6), sharey=True, sharex=True,
                              layout='constrained')
-    offsets = dict(zip(ARMS, (-.22, 0, .22)))
+    offsets = dict(zip(ARMS, (-.27, -.09, .09, .27)))
     for ax, part, title in zip(axes, ('out', 'seg'), ('van segmenta', 'u segmentu')):
         for i, label in enumerate(labels):
             for arm, (name, colour) in ARMS.items():
                 r = data[(data.config == label) & (data.arm == arm) & (data.part == part)]
+                if r.empty:
+                    continue
                 y = i + offsets[arm]
                 ax.plot([r.q25.item(), r.q75.item()], [y, y], color=colour, lw=2,
                         solid_capstyle='round', zorder=3)
@@ -150,10 +167,48 @@ def segment_tail():
         ax.set_xlim(.05, 4)
         ax.set_xticks([.1, .25, .5, 1, 2], ['0,1×', '0,25×', '0,5×', '1×', '2×'])
         ax.xaxis.set_minor_locator(NullLocator())
-    fig.legend(loc='outside upper center', ncol=3, handletextpad=.3, columnspacing=1.4)
+    fig.legend(loc='outside upper center', ncol=4, handletextpad=.3, columnspacing=1.4)
     fig.supxlabel('Predviđeni Q(0,999) prema pravom, čist kontekst, segment ×20 '
                   '(medijana i interkvartilni raspon, 20 semena)', fontsize=10.5)
     save(fig, 'segment_rep', data)
+
+
+def target_transform():
+    """TabPFN-3 at a shift or dose of 20: one member, eight at the default and eight with
+    every member on the untransformed target (rules Y0 to Y3 of 28.10.2026), one dot per
+    seed. Q and R come from the dose design (20 seeds), G from the leverage sweep (5)."""
+    loss, lev = loss_measures(), leverage_measures()
+    if len(loss) < 3 or len(lev) < 3:
+        print('target_transform: a file of 28.10.2026 is missing, figure skipped')
+        return
+    arms = [('1', '1 član'), ('8', '8 članova'), ('8n', '8 članova,\nbez transformacije cilja')]
+    panels = [('Q', 'Q(0,99) na test redovima'), ('R', 'očekivani gubitak na 0,99'),
+              ('G', 'globalna promena Q(0,99)')]
+    records = []
+    for a, _ in arms:
+        for m, v in (('Q', loss[a]['Q']), ('R', loss[a]['R']), ('G', lev[a][20.0])):
+            records += [dict(arm=a, measure=m, value=x) for x in v.to_numpy()]
+    data = pd.DataFrame(records)
+    fig, axes = plt.subplots(1, 3, figsize=(6.8, 2.6), sharey=True, layout='constrained')
+    for ax, (m, title) in zip(axes, panels):
+        for i, (a, _) in enumerate(arms):
+            v = data[(data.arm == a) & (data.measure == m)].value.to_numpy()
+            assert len(v) and np.isfinite(v).all()
+            ax.scatter(v, i + np.linspace(-.15, .15, len(v)), s=16, color=INK, alpha=.45,
+                       linewidths=0, zorder=3)
+            ax.scatter([np.median(v)], [i], s=44, marker='D', color=INK, edgecolors='white',
+                       linewidths=.6, zorder=4)
+        ax.axvline(0, color=INK, lw=.8, zorder=2)
+        ax.set_yticks(range(len(arms)), [t for _, t in arms])
+        ax.set_ylim(len(arms) - .5, -.5)
+        ax.tick_params(axis='y', length=0)
+        ax.spines['left'].set_visible(False)
+        ax.grid(axis='x', color='#E8E8E8', linewidth=.5, zorder=0)
+        ax.set_title(title, fontsize=10.5, loc='left', color=INK)
+        ax.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    fig.supxlabel('Promena prema čistom kontekstu pri pomeraju 20, TabPFN-3 '
+                  '(tačka po semenu, romb je medijana)', fontsize=10.5)
+    save(fig, 'transformacija_cilja', data)
 
 
 # The dose figure is also drawn in English for the README.
@@ -277,6 +332,7 @@ def natural():
 if __name__ == '__main__':
     unit_error()
     segment_tail()
+    target_transform()
     natural()
     dose()
     dose('en')
