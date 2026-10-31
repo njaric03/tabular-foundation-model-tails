@@ -13,9 +13,11 @@ beside it. With p the share of contexts carrying such an error, the arm pays whe
     both <= 0     pays at every p;   both >= 0   never;   both exactly 0   no effect.
 
 The worst repeat on the clean context is the largest relative rise, so a median does not
-hide it. Writes thesis/figures/tabela_6_4.csv, and for \\input the body of table 6.4
-(tabela_6_4.tex, one row per configuration and repair, summarised over the five tables)
-and the full table of appendix C (tabela_c_h3.tex, one row per table), none tracked.
+hide it. Writes thesis/figures/tabela_6_4.csv, and for \\input the bodies of the cost and
+benefit table of chapter 6 (tabela_6_4.tex, one row per configuration and repair,
+summarised over the five tables), of the break-even table beside it (tabela_prag.tex)
+and of the three tables of appendix C, one per repair and one row per table
+(tabela_c_h3_<arm>.tex), none tracked.
 
     python -m analysis.h3_table
 """
@@ -63,10 +65,13 @@ def units(label, arm, w):
         d1 = m[("random", arm)] - m[("random", "raw")]
         rel = lambda cx: g[(cx, arm)] / g[(cx, "raw")] - 1
         kind, p = regime(d0, d1)
+        # The change in mean loss carries the sign of D0 and D1, so the decision reads off it.
         out.append(dict(config=label, arm=arm, table=table,
                         clean_median=rel("clean").median(),
+                        clean_mean=d0 / m[("clean", "raw")],
                         clean_worst=rel("clean").max(),
                         random_median=rel("random").median(),
+                        random_mean=d1 / m[("random", "raw")],
                         visible_median=rel("visible").median(),
                         d0=d0, d1=d1, pays=kind, p_star=p))
     return out
@@ -96,51 +101,77 @@ PAYS = ["always", "above", "never", "none"]
 
 
 def pc(v):
-    """A relative change as LaTeX, with a decimal comma: $+1,5$\\,\\%."""
-    s = "0,0" if abs(v) < 5e-4 else f"{100 * v:+.1f}".replace(".", ",")
-    return f"${s}$\\,\\%"
+    """A relative change in percent as LaTeX, with a decimal comma and no unit, which the
+    header carries: $+1,5$. An exact zero (the repair left the context as it was) is $0$,
+    and a change that rounds to zero keeps its sign, $-0,0$."""
+    return "$0$" if v == 0 else "$" + f"{100 * v:+.1f}".replace(".", ",") + "$"
+
+
+def p(v):
+    return f"{v:.2f}".replace(".", ",")
+
+
+# Header of the cost and benefit tables: what every number is and which way is better.
+LOSS = r"Promena gubitka u \%, negativna vrednost je manji gubitak"
+WHEN = {"always": r"za svako $p$", "never": r"ni za jedno $p$", "none": "bez razlike"}
+
+
+def group(name, cols, first):
+    """A configuration or repair heading inside a table, with air above all but the first."""
+    return ([] if first else [r"\addlinespace[4pt]"]) + [
+        f"\\multicolumn{{{cols}}}{{@{{}}l}}{{\\emph{{{name}}}}} \\\\"]
 
 
 def latex(t, out):
-    """Table 6.4 summarised over the five tables, and the full table for appendix C."""
+    """The cost and benefit table of chapter 6 summarised over the five tables, the
+    break-even table beside it and one table per repair for appendix C."""
     assert not (t.pays == "below").any(), "the inverse case appeared; add a column for it"
-    cols = len(PAYS) + 5
-    body = [r"\begin{tabular}{@{}l r r r r r r r r@{}}", r"\toprule",
-            r"& \multicolumn{2}{c}{Cena na čistom} & \multicolumn{2}{c}{Korist pod greškom}"
-            r" & \multicolumn{4}{c}{Tabele: isplati se} \\",
-            r"\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-9}",
-            r"Konfiguracija & medijana & najgori & nasumična & vidljiva"
-            r" & uvek & iznad $p^\ast$ & nikad & bez efekta \\"]
-    # Obrazac 3 puts every caption below, so it sits in the last foot.
-    head = [r"\toprule", r"Konfiguracija & Tabela & medijana & najgori & nasumična"
-            r" & vidljiva & Isplati se \\", r"\midrule"]
-    full = [r"\setlength{\LTcapwidth}{\textwidth}",
-            r"\begin{longtable}{@{}l l r r r r l@{}}", *head, r"\endfirsthead",
-            *head, r"\endhead", r"\bottomrule", r"\endfoot", r"\bottomrule",
-            r"\caption{Cena i korist korekcija po tabeli osiguranja i konfiguraciji, nivo"
-            r" $0,99$. Kolone kao u tabeli~\ref{tab:h3}; poslednja kaže pri kom udelu $p$"
-            r" konteksta sa nasumičnom greškom se korekcija isplati.}\label{tab:h3-puna}",
-            r"\endlastfoot"]
+    body = [r"\begin{tabular}{@{}l r r r r@{}}", r"\toprule",
+            f"& \\multicolumn{{4}}{{c}}{{{LOSS}}} \\\\", r"\cmidrule(l){2-5}",
+            r"& \multicolumn{2}{c}{Čist kontekst} & \multicolumn{2}{c}{Greška jedinice $\times 100$}"
+            r" \\", r"\cmidrule(lr){2-3}\cmidrule(l){4-5}",
+            r"Konfiguracija & medijana & najveći rast & nasumičan red & vidljiv red \\"]
+    # Fixed widths, so the long header sits over the four counts and not over the last.
+    pays = [r"\begin{tabular}{@{}l *{4}{>{\centering\arraybackslash}p{2.4cm}}@{}}",
+            r"\toprule",
+            r"& \multicolumn{4}{c}{Broj tabela (od pet) na kojima korekcija smanjuje"
+            r" očekivani gubitak} \\", r"\cmidrule(l){2-5}",
+            r"Konfiguracija & za svako $p$ & za $p > p^\ast$ ($p^\ast$) & ni za jedno $p$"
+            r" & bez razlike \\"]
     for arm, name in ARMS.items():
         part = t[t.arm == arm]
-        body += [r"\midrule", f"\\multicolumn{{{cols}}}{{@{{}}l}}{{\\emph{{{name}}}}} \\\\"]
-        full += [f"\\multicolumn{{7}}{{@{{}}l}}{{\\emph{{{name}}}}} \\\\"]
-        for cfg, g in part.groupby("config", sort=False):
+        body += [r"\midrule", *group(name, 5, True)]
+        pays += [r"\midrule", *group(name, 5, True)]
+        full = [r"\begin{tabular}{@{}l r r r r r r l@{}}", r"\toprule",
+                f"& \\multicolumn{{6}}{{c}}{{{LOSS}}} & \\\\", r"\cmidrule(lr){2-7}",
+                r"& \multicolumn{3}{c}{Čist kontekst} & \multicolumn{2}{c}{Nasumičan red}"
+                r" & \multicolumn{1}{c}{Vidljiv red} & Korekcija \\",
+                r"\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(lr){7-7}",
+                r"Tabela & medijana & prosek & najveći rast & medijana & prosek & medijana"
+                r" & se isplati \\", r"\midrule"]
+        for i, (cfg, g) in enumerate(part.groupby("config", sort=False)):
             n = g.pays.value_counts()
             body.append(" & ".join([LABELS[cfg], pc(g.clean_median.median()),
                                     pc(g.clean_worst.max()), pc(g.random_median.median()),
-                                    pc(g.visible_median.median())]
-                                   + [str(n.get(k, 0)) for k in PAYS]) + r" \\")
+                                    pc(g.visible_median.median())]) + r" \\")
+            above = str(n.get("above", 0))
+            if n.get("above", 0):
+                above += " (" + "; ".join(p(v) for v in sorted(g.p_star.dropna())) + ")"
+            pays.append(" & ".join([LABELS[cfg], str(n.get("always", 0)), above,
+                                    str(n.get("never", 0)), str(n.get("none", 0))]) + r" \\")
+            full += group(LABELS[cfg], 8, i == 0)
             for r in g.itertuples():
-                when = {"always": "uvek", "never": "nikad", "none": "bez efekta",
-                        "above": f"$p > {r.p_star:.2f}$".replace(".", ",")}[r.pays]
-                full.append(" & ".join([LABELS[cfg], r.table, pc(r.clean_median),
-                                        pc(r.clean_worst), pc(r.random_median),
+                when = WHEN.get(r.pays) or f"za $p > {p(r.p_star)}$"
+                full.append(" & ".join([r"\hspace{1em}" + r.table, pc(r.clean_median),
+                                        pc(r.clean_mean), pc(r.clean_worst),
+                                        pc(r.random_median), pc(r.random_mean),
                                         pc(r.visible_median), when]) + r" \\")
+        full += [r"\bottomrule", r"\end{tabular}"]
+        (out / f"tabela_c_h3_{arm}.tex").write_text("\n".join(full) + "\n", encoding="utf-8")
     body += [r"\bottomrule", r"\end{tabular}"]
-    full += [r"\end{longtable}"]
+    pays += [r"\bottomrule", r"\end{tabular}"]
     (out / "tabela_6_4.tex").write_text("\n".join(body) + "\n", encoding="utf-8")
-    (out / "tabela_c_h3.tex").write_text("\n".join(full) + "\n", encoding="utf-8")
+    (out / "tabela_prag.tex").write_text("\n".join(pays) + "\n", encoding="utf-8")
 
 
 def main():

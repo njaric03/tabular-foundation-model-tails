@@ -1,9 +1,10 @@
 """The model-by-experiment matrix of the thesis (outline 3.1), read from results/.
 
 For every result file with a `model` column, which models it measures and with how many
-ensemble members. Writes the matrix to thesis/figures/matrica_modela.csv and the body of
-table 3.1 to tabela_modela.tex, neither tracked, and prints both. Pre-training and
-fine-tuning arms are left out, as the thesis does.
+ensemble members. Writes the matrix to thesis/figures/matrica_modela.csv, the body of
+table 3.1 (role, members, chapters) to tabela_modela.tex and the package versions per
+chapter for appendix A to tabela_verzija.tex (none tracked) and prints them. Pre-training
+and fine-tuning arms are left out, as the thesis does.
 
     python -m analysis.model_matrix
 """
@@ -34,33 +35,56 @@ PACKAGE = {'TabPFN-V3': 'tabpfn', 'TabPFN-v3.5': 'tabpfn', 'TabPFN-v2.5': 'tabpf
            'TabPFN-v2.6': 'tabpfn', 'TabICLv2': 'tabicl', 'GBM': 'scikit_learn',
            'XGB': 'xgboost', 'CB': 'catboost', 'EXAONE': 'exaone_tabular',
            'TabDPT': 'tabdpt', 'LimiX-2': 'limix', 'Causilo': 'causilo'}
+# Rows of table 3.1 that hold two models get one row each in appendix A.
+LABEL = {'XGB': 'XGBoost', 'CB': 'CatBoost', 'TabPFN-v2.5': 'TabPFN-2.5',
+         'TabPFN-v2.6': 'TabPFN-2.6'}
 TREES = ('GBM', 'XGB', 'CB')
+# The three parts of the thesis by results/ folder; side checks and rechecks are left out.
+CHAPTERS = {'h1_shape_vs_scale': '4', 'h2_leverage': '5', 'h3_repair': '6'}
+
+
+def members_of(g):
+    return sorted({int(x) for v in g.members.dropna() for x in str(v).split('/') if x})
 
 
 def latex(data):
-    """The body of table 3.1, written to tabela_modela.tex for \\input."""
+    """Table 3.1 (role, members, chapters) to tabela_modela.tex and the versions per
+    chapter of appendix A to tabela_verzija.tex, both for \\input."""
     prov = pd.concat([pd.read_csv(ROOT / 'results' / name, low_memory=False)
                       for name in ('provenance.csv', 'provenance_tfmp.csv')])
     prov['stem'] = prov.output.astype(str).str.split('/').str[-1].str.replace(
         r'\.csv$', '', regex=True)
-    lines = [r'\begin{tabularx}{\textwidth}{@{}l X l l@{}}', r'\toprule',
-             r'Model & Paket i verzija & Članova ansambla & Uloga \\', r'\midrule']
-    for label, models, role in TABLE:
-        packages, members = [], set()
+    lines = [r'\begin{tabular}{@{}l l l l@{}}', r'\toprule',
+             r'Model & Uloga & Članova ansambla & Poglavlja \\', r'\midrule']
+    versions = [r'\begin{tabular}{@{}l l l l l@{}}', r'\toprule',
+                r'Model & Paket & Poglavlje 4 & Poglavlje 5 & Poglavlje 6 \\', r'\midrule']
+    for i, (label, models, role) in enumerate(TABLE):
+        # The two main models, the newer TabPFN and the tree control apart from the rest.
+        if i == 4:
+            lines.append(r'\addlinespace[4pt]')
+        g = data[data.model.isin(models)]
+        n = '---' if set(models) <= set(TREES) else ', '.join(map(str, members_of(g)))
+        chapters = ', '.join(CHAPTERS[p] for p in CHAPTERS if p in set(g.part))
+        lines.append(f'{label} & {role} & {n} & {chapters} \\\\')
         for m in models:
-            g = data[data.model == m]
             pkg = PACKAGE[m]
-            versions = sorted(prov[prov.stem.isin(g.file)][f'v_{pkg}'].dropna().astype(str)
-                              .unique())
-            text = pkg.replace('_', '-') + ' ' + ', '.join(versions)
-            if text not in packages:
-                packages.append(text)
-            members |= {int(x) for v in g.members.dropna() for x in str(v).split('/') if x}
-        n = '---' if set(models) <= set(TREES) else ', '.join(map(str, sorted(members)))
-        lines.append(f'{label} & {"; ".join(packages)} & {n} & {role} \\\\')
-    lines += [r'\bottomrule', r'\end{tabularx}']
+            cells = []
+            for part in CHAPTERS:
+                h = data[(data.model == m) & (data.part == part)]
+                v = prov[prov.stem.isin(h.file)][f'v_{pkg}'].dropna().astype(str)
+                # Most used version first; members only where the model has them.
+                text = (', '.join(v.value_counts().index)
+                        or ('---' if h.empty else 'bez zapisa'))
+                if m not in TREES and members_of(h):
+                    text += ' (' + ', '.join(map(str, members_of(h))) + ')'
+                cells.append(text)
+            name = LABEL.get(m, label)
+            versions.append(f'{name} & {pkg.replace("_", "-")} & {" & ".join(cells)} \\\\')
+    lines += [r'\bottomrule', r'\end{tabular}']
+    versions += [r'\bottomrule', r'\end{tabular}']
     (OUT / 'tabela_modela.tex').write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    print('\n'.join(lines))
+    (OUT / 'tabela_verzija.tex').write_text('\n'.join(versions) + '\n', encoding='utf-8')
+    print('\n'.join(lines + [''] + versions))
 
 
 def main():
