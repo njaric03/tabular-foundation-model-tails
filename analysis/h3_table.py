@@ -140,16 +140,15 @@ def latex(t, out):
             r" jednom redu} \\", r"\cmidrule(lr){2-3}\cmidrule(l){4-5}",
             r"Konfiguracija i korekcija & medijana & najgore ponavljanje & nasumičan red"
             r" & uticajan red \\"]
-    # Fixed widths, so the long header sits over the counts and not over the last; the
-    # p* column is the wide one, for up to three thresholds on a line.
+    # Fixed widths, so the long header sits over the five counts, and the thresholds in a
+    # column of their own after them rather than in brackets beside a count.
     c = r">{\centering\arraybackslash}p{%scm}"
-    pays = [r"\begin{tabular}{@{}l " + "".join(c % w for w in (1.6, 1.6, 3.1, 1.8, 1.6))
-            + "@{}}", r"\toprule",
-            r"& \multicolumn{5}{>{\centering\arraybackslash}p{10.6cm}}{Broj skupova podataka"
-            r" (od pet) prema udelu $p$ za koji korekcija smanjuje očekivani gubitak} \\",
-            r"\cmidrule(l){2-6}",
-            r"Konfiguracija & za svako $p$ & za svako $p > 0$ & za $p > p^\ast$ ($p^\ast$)"
-            r" & ni za jedno $p$ & bez razlike \\"]
+    pays = [r"\begin{tabular}{@{}l " + c % 1.45 * 5 + c % 2.6 + "@{}}", r"\toprule",
+            r"& \multicolumn{5}{>{\centering\arraybackslash}p{8.9cm}}{Broj skupova podataka"
+            r" (od pet) prema udelu $p$ za koji korekcija smanjuje očekivani gubitak} & \\",
+            r"\cmidrule(lr){2-6}",
+            r"Konfiguracija & za svako $p$ & za svako $p > 0$ & za $p > p^\ast$"
+            r" & ni za jedno $p$ & bez razlike & pragovi $p^\ast$ \\"]
     for i, (cfg, g) in enumerate(t.groupby("config", sort=False)):
         body += ([r"\midrule"] if i == 0 else []) + group(LABELS[cfg], 5, i == 0)
         for arm, name in ARMS.items():
@@ -160,7 +159,7 @@ def latex(t, out):
                                         pc(a.visible_median.median())]) + r" \\")
     for arm, name in ARMS.items():
         part = t[t.arm == arm]
-        pays += [r"\midrule", *group(name[0].upper() + name[1:], 6, True)]
+        pays += [r"\midrule", *group(name[0].upper() + name[1:], 7, True)]
         full = [r"\begin{tabular}{@{}l r r r r r r l@{}}", r"\toprule",
                 f"& \\multicolumn{{6}}{{c}}{{{LOSS}}} & \\\\", r"\cmidrule(lr){2-7}",
                 r"& \multicolumn{3}{c}{Čist kontekst} & \multicolumn{2}{c}{Nasumičan red}"
@@ -170,12 +169,9 @@ def latex(t, out):
                 r" & se isplati \\", r"\midrule"]
         for i, (cfg, g) in enumerate(part.groupby("config", sort=False)):
             n = g.pays.value_counts()
-            above = str(n.get("above", 0))
-            if n.get("above", 0):
-                above += " (" + "; ".join(p(v) for v in sorted(g.p_star.dropna())) + ")"
-            pays.append(" & ".join([LABELS[cfg], str(n.get("always", 0)),
-                                    str(n.get("positive", 0)), above, str(n.get("never", 0)),
-                                    str(n.get("none", 0))]) + r" \\")
+            stars = "; ".join(p(v) for v in sorted(g.p_star.dropna())) or "---"
+            pays.append(" & ".join([LABELS[cfg]] + [str(n.get(k, 0)) for k in PAYS]
+                                   + [stars]) + r" \\")
             full += group(LABELS[cfg], 8, i == 0)
             for r in g.itertuples():
                 when = WHEN.get(r.pays) or f"za $p > {p(r.p_star)}$"

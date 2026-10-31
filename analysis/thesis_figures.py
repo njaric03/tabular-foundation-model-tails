@@ -154,7 +154,7 @@ def scheme():
               ('posle odsecanja', y_cap, CAP_BG)]
     fig, ax = plt.subplots(figsize=(6.6, 3.1), layout='constrained')
     ax.set_xlim(0, 3)
-    ax.set_ylim(-.06, 1.2)
+    ax.set_ylim(-.12, 1.2)
     ax.axis('off')
     widths, h = (.27, .25, .36), .11
     money = lambda v: f'{v:,.0f}'.replace(',', ' ')
@@ -179,7 +179,7 @@ def scheme():
                         top - h / 2, text, ha='center' if r == 0 else 'right', va='center',
                         fontsize=10.5, color=ink)
         # The test case, the same in all three comparisons.
-        top = .26
+        top = .2
         for c, text in enumerate((*map(str, SCHEME_TEST), '?')):
             ax.add_patch(plt.Rectangle((edges[c], top - h), widths[c], h, facecolor='#f3f3f3',
                                        edgecolor='#888888', lw=.6, ls='--'))
@@ -191,8 +191,9 @@ def scheme():
             ax.annotate('', xy=(k + 1.02, .7), xytext=(x0 + sum(widths) + .01, .7),
                         arrowprops=dict(arrowstyle='->', color=INK, lw=.9))
     ax.text(2.04, .4, 'prag = medijana + 200 robusnih\nstandardnih devijacija = '
-            + money(cap), fontsize=9.5, color=dark(CAP, .8), va='top')
-    ax.text(1.5, -.04, 'Test slučajevi i njihovi stvarni iznosi isti su u sva tri poređenja; '
+            + money(cap) + '\nublaženo, nije vraćeno na ' + money(y[SCHEME_BAD]),
+            fontsize=9.5, color=dark(CAP, .8), va='top')
+    ax.text(1.5, -.1, 'Test slučajevi i njihovi stvarni iznosi isti su u sva tri poređenja; '
             'menja se samo kontekst.', fontsize=10.5, fontstyle='italic', ha='center')
     data = pd.DataFrame({'age': [r[0] for r in SCHEME_ROWS], 'power': [r[1] for r in SCHEME_ROWS],
                          'clean': y, 'error': y_err, 'capped': y_cap})
@@ -339,8 +340,9 @@ def unit_error():
     key(fig, [mark('o', RAW, 'skup podataka, 1 član'),
               mark('s', RAW, 'skup podataka, 8 članova', ms=6),
               mark('D', dark(RAW), 'medijana preko skupova')])
-    fig.supxlabel('Promena gubitka na 0,99 prema izvornom modelu, greška ×100 u uticajnom '
-                  'redu\n0 % = isti gubitak; levo manji, desno veći gubitak', fontsize=10.5)
+    # Inside the figure only what the axis means; the experiment is in the caption.
+    fig.supxlabel('Promena gubitka na 0,99 prema izvornom modelu\n'
+                  '0 % = isti gubitak; levo manji, desno veći gubitak', fontsize=10.5)
     save(fig, 'greska_jedinice_popravke', data)
 
 
@@ -369,6 +371,10 @@ def segment_tail():
                                     q25=np.quantile(v, .25), q75=np.quantile(v, .75)))
     data = pd.DataFrame(records)
     labels = [c[0] for c in CONFIGS]
+    # A star on the rows without the conditional cap, explained once in the caption, so
+    # its empty lane does not read as a lost mark.
+    measured = set(data[data.arm == 'cclip'].config)
+    shown = [label + ('' if label in measured else '*') for label in labels]
     fig, axes = plt.subplots(1, 2, figsize=(6.6, 4.9), sharey=True, sharex=True,
                              layout='constrained')
     offsets = dict(zip(ARMS, (-.3, -.1, .1, .3)))
@@ -379,9 +385,6 @@ def segment_tail():
                 r = data[(data.config == label) & (data.arm == arm) & (data.part == part)]
                 y = i + offsets[arm]
                 if r.empty:
-                    # Its lane stays empty, so say why rather than leave a gap.
-                    ax.text(.056, y, 'uslovno odsecanje: nije mereno', fontsize=8.5,
-                            fontstyle='italic', color=dark(colour, .8), va='center')
                     continue
                 ax.plot([r.q25.item(), r.q75.item()], [y, y], color=colour, lw=2.6,
                         solid_capstyle='round', zorder=3)
@@ -390,7 +393,7 @@ def segment_tail():
         ax.axvline(1, color=INK, lw=1.4, zorder=2)
         # Inside the panel, above the first row, where the titles leave it room.
         ax.text(1.07, -.62, '1× = tačan kvantil', fontsize=10, color=INK, va='center')
-        rows(ax, labels)
+        rows(ax, shown)
         ax.set_ylim(len(labels) - .5, -.8)
         ax.set_title(title, fontsize=11, loc='left', color=INK)
         ax.set_xscale('log')
@@ -402,10 +405,8 @@ def segment_tail():
     key(fig, [Line2D([], [], color=colour, lw=2.6, marker=ARM_MARK[arm], ms=6.5,
                      mfc=dark(colour), mec='white', mew=.6, label=name)
               for arm, (name, colour) in ARMS.items()])
-    fig.supxlabel('Predviđeni prema pravom Q(0,999), čist kontekst; grupa od 5 % slučajeva '
-                  'ima 20 puta veću skalu iznosa\nlevo od 1× potcenjivanje, desno '
-                  'precenjivanje; oznaka je medijana, linija interkvartilni raspon '
-                  '(20 ponavljanja)', fontsize=10)
+    fig.supxlabel('Predviđeni prema pravom Q(0,999)\n'
+                  'levo od 1× potcenjivanje, desno precenjivanje', fontsize=10.5)
     save(fig, 'segment_rep', data)
 
 
@@ -420,9 +421,8 @@ def target_transform():
         print('target_transform: a file of 28.10.2026 is missing, figure skipped')
         return
     panels = [('Q', 'predviđeni Q(0,99), medijana preko\ntest slučajeva',
-               '0 % = isto predviđanje kao bez\ndodatog reda, što ne znači tačno'),
-              ('R', 'očekivani gubitak na 0,99', '0 % = isti gubitak; levo manji,\n'
-                                                 'desno veći gubitak')]
+               '0 % = isto predviđanje'),
+              ('R', 'očekivani gubitak na 0,99', '0 % = isti gubitak, levo manji')]
     data = pd.DataFrame([dict(arm=a, measure=m, value=x) for a, _ in Y_ARMS
                          for m, _, _ in panels for x in loss[a][m].to_numpy()])
     fig, axes = plt.subplots(1, 2, figsize=(6.6, 3.3), sharey=True, layout='constrained')
@@ -433,8 +433,7 @@ def target_transform():
     key(fig, [mark('o', ONE, 'ponavljanje, 1 član'),
               mark('s', EIGHT, 'ponavljanje, 8 članova', ms=6),
               mark('D', dark(GREY), 'medijana preko ponavljanja')])
-    fig.supxlabel('Promena prema čistom kontekstu, TabPFN-3; dodat red povećava standardnu '
-                  'devijaciju ciljnih vrednosti konteksta 20 puta', fontsize=10)
+    fig.supxlabel('Promena prema kontekstu bez dodatog reda, TabPFN-3', fontsize=10.5)
     save(fig, 'transformacija_cilja', data)
 
 
@@ -476,9 +475,8 @@ def target_transform_global():
 DOSE_TEXT = {
     'sr': dict(one='1 član', eight='8 članova (podrazumevano)', level='nivo {}', sep=',',
                x='Koliko puta jedan dodat red povećava standardnu devijaciju ciljnih '
-                 'vrednosti konteksta\n(medijana, 40 zadataka; 0 % = isti gubitak kao na '
-                 'čistom kontekstu)',
-               y='Promena očekivanog gubitka prema čistom kontekstu'),
+                 'vrednosti konteksta',
+               y='Promena očekivanog gubitka; 0 % = isti kao na čistom'),
     'en': dict(one='1 member', eight='8 members (default)', level='{} level', sep='.',
                x='Context sd multiplied by one added row (median over 40 tasks)',
                y='Change in expected pinball loss over the clean context'),
