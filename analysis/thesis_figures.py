@@ -1,4 +1,4 @@
-"""Main figures of parts two and three of the thesis, with Serbian labels.
+"""Main figures of the thesis, with Serbian labels.
 
 Run from the repository root: python -m analysis.thesis_figures
 Reads the confirmation outputs of 21 and 22 October 2026, the target-transform test of
@@ -6,7 +6,8 @@ Reads the confirmation outputs of 21 and 22 October 2026, the target-transform t
 values to thesis/figures/, which is not tracked; the dose figure is also drawn with
 English labels into figures/ for the README. A figure whose files are not there yet is
 skipped. TabPFN-3.5 ran on a GPU and every other model on CPU, so a row of 3.5 is
-compared with the others by its medians only.
+compared with the others by its medians only. Two figures are illustrations and not
+results: the experiment with made-up values and the generator's quantile function.
 """
 from pathlib import Path
 
@@ -40,6 +41,8 @@ ARMS = {'raw': ('bez izmene', RAW), 'clip': ('odsecanje', CAP), 'log': ('logarit
 # moves, and grey for the default eight, which stays flat. The red is away from the three
 # repairs' hues; trees stay grey as controls.
 ONE, EIGHT = '#c92a2a', '#8a8a8a'
+# Where four repairs share a row, for print in black and white, each has its own mark.
+ARM_MARK = {'raw': 'D', 'clip': '^', 'log': 'v', 'cclip': 'p'}
 # The conditional cap ran at one member only, on the seeds of the segment run.
 CCLIP_SEG = 'legit_segment_cclip.csv'
 # (label, file in the unit-error confirmation, file in the segment run, model name)
@@ -108,9 +111,15 @@ def repeats(ax, v, i, colour, marker='o'):
                marker=marker, color=colour, alpha=.6, linewidths=0, zorder=3)
 
 
-def median(ax, x, i, colour, s=64):
-    ax.scatter([x], [i], s=s, marker='D', color=dark(colour), edgecolors='white',
+def median(ax, x, i, colour, s=64, marker='D'):
+    ax.scatter([x], [i], s=s, marker=marker, color=dark(colour), edgecolors='white',
                linewidths=.8, zorder=4)
+
+
+def pct(v, sep=','):
+    """A change in percent for a label: one decimal below 10 %, none above."""
+    text = f'{100 * v:+.1f}%' if abs(v) < .1 else f'{100 * v:+.0f}%'
+    return text.replace('.', sep).replace('-', '−')
 
 
 def mark(marker, colour, label, ms=6.5, mew=.6):
@@ -122,6 +131,113 @@ def mark(marker, colour, label, ms=6.5, mew=.6):
 def key(fig, handles, ncol=None):
     fig.legend(handles=handles, loc='outside upper center', ncol=ncol or len(handles),
                handletextpad=.3, columnspacing=1.5)
+
+
+# The experiment with made-up values: five past claims as the context, one of them recorded
+# a hundred times too large and the cap computed on that context by the rule of the runs.
+SCHEME_ROWS = [(34, 55, 1200.0), (51, 81, 640.0), (27, 44, 2300.0), (45, 66, 870.0),
+               (62, 92, 1540.0)]
+SCHEME_BAD, SCHEME_TEST = 2, (39, 70)
+ERROR_BG, ERROR_INK = '#f8dcd6', '#a61e1e'
+CAP_BG = '#d9e7f8'
+
+
+def scheme():
+    """Context, error and repair in one picture: the test cases stay the same."""
+    from common import transforms
+    y = np.array([r[2] for r in SCHEME_ROWS])
+    y_err = y.copy()
+    y_err[SCHEME_BAD] *= 100
+    y_cap, _, _ = transforms.transform('clip', 200, y_err)
+    cap = float(y_cap[SCHEME_BAD])
+    panels = [('izvorni kontekst', y, None), ('greška: jedan iznos ×100', y_err, ERROR_BG),
+              ('posle odsecanja', y_cap, CAP_BG)]
+    fig, ax = plt.subplots(figsize=(6.6, 3.1), layout='constrained')
+    ax.set_xlim(0, 3)
+    ax.set_ylim(-.06, 1.2)
+    ax.axis('off')
+    widths, h = (.27, .25, .36), .11
+    money = lambda v: f'{v:,.0f}'.replace(',', ' ')
+    for k, (title, values, bg) in enumerate(panels):
+        x0 = k + .04
+        edges = x0 + np.concatenate([[0], np.cumsum(widths)])
+        ax.text(x0, 1.13, title, fontsize=11.5, va='bottom')
+        cells = [('starost', 'snaga', 'šteta (€)')]
+        cells += [(str(a), str(b), money(v)) for (a, b, _), v in zip(SCHEME_ROWS, values)]
+        for r, row in enumerate(cells):
+            top = 1.08 - r * h
+            for c, text in enumerate(row):
+                fill, ink = 'white', INK
+                if r == 0:
+                    fill = '#eeeeee'
+                elif c == 2 and r - 1 == SCHEME_BAD and bg is not None:
+                    fill, ink = bg, ERROR_INK if bg == ERROR_BG else dark(CAP, .8)
+                ax.add_patch(plt.Rectangle((edges[c], top - h), widths[c], h, facecolor=fill,
+                                           edgecolor='#bbbbbb', lw=.6))
+                # Headers centred, numbers to the right.
+                ax.text((edges[c] + edges[c + 1]) / 2 if r == 0 else edges[c + 1] - .02,
+                        top - h / 2, text, ha='center' if r == 0 else 'right', va='center',
+                        fontsize=10.5, color=ink)
+        # The test case, the same in all three comparisons.
+        top = .26
+        for c, text in enumerate((*map(str, SCHEME_TEST), '?')):
+            ax.add_patch(plt.Rectangle((edges[c], top - h), widths[c], h, facecolor='#f3f3f3',
+                                       edgecolor='#888888', lw=.6, ls='--'))
+            ax.text(edges[c + 1] - .02, top - h / 2, text, ha='right', va='center',
+                    fontsize=10.5)
+        ax.text(x0, top - h - .02, 'novi test slučaj, predviđa se Q(0,99)', fontsize=9.5,
+                va='top', color=INK)
+        if k < 2:
+            ax.annotate('', xy=(k + 1.02, .7), xytext=(x0 + sum(widths) + .01, .7),
+                        arrowprops=dict(arrowstyle='->', color=INK, lw=.9))
+    ax.text(2.04, .4, 'prag = medijana + 200 robusnih\nstandardnih devijacija = '
+            + money(cap), fontsize=9.5, color=dark(CAP, .8), va='top')
+    ax.text(1.5, -.04, 'Test slučajevi i njihovi stvarni iznosi isti su u sva tri poređenja; '
+            'menja se samo kontekst.', fontsize=10.5, fontstyle='italic', ha='center')
+    data = pd.DataFrame({'age': [r[0] for r in SCHEME_ROWS], 'power': [r[1] for r in SCHEME_ROWS],
+                         'clean': y, 'error': y_err, 'capped': y_cap})
+    save(fig, 'shema_konteksta', data)
+
+
+# Chapter 2: the generator's GPD quantile function when only the scale moves and when only
+# the shape does, over the ranges the generator uses. Not a model result.
+TAIL_RAMP = ('#9db4c8', '#5b7fa0', '#24425e')
+
+
+def tails():
+    """Q(tau) of y | x ~ GPD(xi, s) on a log axis, scale against shape."""
+    from common.generator import XI_HI, XI_LO
+    from common.metrics import gpd_quantile
+    tau = 1 - np.logspace(np.log10(.5), np.log10(.0005), 200)
+    x = -np.log10(1 - tau)
+    xi_mid = XI_LO + (XI_HI - XI_LO) * .5
+    panels = [('skala: svi iznosi srazmerno veći',
+               [(np.exp(.6 * k), .7, f's = {np.exp(.6 * k):.2f}'.replace('.', ','))
+                for k in (-1, 0, 1)]),
+              ('oblik repa: krajnje veliki iznosi izraženiji',
+               [(1.0, xi, f'ξ = {xi:.2f}'.replace('.', ',')) for xi in (XI_LO, xi_mid, XI_HI)])]
+    records = []
+    fig, axes = plt.subplots(1, 2, figsize=(6.5, 2.9), sharey=True, layout='constrained')
+    for ax, (title, curves) in zip(axes, panels):
+        for colour, (sc, xi, label) in zip(TAIL_RAMP, curves):
+            q = sc * gpd_quantile(tau, xi)
+            ax.plot(x, q, color=colour, lw=2)
+            ax.text(x[-1] + .05, q[-1], label, color=dark(colour, .9), fontsize=9.5,
+                    va='center')
+            for level in (.99, .999):
+                ax.scatter([-np.log10(1 - level)], [sc * gpd_quantile(level, xi)], s=20,
+                           color=colour, zorder=3)
+            records += [dict(panel=title, s=sc, xi=xi, tau=t, q=v) for t, v in zip(tau, q)]
+        for level in (.99, .999):
+            ax.axvline(-np.log10(1 - level), color='#cccccc', lw=.6, zorder=0)
+        ax.set_yscale('log')
+        ax.set_xlim(.25, 3.85)
+        ax.set_xticks([np.log10(2), 1, 2, 3], ['0,5', '0,9', '0,99', '0,999'])
+        ax.set_title(title, fontsize=10.5, loc='left', color=INK)
+        ax.grid(axis='y', color='#E4E4E4', lw=.5, zorder=0)
+    axes[0].set_ylabel('kvantil Q(τ), logaritamska osa')
+    fig.supxlabel('nivo kvantila τ; tačke su Q(0,99) i Q(0,999)', fontsize=10.5)
+    save(fig, 'skala_oblik_primer', pd.DataFrame(records))
 
 
 # Part one: scale and shape pair only at the same member count. scale_of_x.csv ran at four
@@ -182,11 +298,13 @@ def scale_shape():
     top = blended_transform_factory(axes[1].transData, axes[1].transAxes)
     axes[1].scatter([oracle], [1], s=46, marker='v', color=INK, transform=top, clip_on=False,
                     zorder=5)
-    key(fig, [mark('o', ONE, 'seme, 1 član'), mark('s', EIGHT, 'seme, 4 člana', ms=6),
-              mark('o', GREY, 'seme, GBM'),
-              mark('|', INK, 'sva semena zajedno', ms=11, mew=2.2),
+    key(fig, [mark('o', ONE, 'ponavljanje, 1 član'),
+              mark('s', EIGHT, 'ponavljanje, 4 člana', ms=6),
+              mark('o', GREY, 'ponavljanje, GBM'),
+              mark('|', INK, 'iz proseka svih ponavljanja', ms=11, mew=2.2),
               mark('v', INK, f'EVT orakl, 2000 redova: {oracle:.0%}')], ncol=3)
-    fig.supxlabel('Udeo prave promene koji predviđanje prati', fontsize=10.5)
+    fig.supxlabel('Udeo prave promene koji predviđanje prati\n100 % = prati celu promenu, '
+                  '0 % = ne prati, negativno = suprotan smer', fontsize=10.5)
     save(fig, 'skala_oblik', data.assign(oracle=oracle))
 
 
@@ -218,12 +336,11 @@ def unit_error():
         rows(ax, labels)
         ax.set_title(name, fontsize=11, loc='left', color=INK)
         ax.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
-    axes[0].text(0, -.2, '← niži gubitak', transform=axes[0].transAxes, fontsize=10,
-                 color=INK)
-    key(fig, [mark('o', RAW, 'tabela, 1 član'), mark('s', RAW, 'tabela, 8 članova', ms=6),
-              mark('D', dark(RAW), 'medijana preko tabela')])
-    fig.supxlabel('Promena gubitka na 0,99 prema izvornom modelu, '
-                  'vidljiva greška jedinice ×100', fontsize=10.5)
+    key(fig, [mark('o', RAW, 'skup podataka, 1 član'),
+              mark('s', RAW, 'skup podataka, 8 članova', ms=6),
+              mark('D', dark(RAW), 'medijana preko skupova')])
+    fig.supxlabel('Promena gubitka na 0,99 prema izvornom modelu, greška ×100 u uticajnom '
+                  'redu\n0 % = isti gubitak; levo manji, desno veći gubitak', fontsize=10.5)
     save(fig, 'greska_jedinice_popravke', data)
 
 
@@ -255,22 +372,26 @@ def segment_tail():
     fig, axes = plt.subplots(1, 2, figsize=(6.6, 4.9), sharey=True, sharex=True,
                              layout='constrained')
     offsets = dict(zip(ARMS, (-.3, -.1, .1, .3)))
-    for ax, part, title in zip(axes, ('out', 'seg'), ('van segmenta', 'u segmentu')):
+    for ax, part, title in zip(axes, ('out', 'seg'),
+                               ('ostali slučajevi', 'grupa sa većim iznosima')):
         for i, label in enumerate(labels):
             for arm, (name, colour) in ARMS.items():
                 r = data[(data.config == label) & (data.arm == arm) & (data.part == part)]
-                if r.empty:
-                    continue
                 y = i + offsets[arm]
+                if r.empty:
+                    # Its lane stays empty, so say why rather than leave a gap.
+                    ax.text(.056, y, 'uslovno odsecanje: nije mereno', fontsize=8.5,
+                            fontstyle='italic', color=dark(colour, .8), va='center')
+                    continue
                 ax.plot([r.q25.item(), r.q75.item()], [y, y], color=colour, lw=2.6,
                         solid_capstyle='round', zorder=3)
-                median(ax, r['median'].item(), y, colour, s=40)
+                median(ax, r['median'].item(), y, colour, s=46, marker=ARM_MARK[arm])
         # The exact quantile is the reference every interval is read against.
         ax.axvline(1, color=INK, lw=1.4, zorder=2)
-        ax.text(1.07, 1.01, '1× = tačan kvantil', fontsize=10, color=INK, va='bottom',
-                transform=blended_transform_factory(ax.transData, ax.transAxes))
+        # Inside the panel, above the first row, where the titles leave it room.
+        ax.text(1.07, -.62, '1× = tačan kvantil', fontsize=10, color=INK, va='center')
         rows(ax, labels)
-        ax.set_ylim(len(labels) - .5, -.6)
+        ax.set_ylim(len(labels) - .5, -.8)
         ax.set_title(title, fontsize=11, loc='left', color=INK)
         ax.set_xscale('log')
         ax.set_xlim(.05, 5)
@@ -278,57 +399,89 @@ def segment_tail():
         ax.xaxis.set_minor_locator(NullLocator())
     # Room between the panels for the reference label of the left one.
     fig.get_layout_engine().set(wspace=.08)
-    key(fig, [Line2D([], [], color=colour, lw=2.6, marker='D', ms=6, mfc=dark(colour),
-                     mec='white', mew=.6, label=name) for name, colour in ARMS.values()])
-    fig.supxlabel('Predviđeni Q(0,999) prema pravom, čist kontekst, segment ×20\n'
-                  'romb je medijana, linija interkvartilni raspon preko 20 semena',
-                  fontsize=10.5)
+    key(fig, [Line2D([], [], color=colour, lw=2.6, marker=ARM_MARK[arm], ms=6.5,
+                     mfc=dark(colour), mec='white', mew=.6, label=name)
+              for arm, (name, colour) in ARMS.items()])
+    fig.supxlabel('Predviđeni prema pravom Q(0,999), čist kontekst; grupa od 5 % slučajeva '
+                  'ima 20 puta veću skalu iznosa\nlevo od 1× potcenjivanje, desno '
+                  'precenjivanje; oznaka je medijana, linija interkvartilni raspon '
+                  '(20 ponavljanja)', fontsize=10)
     save(fig, 'segment_rep', data)
 
 
 def target_transform():
-    """TabPFN-3 at a shift or dose of 20: one member, eight at the default and eight with
-    every member on the untransformed target (rules Y0 to Y3 of 28.10.2026), one dot per
-    seed. Q and R come from the dose design (20 seeds), G from the leverage sweep (5)."""
-    loss, lev = loss_measures(), leverage_measures()
-    if len(loss) < 3 or len(lev) < 3:
+    """TabPFN-3 at a shift of 20: one member, eight at the default and eight with every
+    member on the untransformed target (rules Y0 to Y3 of 28.10.2026), one dot per seed of
+    the dose design (20 seeds): the median predicted Q(0.99) over the test rows and the
+    expected loss. The global change from the leverage sweep (5 seeds) measures the first
+    again on another run and goes to the appendix, `target_transform_global`."""
+    loss = loss_measures()
+    if len(loss) < 3:
         print('target_transform: a file of 28.10.2026 is missing, figure skipped')
         return
-    arms = [('1', '1 član'), ('8', '8 članova'), ('8n', '8 članova,\nbez transformacije cilja')]
-    panels = [('Q', 'Q(0,99) na test redovima'), ('R', 'očekivani gubitak na 0,99'),
-              ('G', 'globalna promena Q(0,99)')]
-    records = []
-    for a, _ in arms:
-        for m, v in (('Q', loss[a]['Q']), ('R', loss[a]['R']), ('G', lev[a][20.0])):
-            records += [dict(arm=a, measure=m, value=x) for x in v.to_numpy()]
-    data = pd.DataFrame(records)
-    fig, axes = plt.subplots(1, 3, figsize=(6.8, 3.1), sharey=True, layout='constrained')
-    colours = {'1': ONE, '8': EIGHT, '8n': EIGHT}
-    for ax, (m, title) in zip(axes, panels):
-        for i, (a, label) in enumerate(arms):
-            v = data[(data.arm == a) & (data.measure == m)].value.to_numpy()
-            assert len(v) and np.isfinite(v).all()
-            repeats(ax, v, i, colours[a], shape(label))
-            median(ax, np.median(v), i, colours[a], s=56)
-        ax.axvline(0, color=INK, lw=.9, zorder=2)
-        rows(ax, [t for _, t in arms], control=False)
+    panels = [('Q', 'predviđeni Q(0,99), medijana preko\ntest slučajeva',
+               '0 % = isto predviđanje kao bez\ndodatog reda, što ne znači tačno'),
+              ('R', 'očekivani gubitak na 0,99', '0 % = isti gubitak; levo manji,\n'
+                                                 'desno veći gubitak')]
+    data = pd.DataFrame([dict(arm=a, measure=m, value=x) for a, _ in Y_ARMS
+                         for m, _, _ in panels for x in loss[a][m].to_numpy()])
+    fig, axes = plt.subplots(1, 2, figsize=(6.6, 3.3), sharey=True, layout='constrained')
+    for ax, (m, title, reference) in zip(axes, panels):
+        y_rows(ax, data[data.measure == m])
         ax.set_title(title, fontsize=10.5, loc='left', color=INK)
-        ax.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
-    key(fig, [mark('o', ONE, 'seme, 1 član'), mark('s', EIGHT, 'seme, 8 članova', ms=6),
-              mark('D', dark(GREY), 'medijana preko semena')])
-    fig.supxlabel('Promena prema čistom kontekstu pri pomeraju 20, TabPFN-3', fontsize=10.5)
+        ax.set_xlabel(reference, fontsize=9.5)
+    key(fig, [mark('o', ONE, 'ponavljanje, 1 član'),
+              mark('s', EIGHT, 'ponavljanje, 8 članova', ms=6),
+              mark('D', dark(GREY), 'medijana preko ponavljanja')])
+    fig.supxlabel('Promena prema čistom kontekstu, TabPFN-3; dodat red povećava standardnu '
+                  'devijaciju ciljnih vrednosti konteksta 20 puta', fontsize=10)
     save(fig, 'transformacija_cilja', data)
+
+
+Y_ARMS = [('1', '1 član'), ('8', '8 članova'), ('8n', '8 članova,\nbez transformacije cilja')]
+Y_COLOURS = {'1': ONE, '8': EIGHT, '8n': EIGHT}
+
+
+def y_rows(ax, d):
+    """One row per arm of the target-transform test, dots per seed and their median."""
+    for i, (a, label) in enumerate(Y_ARMS):
+        v = d[d.arm == a].value.to_numpy()
+        assert len(v) and np.isfinite(v).all()
+        repeats(ax, v, i, Y_COLOURS[a], shape(label))
+        median(ax, np.median(v), i, Y_COLOURS[a], s=56)
+    ax.axvline(0, color=INK, lw=.9, zorder=2)
+    rows(ax, [t for _, t in Y_ARMS], control=False)
+    ax.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+
+
+def target_transform_global():
+    """The appendix check of figure 5.2: per test row the relative change of Q(0.99), its
+    median over the rows, from the leverage sweep at the same shift (5 seeds)."""
+    lev = leverage_measures()
+    if len(lev) < 3:
+        print('target_transform_global: a file of 28.10.2026 is missing, figure skipped')
+        return
+    data = pd.DataFrame([dict(arm=a, measure='G', value=x) for a, _ in Y_ARMS
+                         for x in lev[a][20.0].to_numpy()])
+    fig, ax = plt.subplots(figsize=(4.6, 2.6), layout='constrained')
+    y_rows(ax, data)
+    ax.set_xlabel('Promena Q(0,99) po test slučaju, medijana preko slučajeva\n'
+                  '0 % = isto predviđanje kao bez dodatog reda', fontsize=10)
+    key(fig, [mark('o', ONE, '1 član'), mark('s', EIGHT, '8 članova', ms=6),
+              mark('D', dark(GREY), 'medijana')])
+    save(fig, 'transformacija_cilja_globalno', data)
 
 
 # The dose figure is also drawn in English for the README.
 DOSE_TEXT = {
-    'sr': dict(one='1 član', eight='8 članova (podrazumevano)', level='nivo {}',
-               x='Povećanje standardne devijacije konteksta jednim dodatim redom '
-                 '(medijana, 40 zadataka)',
-               y='Rast očekivanog gubitka prema čistom kontekstu'),
-    'en': dict(one='1 member', eight='8 members (default)', level='{} level',
+    'sr': dict(one='1 član', eight='8 članova (podrazumevano)', level='nivo {}', sep=',',
+               x='Koliko puta jedan dodat red povećava standardnu devijaciju ciljnih '
+                 'vrednosti konteksta\n(medijana, 40 zadataka; 0 % = isti gubitak kao na '
+                 'čistom kontekstu)',
+               y='Promena očekivanog gubitka prema čistom kontekstu'),
+    'en': dict(one='1 member', eight='8 members (default)', level='{} level', sep='.',
                x='Context sd multiplied by one added row (median over 40 tasks)',
-               y='Rise in expected pinball loss over the clean context'),
+               y='Change in expected pinball loss over the clean context'),
 }
 
 
@@ -371,6 +524,11 @@ def dose(lang='sr'):
                 ax.plot(range(len(shifts)), p['median'], lw=2, ms=6,
                         label=style['label'] if r == 0 and c == 0 else None,
                         **{k: v for k, v in style.items() if k != 'label'})
+                # The value at the largest shift, where the two sizes part most.
+                end = p['median'].iloc[-1]
+                ax.annotate(pct(end, text['sep']), (len(shifts) - 1, end), xytext=(6, 0),
+                            textcoords='offset points', va='center', fontsize=9,
+                            color=dark(style['color'], .85))
             ax.axhline(0, color=INK, lw=.9, zorder=0)
             ax.grid(axis='y', color='#E4E4E4', lw=.5, zorder=0)
             # Ticks on whole percents, so the formatter never rounds 2.5% to 2%.
@@ -382,6 +540,7 @@ def dose(lang='sr'):
                 shown = str(level).replace('.', ',') if lang == 'sr' else str(level)
                 ax.set_ylabel(text['level'].format(shown))
         axes[1, 0].set_xticks(range(len(shifts)), ['1×', '4×', '20×', '50×'])
+        axes[1, 0].set_xlim(-.2, len(shifts) - .35)
     fig.legend(loc='outside upper center', ncol=2)
     fig.supxlabel(text['x'], fontsize=10.5)
     fig.supylabel(text['y'], fontsize=10.5)
@@ -411,8 +570,10 @@ def natural():
     # Every model here ran at one member. Red stands for one member only where the count
     # is compared, so the left panel is the raw model in dark grey and the right the cap.
     for ax, panel, colour, title in zip(axes, ('ratio', 'cap'), (RAW, CAP),
-                                        ('najveća šteta zadržana prema uklonjenoj',
-                                         'odsecanje prema bez izmene')):
+                                        ('a) Q(0,99) sa najvećim iznosom u\n'
+                                         'kontekstu prema Q(0,99) bez njega',
+                                         'b) promena gubitka na 0,99 posle\n'
+                                         'odsecanja konteksta')):
         for i, m in enumerate(models):
             v = data[(data.panel == panel) & (data.model == m)].value.to_numpy()
             c = colour if m in TFM else GREY
@@ -426,21 +587,29 @@ def natural():
     axes[0].set_xlim(.3, 3.3)
     axes[0].set_xticks([.5, 1, 2, 3], ['0,5×', '1×', '2×', '3×'])
     axes[0].xaxis.set_minor_locator(NullLocator())
-    axes[0].set_xlabel('Q(0,99), pomeraj ≥4\n5 poduzoraka', fontsize=10)
+    axes[0].set_xlabel('5 poduzoraka; najveći iznos bar 4 puta\npovećava standardnu '
+                       'devijaciju konteksta\n1× = isto predviđanje', fontsize=9.5)
     axes[1].axvline(0, color=INK, lw=.9, zorder=2)
     axes[1].set_xlim(-1, .3)
     axes[1].xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
-    axes[1].set_xlabel('gubitak na 0,99, pomeraj ≥2\n10 poduzoraka', fontsize=10)
+    axes[1].set_xlabel('10 poduzoraka; najveći iznos bar 2 puta\npovećava standardnu '
+                       'devijaciju konteksta\n0 % = isti gubitak, levo manji', fontsize=9.5)
+    # The panels select their subsamples differently, so they stand apart.
+    fig.get_layout_engine().set(wspace=.12)
     key(fig, [mark('o', RAW, 'poduzorak, 1 član'),
               mark('D', dark(RAW), 'medijana preko poduzoraka')])
+    fig.supxlabel('freMTPL2sev, iznos po polisi; b obuhvata poduzorke iz a i još pet sa manjim povećanjem', fontsize=10.5)
     save(fig, 'prirodni_ekstremi', data)
 
 
 if __name__ == '__main__':
+    scheme()
+    tails()
     scale_shape()
     unit_error()
     segment_tail()
     target_transform()
+    target_transform_global()
     natural()
     dose()
     dose('en')

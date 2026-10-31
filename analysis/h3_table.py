@@ -10,7 +10,8 @@ beside it. With p the share of contexts carrying such an error, the arm pays whe
 
     D0 > 0 > D1   pays above  p* = D0 / (D0 - D1)
     D0 < 0 < D1   pays below  p* = -D0 / (D1 - D0)   (the inverse case of TODO P2)
-    both <= 0     pays at every p;   both >= 0   never;   both exactly 0   no effect.
+    both < 0      pays at every p;   D0 = 0 > D1   at every p above 0, the clean context
+                  being untouched;   both >= 0   never;   both exactly 0   no effect.
 
 The worst repeat on the clean context is the largest relative rise, so a median does not
 hide it. Writes thesis/figures/tabela_6_4.csv, and for \\input the bodies of the cost and
@@ -44,8 +45,13 @@ def regime(d0, d1):
     # A cap that fires on no context reuses raw's prediction, so both differences are 0.
     if d0 == 0 and d1 == 0:
         return "none", np.nan
-    if d0 <= 0 and d1 <= 0:
+    if d0 < 0 and d1 < 0:
         return "always", np.nan
+    # At p = 0 nothing changes, so the gain holds only once an error can occur.
+    if d0 == 0 and d1 < 0:
+        return "positive", np.nan
+    if d0 < 0 and d1 == 0:
+        return "below", 1.0
     if d0 >= 0 and d1 >= 0:
         return "never", np.nan
     if d0 > 0:
@@ -96,8 +102,8 @@ def rows():
 LABELS = {"TabPFN-3, 1": "TabPFN-3, 1 član", "TabPFN-3, 8": "TabPFN-3, 8 članova",
           "TabPFN-3.5, 1": "TabPFN-3.5, 1 član", "TabPFN-3.5, 8": "TabPFN-3.5, 8 članova",
           "TabICLv2, 1": "TabICLv2, 1 član", "GBM, 1": "GBM (kontrola)"}
-ARMS = {"clip": "Odsecanje", "log": "Logaritam", "cclip": "Uslovno odsecanje"}
-PAYS = ["always", "above", "never", "none"]
+ARMS = {"clip": "odsecanje", "log": "logaritam", "cclip": "uslovno odsecanje"}
+PAYS = ["always", "positive", "above", "never", "none"]
 
 
 def pc(v):
@@ -113,7 +119,8 @@ def p(v):
 
 # Header of the cost and benefit tables: what every number is and which way is better.
 LOSS = r"Promena gubitka u \%, negativna vrednost je manji gubitak"
-WHEN = {"always": r"za svako $p$", "never": r"ni za jedno $p$", "none": "bez razlike"}
+WHEN = {"always": r"za svako $p$", "positive": r"za svako $p > 0$",
+        "never": r"ni za jedno $p$", "none": "bez razlike"}
 
 
 def group(name, cols, first):
@@ -123,42 +130,52 @@ def group(name, cols, first):
 
 
 def latex(t, out):
-    """The cost and benefit table of chapter 6 summarised over the five tables, the
-    break-even table beside it and one table per repair for appendix C."""
+    """The cost and benefit table of chapter 6 summarised over the five tables, by
+    configuration so its repairs stand together, the break-even table beside it and one
+    table per repair for appendix C, where the repair is the question."""
     assert not (t.pays == "below").any(), "the inverse case appeared; add a column for it"
     body = [r"\begin{tabular}{@{}l r r r r@{}}", r"\toprule",
             f"& \\multicolumn{{4}}{{c}}{{{LOSS}}} \\\\", r"\cmidrule(l){2-5}",
-            r"& \multicolumn{2}{c}{Čist kontekst} & \multicolumn{2}{c}{Greška jedinice $\times 100$}"
-            r" \\", r"\cmidrule(lr){2-3}\cmidrule(l){4-5}",
-            r"Konfiguracija & medijana & najveći rast & nasumičan red & vidljiv red \\"]
-    # Fixed widths, so the long header sits over the four counts and not over the last.
-    pays = [r"\begin{tabular}{@{}l *{4}{>{\centering\arraybackslash}p{2.4cm}}@{}}",
-            r"\toprule",
-            r"& \multicolumn{4}{c}{Broj tabela (od pet) na kojima korekcija smanjuje"
-            r" očekivani gubitak} \\", r"\cmidrule(l){2-5}",
-            r"Konfiguracija & za svako $p$ & za $p > p^\ast$ ($p^\ast$) & ni za jedno $p$"
-            r" & bez razlike \\"]
+            r"& \multicolumn{2}{c}{Čist kontekst} & \multicolumn{2}{c}{Greška $\times 100$ u"
+            r" jednom redu} \\", r"\cmidrule(lr){2-3}\cmidrule(l){4-5}",
+            r"Konfiguracija i korekcija & medijana & najgore ponavljanje & nasumičan red"
+            r" & uticajan red \\"]
+    # Fixed widths, so the long header sits over the counts and not over the last; the
+    # p* column is the wide one, for up to three thresholds on a line.
+    c = r">{\centering\arraybackslash}p{%scm}"
+    pays = [r"\begin{tabular}{@{}l " + "".join(c % w for w in (1.6, 1.6, 3.1, 1.8, 1.6))
+            + "@{}}", r"\toprule",
+            r"& \multicolumn{5}{>{\centering\arraybackslash}p{10.6cm}}{Broj skupova podataka"
+            r" (od pet) prema udelu $p$ za koji korekcija smanjuje očekivani gubitak} \\",
+            r"\cmidrule(l){2-6}",
+            r"Konfiguracija & za svako $p$ & za svako $p > 0$ & za $p > p^\ast$ ($p^\ast$)"
+            r" & ni za jedno $p$ & bez razlike \\"]
+    for i, (cfg, g) in enumerate(t.groupby("config", sort=False)):
+        body += ([r"\midrule"] if i == 0 else []) + group(LABELS[cfg], 5, i == 0)
+        for arm, name in ARMS.items():
+            a = g[g.arm == arm]
+            if len(a):
+                body.append(" & ".join([r"\hspace{1em}" + name, pc(a.clean_median.median()),
+                                        pc(a.clean_worst.max()), pc(a.random_median.median()),
+                                        pc(a.visible_median.median())]) + r" \\")
     for arm, name in ARMS.items():
         part = t[t.arm == arm]
-        body += [r"\midrule", *group(name, 5, True)]
-        pays += [r"\midrule", *group(name, 5, True)]
+        pays += [r"\midrule", *group(name[0].upper() + name[1:], 6, True)]
         full = [r"\begin{tabular}{@{}l r r r r r r l@{}}", r"\toprule",
                 f"& \\multicolumn{{6}}{{c}}{{{LOSS}}} & \\\\", r"\cmidrule(lr){2-7}",
                 r"& \multicolumn{3}{c}{Čist kontekst} & \multicolumn{2}{c}{Nasumičan red}"
-                r" & \multicolumn{1}{c}{Vidljiv red} & Korekcija \\",
+                r" & \multicolumn{1}{c}{Uticajan red} & Korekcija \\",
                 r"\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(lr){7-7}",
-                r"Tabela & medijana & prosek & najveći rast & medijana & prosek & medijana"
+                r"Skup podataka & medijana & prosek & najgore & medijana & prosek & medijana"
                 r" & se isplati \\", r"\midrule"]
         for i, (cfg, g) in enumerate(part.groupby("config", sort=False)):
             n = g.pays.value_counts()
-            body.append(" & ".join([LABELS[cfg], pc(g.clean_median.median()),
-                                    pc(g.clean_worst.max()), pc(g.random_median.median()),
-                                    pc(g.visible_median.median())]) + r" \\")
             above = str(n.get("above", 0))
             if n.get("above", 0):
                 above += " (" + "; ".join(p(v) for v in sorted(g.p_star.dropna())) + ")"
-            pays.append(" & ".join([LABELS[cfg], str(n.get("always", 0)), above,
-                                    str(n.get("never", 0)), str(n.get("none", 0))]) + r" \\")
+            pays.append(" & ".join([LABELS[cfg], str(n.get("always", 0)),
+                                    str(n.get("positive", 0)), above, str(n.get("never", 0)),
+                                    str(n.get("none", 0))]) + r" \\")
             full += group(LABELS[cfg], 8, i == 0)
             for r in g.itertuples():
                 when = WHEN.get(r.pays) or f"za $p > {p(r.p_star)}$"
@@ -186,7 +203,8 @@ def main():
               " and when it pays")
         part = t[t.arm == arm]
         for (cfg, table), r in part.set_index(["config", "table"]).iterrows():
-            when = {"always": "always", "never": "never", "none": "no effect",
+            when = {"always": "always", "positive": "for every p > 0", "never": "never",
+                    "none": "no effect",
                     "above": f"if p > {r.p_star:.2f}", "below": f"if p < {r.p_star:.2f}"}[r.pays]
             print(f"  {cfg:13s} {table:16s} {pct(r.clean_median):>7} {pct(r.clean_worst):>7}"
                   f" {pct(r.random_median):>7} {pct(r.visible_median):>7}   {when}")
